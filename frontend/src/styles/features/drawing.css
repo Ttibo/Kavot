@@ -1,0 +1,127 @@
+.modal.modal-wide.modal-drawing { width: calc(100vw - 24px); max-width: 1800px; height: calc(100dvh - var(--titlebar-height) - 24px); max-height: 1200px; overflow: hidden; border-radius: 14px; }
+.modal-drawing #modal-content { height: 100%; }
+.modal-drawing .modal-close { top: 18px; right: 16px; }
+.drawing-editor { position: relative; display: flex; flex-direction: column; height: 100%; min-height: 0; background: var(--surface); color: var(--ink); }
+.drawing-editor *, .drawing-editor *::before, .drawing-editor *::after { box-sizing: border-box; }
+.drawing-editor [hidden] { display: none !important; }
+.drawing-editor button, .drawing-editor input, .drawing-editor select, .drawing-editor textarea { font: inherit; }
+.drawing-editor button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border: 1px solid transparent; border-radius: 6px; padding: 7px 9px; background: transparent; color: var(--ink); font-size: 12px; cursor: pointer; }
+.drawing-editor button:hover { background: var(--hover); }
+.drawing-editor button:focus-visible, .drawing-editor summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.drawing-editor button[aria-pressed='true'] { background: var(--accent-soft); color: var(--accent); border-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+.drawing-editor button:disabled { opacity: .35; cursor: default; }
+.drawing-editor label { display: flex; flex-direction: column; gap: 6px; min-width: 0; color: var(--muted); font-size: 11px; }
+.drawing-editor input:not([type='checkbox']), .drawing-editor select, .drawing-editor textarea { min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 7px; color: var(--ink); background: var(--surface); font-size: 12px; }
+.drawing-editor input:focus, .drawing-editor textarea:focus, .drawing-editor select:focus { outline: 2px solid var(--focus-ring); border-color: var(--accent); }
+.drawing-editor input[type='checkbox'] { accent-color: var(--accent); }
+.drawing-editor input[type='color'] { padding: 3px; height: 31px; width: 100%; }
+.drawing-topbar { display: flex; flex: none; align-items: center; gap: 14px; min-height: 76px; padding: 12px 64px 10px 18px; }
+.drawing-app-icon { display: grid; place-items: center; flex: none; width: 40px; height: 44px; border-radius: 10px; background: #fff1d8; color: #b76c12; }
+.drawing-app-icon svg { width: 25px; height: 25px; }
+.drawing-document-heading { flex: 1; min-width: 0; }
+.drawing-document-heading h2 { margin: 0 0 4px; color: var(--subtle); font-size: 10px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
+.drawing-document-heading input { width: min(480px, 100%); padding: 3px 0 !important; border-color: transparent !important; background: transparent !important; font-size: 19px !important; font-weight: 550; }
+.drawing-document-heading input:focus { padding-left: 6px !important; }
+.drawing-editor [data-drawing-status] { color: var(--muted); font-size: 11px; max-width: 200px; text-align: left; }
+.drawing-editor [data-drawing-done] { background: var(--accent); color: #fff; min-width: 74px; min-height: 36px; padding-inline: 18px; }
+.drawing-menubar { position: relative; z-index: 6; display: flex; flex: none; align-items: center; gap: 4px; padding: 0 16px 8px; }
+.drawing-menubar details { position: relative; }
+.drawing-menubar summary { list-style: none; padding: 6px 10px; border-radius: 5px; font-size: 12px; cursor: pointer; }
+.drawing-menubar summary::-webkit-details-marker { display: none; }
+.drawing-menubar details[open] summary, .drawing-menubar summary:hover { background: var(--hover); }
+.drawing-menu { position: absolute; top: calc(100% + 5px); left: 0; z-index: 10; display: flex; flex-direction: column; width: 260px; max-height: min(660px, 65vh); overflow-y: auto; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-raised); padding: 7px; box-shadow: var(--shadow); }
+.drawing-menu button { justify-content: space-between; flex: none; padding: 9px 10px; }
+.drawing-menu kbd { color: var(--subtle); font: 10px sans-serif; }
+.drawing-menu label { flex-direction: row; align-items: center; padding: 9px; color: var(--ink); font-size: 12px; }
+.drawing-menu-section { border-top: 1px solid var(--line); margin: 5px 0; padding: 10px 10px 2px; color: var(--subtle); font-size: 10px; text-transform: uppercase; letter-spacing: .07em; }
+.drawing-menu-section:first-child { border: 0; margin: 0; }
+.drawing-menu-hint { margin-left: auto; padding-right: 6px; color: var(--subtle); font-size: 10px; }
+.drawing-toolbar { position: relative; z-index: 3; display: flex; flex: none; align-items: center; flex-wrap: wrap; gap: 4px; margin: 0 12px 10px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+.drawing-tool-group { display: flex; flex: none; align-items: center; gap: 3px; border-right: 1px solid var(--line-strong); padding-right: 8px; margin-right: 4px; }
+.drawing-toolbar button { min-height: 32px; min-width: 30px; padding: 6px; }
+.drawing-toolbar .drawing-tool-caption { display: none; }
+.drawing-toolbar select { height: 30px; border-color: transparent; padding: 4px; background: transparent; font-size: 11px; max-width: 98px; }
+.drawing-toolbar-color { position: relative; width: 35px; height: 32px; align-items: center; gap: 0 !important; }
+.drawing-toolbar-color span { font-size: 8px; line-height: 10px; }
+.drawing-toolbar-color input[type='color'] { width: 29px; height: 20px; border: 0; padding: 1px; background: transparent; cursor: pointer; }
+.drawing-workspace { display: grid; grid-template-columns: minmax(0, 1fr) 260px; flex: 1; min-height: 0; border-top: 1px solid var(--line); }
+.drawing-paper { display: flex; min-width: 0; min-height: 0; overflow: auto; padding: 36px; background: color-mix(in srgb, var(--canvas-deep) 65%, var(--surface-soft)); overscroll-behavior: contain; }
+.drawing-paper canvas { display: block; flex: none; margin: auto; align-self: flex-start; touch-action: none; background-color: #fff; background-image: linear-gradient(45deg, #f1f1f1 25%, transparent 25%), linear-gradient(-45deg, #f1f1f1 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #f1f1f1 75%), linear-gradient(-45deg, transparent 75%, #f1f1f1 75%); background-size: 16px 16px; background-position: 0 0, 0 8px, 8px -8px, -8px 0; box-shadow: 0 2px 12px #0000001a; outline: 1px solid #cbd5e1; }
+.drawing-paper canvas:focus { outline-color: #94a3b8; }
+.drawing-inspector { min-height: 0; overflow-y: auto; border-left: 1px solid var(--line); padding: 18px 16px; background: var(--surface); }
+.drawing-inspector-heading { margin-bottom: 16px; }
+.drawing-inspector-heading h3 { font-size: 13px; margin: 0 0 7px; }
+.drawing-inspector-heading span { color: var(--subtle); font-size: 11px; text-transform: capitalize; }
+.drawing-inspector details { border-top: 1px solid var(--line); padding: 12px 0; }
+.drawing-inspector summary { font-size: 12px; font-weight: 600; cursor: pointer; margin-bottom: 12px; }
+.drawing-inspector details:not([open]) summary { margin-bottom: 0; }
+.drawing-inspector details > label { margin-top: 12px; }
+.drawing-property-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 10px; margin-top: 12px; }
+.drawing-property-grid input, .drawing-property-grid select { width: 100%; }
+.drawing-inspector .drawing-check { flex-direction: row; align-items: center; gap: 7px; margin-top: 12px; }
+.drawing-inspector textarea { width: 100%; min-height: 70px; resize: vertical; line-height: 1.6; }
+.drawing-text-buttons { display: flex; margin-top: 10px; gap: 5px; }
+.drawing-text-buttons button { width: 32px; border-color: var(--line); }
+.drawing-editor footer { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 14px; border-top: 1px solid var(--line); background: var(--surface); }
+.drawing-help { color: var(--subtle); font-size: 10px; line-height: 1.6; }
+.drawing-footer-actions { display: flex; flex: none; gap: 4px; }
+.drawing-footer-actions button { font-size: 10px; padding: 6px 8px; }
+.drawing-popover { position: absolute; z-index: 8; top: 158px; left: 190px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-raised); box-shadow: var(--shadow); }
+.drawing-shape-picker { width: min(510px, calc(100% - 30px)); padding: 16px; }
+.drawing-shape-picker header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.drawing-shape-picker strong { font-size: 13px; }
+.drawing-shape-picker strong small { margin-left: 7px; color: var(--subtle); font-size: 10px; font-weight: 400; }
+.drawing-shape-picker input { width: 100%; min-height: 36px; }
+.drawing-shape-categories { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0; }
+.drawing-shape-categories button { font-size: 10px; padding: 6px 9px; }
+.drawing-shape-grid { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 6px; max-height: min(430px, 46vh); overflow-y: auto; padding: 3px; }
+.drawing-shape-grid button { display: flex; flex-direction: column; align-items: center; justify-content: flex-start; padding: 9px 3px; gap: 8px; border-color: var(--line); min-width: 0; }
+.drawing-shape-grid svg { width: 31px; height: 31px; flex: none; }
+.drawing-shape-grid span { font-size: 9px; line-height: 1.3; }
+.drawing-line-picker { left: 400px; display: flex; flex-direction: column; width: 240px; padding: 8px; }
+.drawing-line-picker button { justify-content: flex-start; padding: 10px; }
+.drawing-line-picker p { margin: 8px; color: var(--subtle); font-size: 10px; line-height: 1.6; }
+.canvas-node-drawing .canvas-node-content { padding: 0; background-color: #f8fafc; background-image: linear-gradient(45deg, #e8edf5 25%, transparent 25%), linear-gradient(-45deg, #e8edf5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e8edf5 75%), linear-gradient(-45deg, transparent 75%, #e8edf5 75%); background-size: 18px 18px; background-position: 0 0, 0 9px, 9px -9px, -9px 0; }
+.canvas-node-drawing .canvas-node-content img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+.drawing-note-pane { display: flex; flex: 1; min-height: 0; flex-direction: column; padding: 22px; gap: 18px; background: var(--surface); }
+.drawing-note-pane > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.drawing-note-pane > header > div { display: flex; align-items: center; gap: 11px; min-width: 0; }
+.drawing-note-pane header > div > span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; color: #b76c12; background: #fff1d8; }
+.drawing-note-pane h2 { margin: 2px 0 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.drawing-note-pane small { color: var(--muted); font-size: 11px; }
+.drawing-note-preview { display: grid; place-items: center; flex: 1; min-height: 200px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background-color: #f8fafc; background-image: linear-gradient(45deg, #e8edf5 25%, transparent 25%), linear-gradient(-45deg, #e8edf5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e8edf5 75%), linear-gradient(-45deg, transparent 75%, #e8edf5 75%); background-size: 18px 18px; background-position: 0 0, 0 9px, 9px -9px, -9px 0; cursor: pointer; }
+.drawing-note-preview img { display: block; width: min(100%, 1200px); max-height: 100%; object-fit: contain; }
+.workspace-drawing-label { color: #b76c12; font-weight: 700; }
+@media (max-width: 1100px) { .drawing-menu-hint { display: none; } .drawing-help { max-width: 220px; } }
+@media (max-width: 760px) {
+  .modal.modal-wide.modal-drawing { width: 100vw; height: calc(100dvh - var(--titlebar-height)); max-height: none; border-radius: 0; }
+  .drawing-topbar { gap: 8px; padding-left: 12px; }
+  .drawing-app-icon { display: none; }
+  .drawing-document-heading input { font-size: 16px !important; }
+  .drawing-topbar [data-drawing-status] { display: none; }
+  .drawing-toolbar { gap: 5px; margin: 0 8px 8px; }
+  .drawing-tool-group { padding-right: 5px; margin-right: 0; }
+  .drawing-workspace { grid-template-columns: 1fr; grid-template-rows: minmax(300px, 50vh) auto; overflow-y: auto; }
+  .drawing-paper { padding: 20px; }
+  .drawing-inspector { overflow: visible; border-left: 0; border-top: 1px solid var(--line); }
+  .drawing-inspector > details { display: block; }
+  .drawing-popover { left: 12px; top: 195px; }
+  .drawing-shape-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .drawing-editor footer { padding: 6px 8px; }
+  .drawing-help { display: none; }
+  .drawing-footer-actions { width: 100%; overflow-x: auto; }
+  .drawing-footer-actions button { flex: none; }
+  .drawing-menu { position: fixed; top: 110px; left: 12px; }
+}
+
+/* Render only the viewport of the infinite drawing surface. */
+.drawing-paper { position: relative; overflow: hidden; padding: 0; }
+.drawing-paper canvas { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; box-shadow: none; outline: none; }
+/* Drawing notes edit in their tab: the studio fills the pane, with a slimmer header. */
+.drawing-note-pane.drawing-inline-host { padding: 0; gap: 0; }
+.drawing-editor-inline { flex: 1; height: 100%; }
+.drawing-editor-inline .drawing-topbar { min-height: 0; padding: 6px 12px; gap: 10px; }
+.drawing-editor-inline .drawing-app-icon { width: 26px; height: 26px; border-radius: 6px; }
+.drawing-editor-inline .drawing-app-icon svg { width: 16px; height: 16px; }
+.drawing-editor-inline .drawing-document-heading h2 { display: none; }
+.drawing-editor-inline .drawing-document-heading input { font-size: 14px !important; }

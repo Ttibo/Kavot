@@ -1,0 +1,24 @@
+.workspace-data-table { border: 1px solid var(--line, #e2e5e6); border-radius: 12px; background: var(--surface, #fff); min-width: 0; overflow: visible; }
+.workspace-table-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--line, #e2e5e6); }
+.workspace-table-count { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; margin-right: auto; }
+.workspace-table-tools input[type=search] { width: 180px; max-width: 100%; background: var(--surface-alt); border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; color: var(--ink); }
+.workspace-table-tools button, .workspace-table-tools summary { border: 0; background: transparent; color: var(--muted); font: inherit; font-size: 12px; cursor: pointer; padding: 6px; }
+.workspace-table-tools button[aria-pressed=true] { color: var(--accent); background: var(--accent-soft); border-radius: 5px; }
+.workspace-table-tools details { position: relative; }
+.workspace-table-tools details > div { position: absolute; z-index: 20; right: 0; top: 30px; min-width: 170px; padding: 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface, #fff); box-shadow: 0 8px 30px #0002; }
+.workspace-table-tools label { display: flex; gap: 8px; padding: 5px; }
+.workspace-table-scroll { overflow-x: auto; border-radius: 0 0 12px 12px; }
+.workspace-data-table table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+.workspace-data-table caption.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.workspace-data-table th { background: var(--surface-alt, #f5f6f7); font-size: 11px; letter-spacing: .03em; color: var(--muted); white-space: nowrap; }
+.workspace-data-table th button { background: transparent; color: inherit; border: 0; font: inherit; padding: 0; cursor: pointer; }
+.workspace-data-table th, .workspace-data-table td { padding: 14px 18px; border-bottom: 1px solid var(--line, #e2e5e6); }
+.workspace-data-table td:first-child { min-width: 170px; font-weight: 550; }
+.workspace-data-table td { max-width: 400px; overflow-wrap: anywhere; }
+.workspace-data-table tbody tr:hover { background: var(--accent-soft, #edf7f9); }
+.workspace-data-table tbody tr:last-child td { border-bottom: 0; }
+.workspace-data-table.compact td { padding-top: 7px; padding-bottom: 7px; }
+.workspace-table-empty { padding: 24px; color: var(--muted); text-align: center; }
+.workspace-data-table .text-link { text-align: left; }
+.project-table-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.research-resource-panel > .workspace-data-table { border: 0; }

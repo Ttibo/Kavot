@@ -1,0 +1,16 @@
+.agent-live-body { display: flex; flex-direction: column; gap: 18px; padding: 16px; }
+.agent-live-body p { font-size: 12px; line-height: 1.5; }
+.agent-live-body details { margin-top: 12px; }
+.agent-live-body summary { cursor: pointer; font-size: 12px; font-weight: 600; }
+.agent-live-body input:not([type=checkbox]) { width: 100%; margin: 8px 0; }
+.agent-resource-list { max-height: 210px; overflow: auto; margin: 8px 0; }
+.agent-resource-list label { display: flex; align-items: flex-start; gap: 8px; padding: 7px 0; font-size: 12px; overflow-wrap: anywhere; }
+.agent-resource-list small { display: block; color: var(--muted); }
+.agent-messages { display: grid; gap: 12px; }
+.agent-message { padding: 12px; border: 1px solid var(--line); border-radius: 9px; font-size: 12px; }
+.agent-message.user { background: var(--surface-soft); }
+.agent-message > div { white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.6; margin-top: 8px; }
+.agent-error { color: #ce654f; }
+.agent-live-body input:not([type=checkbox]) { border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.agent-live-body button { border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px; background: var(--surface); color: var(--ink); cursor: pointer; font-size: 12px; }
+.agent-live-body button:hover { background: var(--surface-soft); }

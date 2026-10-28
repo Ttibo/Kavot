@@ -1,0 +1,30 @@
+/* Preferences override fixed sizes only in the area explicitly customized. */
+html[data-font-interface] :is(.button, .settings-tabs button, .settings-card, .settings-card p, .settings-card label, .form-field, .modal-body label, .collection-controls label, .context-menu button, .editor-context-item button),
+html[data-font-interface] :is(.settings-page, .modal, .collection-controls) :is(input, select, textarea) { font-size: var(--font-interface) !important; }
+html[data-font-navigation] :is(.research-sidebar .nav-copy strong, .research-sidebar .sidebar-collection-item strong, .sidebar-project, .workspace-tab strong, .workspace-file-label strong, .project-view-tabs > button) { font-size: var(--font-navigation) !important; }
+html[data-font-navigation] :is(.workspace-tab, .workspace-file-row, .project-view-tabs > button) { min-height: calc(var(--font-navigation) + 16px); height: auto; }
+html[data-font-titles] :is(.page-header, .registry-header, .library-page-header, .database-header, .code-header, .resources-hero, .project-hero, .project-header, .dashboard-header) h1 { font-size: var(--font-titles) !important; }
+html[data-font-editor] :is(.continuous-editor .cm-editor, .continuous-editor .cm-scroller, .continuous-editor .continuous-reading, .markdown-preview, .markdown-block-render, .markdown-block-input, .relational-note-content) { font-size: var(--font-editor) !important; }
+html[data-font-editor] :is(.continuous-reading, .markdown-preview, .markdown-block-render, .relational-note-content) h1 { font-size: 2em; }
+html[data-font-editor] :is(.continuous-reading, .markdown-preview, .markdown-block-render, .relational-note-content) h2 { font-size: 1.6em; }
+html[data-font-editor] :is(.continuous-reading, .markdown-preview, .markdown-block-render, .relational-note-content) h3 { font-size: 1.3em; }
+html[data-font-tables] :is(.workspace-data-table, .review-data-table, .library-table, .data-table) :is(th, td, input, button),
+html[data-font-tables] :is(.collection-item-row strong, .collection-item-row small, .task-list-title strong, .task-list-title small, .resource-card h3) { font-size: var(--font-tables) !important; }
+html[data-font-assistant] .agent-panel :is(.markdown-preview, .assistant-message, .agent-message, textarea, .chat-message, .message-content) { font-size: var(--font-assistant) !important; }
+.typography-settings fieldset { border: 0; padding: 0; margin: 18px 0; display: grid; gap: 14px; min-width: 0; }
+.typography-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto 50px; gap: 12px; align-items: center; }
+.typography-setting small { display: block; margin-top: 4px; color: var(--muted); }
+.typography-setting select { padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); }
+.typography-preview { text-align: center; overflow-wrap: anywhere; }
+@media (max-width: 540px) { .typography-setting { grid-template-columns: minmax(0, 1fr) auto; } .typography-preview { display: none; } }
+
+/* Colors (Settings → General). */
+.color-roles { display: grid; gap: 10px; margin-bottom: 14px; }
+.color-role { display: grid; grid-template-columns: minmax(0, 1fr) 44px auto; gap: 12px; align-items: center; }
+.color-role small { display: block; margin-top: 4px; color: var(--muted); }
+.color-settings input[type="color"] { width: 44px; height: 30px; padding: 2px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); cursor: pointer; }
+.color-settings .color-palette-title { margin-top: 24px; }
+.color-palette { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 14px; }
+.color-swatch { position: relative; }
+.color-swatch button { position: absolute; top: -7px; right: -7px; display: none; width: 18px; height: 18px; padding: 0; border: 1px solid var(--line); border-radius: 50%; background: var(--surface); color: var(--muted); font-size: 12px; line-height: 1; cursor: pointer; }
+.color-swatch:hover button:not(:disabled), .color-swatch:focus-within button:not(:disabled) { display: grid; place-items: center; }

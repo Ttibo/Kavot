@@ -1,0 +1,27 @@
+.external-agent-settings { margin-top: 28px; }
+.external-agent-settings > header { margin-bottom: 14px; }
+.external-engine-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.external-engine-card { display: flex; flex-direction: column; gap: 10px; }
+.external-engine-card h4, .external-engine-card p { margin: 0; }
+.external-engine-card p, .external-engine-card small { color: var(--muted); line-height: 1.5; }
+.external-engine-card label:not(.llm-checkbox) { display: grid; gap: 5px; font-size: 12px; }
+.external-engine-card input:not([type=checkbox]), .external-engine-card select { width: 100%; min-width: 0; border: 1px solid var(--line); border-radius: 6px; padding: 8px; background: var(--surface); color: var(--ink); font: inherit; }
+.external-engine-heading { display: flex; justify-content: space-between; gap: 8px; align-items: start; }
+.external-engine-heading > div { display: grid; gap: 3px; }
+.external-engine-heading .llm-checkbox { white-space: nowrap; }
+.external-engine-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.external-engine-log { margin: 0; max-height: 140px; overflow: auto; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--muted); font-size: 11px; line-height: 1.45; white-space: pre-wrap; overflow-wrap: anywhere; }
+.external-agent-body { min-height: 0; overflow-y: auto; }
+.external-context-actions { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.external-context-actions button, .external-upload { border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; background: var(--surface); color: var(--ink); font-size: 12px; cursor: pointer; }
+.external-upload input { display: none; }
+.external-file-picker input[type=text], .external-file-picker > input { width: 100%; padding: 7px; border: 1px solid var(--line); background: var(--surface); color: var(--ink); }
+.external-event { border-left: 2px solid var(--line); padding: 5px 8px; background: var(--surface); font-size: 11px; }
+.external-event.tool { border-color: var(--accent); }
+.external-event.error { border-color: #c44747; }
+.external-event pre { white-space: pre-wrap; overflow-wrap: anywhere; margin: 4px 0 0; font: inherit; color: var(--muted); }
+.external-model-picker { display: grid; gap: 7px; }
+.external-model-picker > button { justify-self: start; font-size: 11px; }
+.external-proposals article { display: grid; gap: 7px; border: 1px solid var(--line); padding: 10px; border-radius: 8px; margin-bottom: 8px; }
+.external-proposals article > div { display: flex; flex-wrap: wrap; gap: 6px; }
+.external-proposals small { color: var(--muted); overflow-wrap: anywhere; }

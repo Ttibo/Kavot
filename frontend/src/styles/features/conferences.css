@@ -1,0 +1,20 @@
+.registry-header { display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; margin-bottom: 12px; }
+.registry-header .eyebrow { color: var(--accent); font-size: 9px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
+.registry-header h1 { margin: 3px 0; font-size: clamp(24px, 3vw, 34px); letter-spacing: -.045em; }.registry-header p { margin: 0; color: var(--muted); font-size: 11px; }.status-submitted, .status-requested { background: #fff3df; color: #9b620d; }.status-accepted, .status-available { background: #e3f5ef; color: #117565; }.status-rejected, .status-restricted { background: #fdeaea; color: #a94444; }
+.registry-fieldset { min-width: 0; margin: 0; border: 1px solid var(--line); border-radius: 11px; padding: 10px; }.registry-fieldset legend { padding: 0 5px; color: var(--muted); font-size: 10px; font-weight: 700; }.relation-options { display: flex; flex-wrap: wrap; gap: 6px; }.relation-check { display: flex; align-items: center; gap: 5px; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 6px 8px; cursor: pointer; font-size: 10px; }.relation-check:has(input:checked) { border-color: #c3f5ff; background: var(--accent-soft); color: #46afc4; }.relation-check input { margin: 0; }.relation-empty { margin: 0; color: var(--muted); font-size: 10px; }
+#deadline-rows { display: grid; gap: 6px; margin-bottom: 8px; }.deadline-form-row { display: grid; grid-template-columns: 120px minmax(120px,1fr) 190px 34px; gap: 6px; }.deadline-form-row input, .deadline-form-row select { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 7px; font-size: 10px; }
+@media (max-width: 760px) { .registry-header { align-items: stretch; flex-direction: column; }.deadline-form-row { grid-template-columns: 1fr 34px; }.deadline-form-row input, .deadline-form-row select { grid-column: 1; }.deadline-form-row .remove-deadline { grid-column: 2; grid-row: 1; } }
+
+/* Searchable research collections. */
+.research-registry { max-width: 1480px; margin: 0 auto; padding: 10px 4px 28px; }
+.research-registry .registry-header { align-items: center; margin-bottom: 24px; }
+.research-registry .registry-header h1 { margin: 6px 0 8px; }
+.research-registry .registry-header p { font-size: 12px; line-height: 1.6; }
+.research-registry .registry-header > .button { flex: none; min-height: 40px; }
+.research-registry :is(.status-submitted, .status-requested) { color: var(--amber); background: color-mix(in srgb, var(--amber) 12%, var(--surface)); }
+.research-registry :is(.status-accepted, .status-available) { color: var(--teal); background: color-mix(in srgb, var(--teal) 12%, var(--surface)); }
+.research-registry :is(.status-rejected, .status-restricted) { color: var(--red); background: color-mix(in srgb, var(--red) 12%, var(--surface)); }
+@media (max-width: 760px) {
+  .research-registry { padding-top: 48px; }
+  .research-registry .registry-header { align-items: stretch; }
+}

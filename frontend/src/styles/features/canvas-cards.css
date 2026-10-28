@@ -1,0 +1,77 @@
+/* Canvas cards: one modern look on top of the earlier canvas layers (loaded last). */
+.research-shell .canvas-studio .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text):not(.canvas-node-media) {
+  grid-template-rows: 46px minmax(0, 1fr);
+  border: 1px solid color-mix(in srgb, var(--ink) 9%, transparent);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 10px 28px -10px rgb(16 24 40 / 18%);
+  transition: box-shadow .18s ease, border-color .18s ease;
+}
+/* A thin band of the card's colour identifies its type at a glance. */
+.research-shell .canvas-studio .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text):not(.canvas-node-media)::before {
+  content: ""; position: absolute; z-index: 1; inset: -1px -1px auto; height: 4px; border-radius: 16px 16px 0 0;
+  background: var(--canvas-card-color); pointer-events: none;
+}
+.research-shell .canvas-studio .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text):not(.canvas-node-media):hover {
+  border-color: color-mix(in srgb, var(--canvas-card-color) 35%, transparent);
+  box-shadow: 0 2px 4px rgb(16 24 40 / 6%), 0 18px 40px -12px rgb(16 24 40 / 24%);
+}
+.research-shell .canvas-studio .canvas-node.canvas-node.is-selected:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text):not(.canvas-node-media) {
+  outline: 0;
+  box-shadow: 0 0 0 2px var(--accent), 0 0 0 6px color-mix(in srgb, var(--accent) 16%, transparent), 0 18px 40px -12px rgb(16 24 40 / 24%);
+}
+
+.research-shell .canvas-studio .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text) .canvas-node-header {
+  min-height: 46px; padding: 6px 8px 0 12px; gap: 10px; border: 0; border-radius: 16px 16px 0 0; background: transparent;
+}
+.research-shell .canvas-studio .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text) .canvas-node-header > span {
+  width: 28px; min-width: 28px; height: 28px; border-radius: 9px;
+  background: color-mix(in srgb, var(--canvas-card-color) 14%, var(--surface)); color: var(--canvas-card-color);
+}
+.research-shell .canvas-studio .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text) .canvas-node-header strong {
+  display: block; overflow: hidden; color: var(--ink); font-size: 14px; font-weight: 650; line-height: 1.3; letter-spacing: -.01em; white-space: nowrap; text-overflow: ellipsis;
+}
+.research-shell .canvas-studio .canvas-node:not(.canvas-node-project) .canvas-node-header > div { opacity: 0; transition: opacity .15s ease; }
+.research-shell .canvas-studio .canvas-node:is(:hover, :focus-within, .is-selected) .canvas-node-header > div { opacity: 1; }
+.research-shell .canvas-studio .canvas-node .canvas-node-header button { width: 28px; height: 28px; border-radius: 8px; }
+.research-shell .canvas-studio .canvas-node-project .canvas-node-header strong { font-size: 18px; }
+
+/* Notes: the page sits inside the card like a sheet of paper. */
+.research-shell .canvas-studio .canvas-node.canvas-node-note .canvas-node-content.canvas-node-content { padding: 0 8px 8px; background: transparent; border-radius: 0 0 16px 16px; }
+.canvas-note-sheet {
+  box-sizing: border-box; height: 100%; overflow: hidden auto; scrollbar-width: none; overscroll-behavior: contain;
+  border-radius: 10px; background: var(--note-paper, var(--surface));
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ink) 8%, transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 28px), transparent);
+}
+.canvas-note-sheet::-webkit-scrollbar { display: none; }
+.research-shell .canvas-studio .canvas-note-page {
+  box-sizing: border-box; min-height: 100%; margin: 0; padding: 40px 48px 56px; background: transparent;
+  color: var(--ink); font: 16px/1.65 system-ui, -apple-system, "Segoe UI", sans-serif; overflow-wrap: anywhere;
+}
+.canvas-note-sheet[data-paper] .canvas-note-page { color: #222; }
+.research-shell .canvas-studio .canvas-note-page > :first-child { margin-top: 0; }
+.research-shell .canvas-studio .canvas-note-page h1 { font-size: 2em; letter-spacing: -.02em; }
+.research-shell .canvas-studio .canvas-note-page h2 { font-size: 1.5em; }
+.research-shell .canvas-studio .canvas-note-page h3 { font-size: 1.25em; }
+.research-shell .canvas-studio .canvas-note-page p { margin: 0 0 1em; }
+/* Scripts show only their output; their toolbar belongs to the note editor. */
+.canvas-note-page .kv-script { border: 0; background: transparent; }
+.canvas-note-page .kv-script > .kv-embed-head { display: none; }
+.canvas-note-page .kv-script > .kv-script-frame { margin: 12px 0; width: 100%; }
+.canvas-note-page .kv-script > .kv-script-resize { display: none; }
+
+/* Text bubbles and media share the rounder, softer frame. */
+.research-shell .canvas-studio .canvas-node.canvas-node-text { border-radius: 16px; }
+.research-shell .canvas-studio .canvas-node.canvas-node-media { border-radius: 14px; box-shadow: 0 1px 2px rgb(16 24 40 / 5%), 0 10px 28px -10px rgb(16 24 40 / 18%); }
+
+/* Zoomed out (canvas-overview), a card shows only its title, centred and large. */
+.research-shell .canvas-studio.canvas-overview .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text):not(.canvas-node-media) { grid-template-rows: minmax(0, 1fr); }
+.research-shell .canvas-studio.canvas-overview .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text) .canvas-node-header {
+  display: flex; height: 100%; min-height: 0; padding: 8% 10%; align-items: center; justify-content: center; border-radius: 16px;
+  background: color-mix(in srgb, var(--canvas-card-color) 10%, var(--surface));
+}
+.research-shell .canvas-studio.canvas-overview .canvas-node.canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text) .canvas-node-header strong {
+  display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 3; white-space: normal; overflow-wrap: break-word; text-align: center;
+  font-size: min(calc(15px * var(--canvas-inverse-zoom, 1)), 15cqw, 26cqh); line-height: 1.15;
+}

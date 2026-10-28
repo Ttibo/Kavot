@@ -1,0 +1,46 @@
+.custom-collection-creator fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 16px; min-width: 0; }
+.custom-collection-creator label { display: grid; gap: 6px; }
+.custom-collection-creator input:not([type="checkbox"]), .custom-collection-creator select, .custom-collection-creator textarea { width: 100%; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--ink); font: inherit; box-sizing: border-box; }
+.custom-collection-creator .form-actions { flex-wrap: wrap; align-items: end; }
+.custom-collection-creator small { color: var(--muted); }
+.custom-collection-creator > .form-actions { margin-top: 16px; }
+.custom-collection-creator h4 { margin: 0; }
+.custom-collection-section { display: grid; gap: 10px; }
+.custom-field-row { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft, transparent); }
+.custom-field-main { display: grid; grid-template-columns: auto minmax(0, 2fr) minmax(0, 1.4fr) auto auto; gap: 10px; align-items: end; }
+.custom-field-order { display: inline-flex; flex-direction: column; gap: 2px; }
+.custom-field-order .icon-button { width: 24px; height: 20px; padding: 0; font-size: 12px; line-height: 1; }
+.custom-field-order .icon-button:disabled { opacity: .35; }
+.custom-collection-creator .custom-field-inline { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.custom-collection-creator .custom-field-inline select { width: auto; padding: 6px 8px; }
+.custom-field-options { display: flex !important; flex-wrap: wrap; align-items: center; gap: 6px !important; }
+.custom-field-options legend { font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+.custom-field-option { display: inline-flex; align-items: center; gap: 4px; }
+.custom-collection-creator .custom-field-option input { width: 140px; padding: 6px 8px; }
+.custom-template-editor { display: grid; gap: 8px; }
+.custom-template-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.custom-template-editor .markdown-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.custom-template-editor .markdown-toolbar button { min-width: 30px; padding: 4px 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.custom-template-editor .markdown-toolbar select { width: auto; padding: 4px 8px; }
+.custom-template-editor .custom-template-toggle { margin-left: auto; }
+.custom-template-editor .custom-template-toggle[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent-strong); }
+.custom-template-editor textarea { font-family: var(--font-mono, ui-monospace, monospace); font-size: 13px; line-height: 1.5; }
+.custom-template-preview { min-height: 180px; padding: 12px 16px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.custom-list-columns { display: grid; gap: 8px; padding: 10px; border: 1px dashed var(--line); border-radius: 8px; margin: 0; }
+.custom-list-columns legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.custom-list-column { display: grid; gap: 6px; }
+.custom-list-column-main { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr) auto; gap: 8px; align-items: end; }
+.custom-collection-creator .custom-list-columns > .button { justify-self: start; }
+.custom-item-preview { display: grid; gap: 8px; }
+.custom-item-preview-page { padding: 18px 22px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 12px; }
+.custom-item-preview-title { display: block; margin-bottom: 10px; font-size: 22px; color: var(--subtle); }
+.custom-item-preview-page .markdown-preview { margin-top: 10px; }
+.builtin-fields-summary { margin-top: 10px; }
+.builtin-fields-summary summary { cursor: pointer; font-weight: 600; font-size: 13px; }
+.builtin-fields-summary table { margin-top: 8px; font-size: 12px; }
+.builtin-fields-summary small { color: var(--muted); }
+@media (max-width: 640px) { .custom-field-main { grid-template-columns: auto 1fr 1fr; } .custom-list-column-main { grid-template-columns: 1fr 1fr auto; } }
+
+.collection-icon-picker { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin: 10px 0; }
+.custom-collection-creator .collection-icon-picker { display: flex; }
+.collection-icon-picker select { width: auto; max-width: 100%; padding: 8px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; }

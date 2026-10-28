@@ -1,0 +1,10 @@
+/* Trash view: one row per deleted note, file or project. */
+.research-shell .trash-view .fit-items { display: grid; gap: 2px; }
+.research-shell .trash-row { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; align-items: center; gap: 10px; min-height: 44px; padding: 6px 10px; border-bottom: 1px solid var(--line); }
+.research-shell .trash-row > svg { color: var(--subtle); }
+.research-shell .trash-row-copy { display: grid; min-width: 0; }
+.research-shell .trash-row-copy strong { overflow: hidden; color: var(--ink); font-size: 13px; font-weight: 550; text-overflow: ellipsis; white-space: nowrap; }
+.research-shell .trash-row-copy small { color: var(--subtle); font-size: 11px; }
+.research-shell .trash-row-actions { display: flex; gap: 6px; }
+.research-shell .trash-delete { color: var(--red); }
+.research-shell .trash-error { margin: 0; color: var(--red); font-size: 12px; }

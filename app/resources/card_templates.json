@@ -1,0 +1,79 @@
+[
+  {
+    "id": 1,
+    "name": "Daily Notes",
+    "title_template": "Daily Notes — {{today}}",
+    "content_template": "# Daily Notes — {{today}}\n\n## Focus\n\n## Notes\n\n## Next steps\n\n",
+    "auto_create": false,
+    "is_article_default": false,
+    "color": "#d08b33",
+    "icon": "calendar",
+    "archived": false
+  },
+  {
+    "id": 2,
+    "name": "Notes",
+    "title_template": "Notes",
+    "content_template": "# Notes\n\n",
+    "auto_create": false,
+    "is_article_default": false,
+    "color": "#087e86",
+    "icon": "note",
+    "archived": false
+  },
+  {
+    "id": 3,
+    "name": "Hypothesis",
+    "title_template": "Hypothesis",
+    "content_template": "# Hypothesis\n\n## Statement\n\n## Rationale\n\n## How to test it\n\n",
+    "auto_create": false,
+    "is_article_default": false,
+    "color": "#59aaba",
+    "icon": "bulb",
+    "archived": false
+  },
+  {
+    "id": 4,
+    "name": "Results",
+    "title_template": "Results",
+    "content_template": "# Results\n\n## Observation\n\n## Evidence\n\n## Interpretation\n\n",
+    "auto_create": false,
+    "is_article_default": false,
+    "color": "#39917d",
+    "icon": "chart",
+    "archived": false
+  },
+  {
+    "id": 5,
+    "name": "Conclusion",
+    "title_template": "Conclusion",
+    "content_template": "# Conclusion\n\n## Main finding\n\n## Limits\n\n## Implications\n\n",
+    "auto_create": false,
+    "is_article_default": false,
+    "color": "#bc4c7b",
+    "icon": "check",
+    "archived": false
+  },
+  {
+    "id": 6,
+    "name": "Sources",
+    "title_template": "Sources",
+    "content_template": "# Sources\n\n## Key references\n\n## To review\n\n",
+    "auto_create": false,
+    "is_article_default": false,
+    "color": "#3282c4",
+    "icon": "file",
+    "archived": false
+  },
+  {
+    "id": 7,
+    "name": "Paper",
+    "title_template": "Notes — {{article_title}}",
+    "content_template": "# {{article_title}}\n\n{{article_metadata}}\n\n## Summary\n\n## Key points\n\n## Quotes and evidence\n\n## Links to the project\n\n",
+    "auto_create": false,
+    "is_article_default": true,
+    "color": "#499acd",
+    "icon": "file",
+    "archived": false
+  }
+]

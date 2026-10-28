@@ -1,0 +1,46 @@
+/* Library, Graph search, Watch agents and collections share the sober Obsidian-like chrome:
+   one compact page header, flat panels, list rows instead of floating cards, 28px controls. */
+
+/* Page headers */
+.research-shell :is(.registry-header, .library-page-header, .watch-page-header) { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 40px; margin: 0 0 12px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+.research-shell :is(.registry-header, .library-page-header, .watch-page-header) h1 { display: flex; align-items: center; gap: 8px; margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -.01em; line-height: 1.25; }
+.research-shell .watch-page-header p { margin: 2px 0 0; color: var(--subtle); font-size: 12px; }
+.research-shell :is(.registry-header, .library-page-header, .watch-page-header, .library-header-actions, .watch-header-right) .button { min-height: 28px; height: 28px; padding: 0 10px; border-radius: 5px; font-size: 12px; font-weight: 500; }
+.research-shell :is(.registry-header, .library-page-header, .watch-page-header) .button svg { width: 14px; height: 14px; }
+.research-shell .research-registry, .research-shell .collection-page { max-width: none; padding: 0; }
+
+/* Library */
+.research-shell .library-workspace.library-refined:not(.library-reader-view) { gap: 0; padding: 0; }
+.research-shell .library-refined .library-folder-nav { top: 0; padding: 6px 8px 12px 0; border: 0; border-right: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+.research-shell .library-refined .library-nav-heading { margin: 10px 0 2px 8px; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
+.research-shell .library-refined .library-folder-nav :is(button, .paper-folder-label) { min-height: 26px; font-size: 13px; border-radius: 4px; }
+.research-shell .library-refined .library-folder-nav button.active { background: var(--active); color: var(--ink); box-shadow: none; }
+.research-shell .library-refined .library-content { padding-left: 20px; }
+.research-shell .library-toolbar { gap: 8px; padding: 0 0 10px; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; box-shadow: none; }
+.research-shell .library-toolbar :is(input, select) { height: 28px; min-height: 28px; border-radius: 5px; font-size: 12px; }
+.research-shell .library-search { min-height: 28px; height: 28px; border-radius: 5px; }
+.research-shell .library-reading-filters button { min-height: 24px; padding: 0 8px; border-radius: 4px; font-size: 12px; }
+.research-shell .library-list-heading { margin: 12px 0 4px; }
+.research-shell .library-list-heading h2 { font-size: 14px; font-weight: 600; }
+.research-shell .library-list-columns { padding: 6px 8px; border-bottom: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--subtle); font-size: 11px; }
+.research-shell .library-refined .paper-row.library-entry { min-height: 0; padding: 10px 8px; border: 0; border-bottom: 1px solid var(--line); border-left: 2px solid transparent; border-radius: 0; background: transparent; box-shadow: none; }
+.research-shell .library-refined .paper-row.library-entry:hover { background: var(--hover); }
+.research-shell .library-refined .paper-row.library-entry.selected, .research-shell .library-refined .paper-row.library-entry[aria-current="true"] { border-left-color: var(--accent); }
+.research-shell .library-entry-title { font-size: 14px; font-weight: 600; }
+.research-shell :is(.library-entry-authors, .library-entry-publication) { font-size: 12px; }
+.research-shell .library-entry-actions .button { min-height: 26px; height: 26px; padding: 0 8px; border-radius: 4px; font-size: 12px; }
+.research-shell .library-list { gap: 0; border: 0; }
+
+/* Graph search */
+.research-shell .discovery-page { padding-top: 6px; }
+.research-shell .discovery-header h1 { font-size: 16px; }
+.research-shell .discovery-identifier :is(input, .button) { height: 30px; min-height: 30px; border-radius: 6px; font-size: 12px; }
+.research-shell .discovery-panel { border-radius: 6px; }
+.research-shell .discovery-panel-head { padding: 4px 8px; background: transparent; }
+.research-shell .discovery-panel-head h2 { font-size: 11px; }
+.research-shell .discovery-panel-tools .library-search input { height: 24px; }
+
+/* Watch agents */
+.research-shell .watch-detail-head h2, .research-shell .watch-editor-head h2 { font-size: 13px; }
+.research-shell :is(.watch-result-card, .watch-report, .watch-panel) { box-shadow: none; }
+.research-shell .watch-welcome h2 { font-size: 18px; }

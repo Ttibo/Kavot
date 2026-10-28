@@ -1,0 +1,65 @@
+@media (max-width: 1050px) {
+  .paper-row { grid-template-columns: minmax(260px, 2fr) 120px 100px 28px; }
+  .paper-row .paper-cell.publication { display: none; }
+  .notes-layout { grid-template-columns: minmax(230px, var(--notes-sidebar-width)) 9px minmax(0, 1fr); }
+}
+
+@media (max-width: 760px) {
+  .app-shell { display: block; }
+  .mobile-only { display: grid; }
+  .sidebar { position: fixed; left: 0; transform: translateX(-105%); width: 270px; transition: transform 200ms ease; box-shadow: 18px 0 60px rgba(0,0,0,.18); }
+  .sidebar.open { transform: translateX(0); }
+  .sidebar .brand > span:last-child { opacity: 1; }
+  .sidebar .nav-item { justify-content: flex-start; font-size: 12px; }
+  .workspace { margin-left: 0; }
+  .button-primary { padding-inline: 12px; }
+  #main-content { padding: 62px 16px 60px; }
+  #main-content.tasks-mode { height: calc(100vh - var(--titlebar-height)); padding: 62px 16px 16px !important; }
+  .page-header { display: block; }
+  .header-actions { margin-top: 16px; }
+  .paper-table { overflow-x: auto; }
+  .paper-row { min-width: 680px; }
+  .notes-layout { grid-template-columns: 1fr; }
+  .notes-sidebar { max-height: 420px; border-right: 0; border-bottom: 1px solid var(--line); }
+  .notes-sidebar-resizer, .note-split-resizer, .secondary-note-split-resizer, .note-workspace-resizer { display: none; }
+  .notes-tree, .note-search-results { max-height: 330px; }
+  .notes-contexts-head { display: flex; }
+  .note-scope { width: 100%; }
+  .note-folder-row { min-width: 0; }
+  .folder-actions { opacity: 1; }
+  .tree-note-menu { opacity: 1; }
+  .board-toolbar { align-items: stretch; flex-wrap: wrap; }
+  .board-toolbar select { flex: 1; min-width: 160px; }
+  .kanban-column { height: min(520px, calc(calc(100vh - var(--titlebar-height)) - 135px)); min-height: 330px; }
+  .archive-filters { grid-template-columns: 1fr 1fr; }
+  .archive-card { align-items: flex-start; flex-direction: column; }
+  .form-grid, .paper-detail-grid { grid-template-columns: 1fr; }
+  .note-editor-state { width: 100%; justify-content: space-between; }
+  .note-pane-controls { align-items: center; flex-direction: row; }
+  .note-pane-controls .note-editor-state { width: auto; justify-content: flex-end; }
+  .notes-main-workspace.with-secondary { grid-template-columns: 1fr; }
+  .notes-main-workspace.with-secondary > .note-editor, .secondary-resource-pane { min-height: 520px; }
+  .markdown-block-editor { padding: 28px 12px 80px; }
+  .markdown-block { grid-template-columns: 42px minmax(0, 1fr) 66px; }
+  .form-field.full { grid-column: auto; }
+  .form-actions { grid-column: auto; }
+  .modal-backdrop { padding: 0; }
+  .modal.modal-wide.modal-task { width: 100vw; height: calc(100dvh - var(--titlebar-height)); border-radius: 0; }
+  .modal-task .task-modal-header { padding: 18px 56px 16px 20px; }
+  .task-compose-layout { grid-template-columns: 1fr; overflow-y: auto; }
+  .task-compose-main { min-height: 560px; padding: 20px; gap: 20px; }
+  .task-compose-details { overflow: visible; border-left: 0; border-top: 1px solid var(--line); padding: 20px; }
+  .task-compose-footer { padding: 12px 16px; }
+  .task-footer-hint { display: none; }
+  .modal-task .continuous-editor .cm-content, .modal-task .continuous-editor .continuous-reading { padding: 20px 16px 70px; }
+  .reader-note-pane { min-height: 75vh; border-top: 1px solid var(--line); border-left: 0; }
+  .paper-reader-page { height: auto; min-height: calc(calc(100vh - var(--titlebar-height)) - 120px); overflow: visible; }
+}
+
+@media (max-width: 480px) {
+  .kanban-column { flex-basis: 270px; min-width: 270px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

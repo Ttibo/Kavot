@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Kavot
+Comment=Local-first workspace for research projects
+Exec=Kavot
+Icon=kavot
+Terminal=false
+Categories=Office;Education;Science;
+StartupWMClass=Kavot

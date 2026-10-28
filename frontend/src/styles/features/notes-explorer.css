@@ -1,0 +1,262 @@
+/* Notes explorer, Obsidian-style: a toolbar to create every document type, a quiet
+   tree with indent guides, and hover tools ("+" and "⋯") instead of icon strips. */
+.research-shell .notes-sidebar {
+  --tree-indent: 14px;
+  background: var(--sidebar-surface, var(--surface-soft));
+  border-right: 0;
+}
+
+/* Toolbar */
+.notes-sidebar .notes-explorer-toolbar {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line);
+}
+.notes-sidebar .notes-explorer-toolbar > button {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--subtle);
+  cursor: pointer;
+}
+.notes-sidebar .notes-explorer-toolbar > button:hover:not(:disabled) { background: var(--hover); color: var(--ink); }
+.notes-sidebar .notes-explorer-toolbar > button:disabled { opacity: .35; cursor: default; }
+.notes-sidebar .notes-explorer-toolbar .ui-icon { width: 17px; height: 17px; }
+.notes-sidebar .notes-explorer-toolbar-spacer { flex: 1; }
+
+/* Tree */
+.research-shell .notes-tree { padding: 6px 6px 24px; scrollbar-width: thin; }
+.notes-sidebar .files-explorer-roots .workspace-file-tree { padding: 0; }
+.notes-sidebar .workspace-root-section.separated { margin-top: 12px; padding-top: 0; border-top: 0; }
+.notes-sidebar [data-workspace-root].workspace-drag-over { background: color-mix(in srgb, var(--accent) 6%, transparent); border-radius: 6px; outline: 0; }
+
+/* Section heads (General, Projects): small muted labels. */
+.notes-sidebar .notes-contexts-head.workspace-root-head {
+  display: flex;
+  align-items: center;
+  min-height: 26px;
+  padding: 0 2px 0 0;
+  border-radius: 5px;
+}
+.notes-sidebar .notes-contexts-head.workspace-root-head:hover { background: var(--hover); }
+.notes-sidebar .notes-contexts-head.workspace-root-head > button[data-workspace-toggle] {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+.notes-sidebar .notes-contexts-head.workspace-root-head > button[data-workspace-toggle] > span {
+  display: grid;
+  width: 16px;
+  place-items: center;
+  color: var(--subtle);
+}
+.notes-sidebar .notes-contexts-head.workspace-root-head > button[data-workspace-toggle] > strong {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: .04em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.notes-sidebar .notes-contexts-head.workspace-root-head > button[data-workspace-toggle] > small { display: none; }
+
+/* Rows */
+.research-shell .notes-sidebar .workspace-file-row {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  min-height: 28px;
+  height: auto;
+  margin-block: 0;
+  padding: 0 2px 0 calc(min(var(--file-depth), 10) * var(--tree-indent) + 2px);
+  border-radius: 5px;
+  color: var(--ink);
+  box-shadow: none;
+}
+.research-shell .notes-sidebar .workspace-file-row:hover { background: var(--hover); }
+.research-shell .notes-sidebar .workspace-file-row.primary-active,
+.research-shell .notes-sidebar .workspace-file-row.primary-active:hover {
+  background: var(--active);
+  box-shadow: none;
+}
+.research-shell .notes-sidebar .workspace-file-row.primary-active .workspace-file-label strong { color: var(--ink); font-weight: 550; }
+.research-shell .notes-sidebar .workspace-file-row.secondary-active { box-shadow: inset 2px 0 var(--line-strong); }
+.research-shell .notes-sidebar .workspace-file-row.directory.tree-focused:not(:hover) { background: color-mix(in srgb, var(--hover) 70%, transparent); }
+.research-shell .notes-sidebar .workspace-file-row.directory.tree-focused { box-shadow: inset 0 0 0 1px var(--line-strong); }
+.research-shell .notes-sidebar .workspace-file-row.multi-selected,
+.research-shell .notes-sidebar .workspace-file-row.multi-selected:hover {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: none;
+}
+
+.notes-sidebar .tree-toggle,
+.notes-sidebar .workspace-file-spacer {
+  display: grid;
+  flex: 0 0 16px;
+  width: 16px;
+  min-width: 16px;
+  height: 24px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--subtle);
+}
+.notes-sidebar .tree-toggle:hover { background: transparent; color: var(--ink); }
+.notes-sidebar .workspace-file-grip { font-size: 0; opacity: 1; }
+.notes-sidebar .tree-chevron { width: 12px; height: 12px; stroke-width: 2; transition: transform 120ms ease; }
+.notes-sidebar [aria-expanded="true"] > .tree-chevron,
+.notes-sidebar [aria-expanded="true"] > span > .tree-chevron { transform: rotate(90deg); }
+
+.research-shell .notes-sidebar .workspace-file-label {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 28px;
+  height: auto;
+  padding: 3px 4px 3px 2px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.notes-sidebar .workspace-file-label strong {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--ink);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.35;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.notes-sidebar .workspace-file-row.directory .workspace-file-label strong { font-weight: 500; }
+.notes-sidebar .workspace-file-label > span,
+.notes-sidebar .workspace-file-row.directory .workspace-file-label > span.directory {
+  display: grid;
+  flex: 0 0 16px;
+  width: 16px;
+  height: 16px;
+  place-items: center;
+  border-radius: 0;
+  background: transparent;
+  color: var(--subtle);
+}
+.notes-sidebar .workspace-file-label > span .ui-icon { width: 15px; height: 15px; }
+.notes-sidebar .workspace-file-row.directory .workspace-file-label > span.directory { color: color-mix(in srgb, var(--folder-color, var(--subtle)) 75%, var(--subtle)); }
+.notes-sidebar .workspace-file-label > span.pdf { color: var(--red); }
+.notes-sidebar .workspace-file-label > span .workspace-icon.drawing,
+.notes-sidebar .workspace-file-label > span.canvas { color: var(--accent); }
+.notes-sidebar .workspace-file-row.directory .workspace-file-label small { display: none; }
+.notes-sidebar .workspace-file-label small,
+.notes-sidebar .workspace-file-label small.workspace-kind-label {
+  flex: 0 0 auto;
+  max-width: none;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--hover);
+  color: var(--subtle);
+  font: 600 9px/1.4 inherit;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.notes-sidebar .workspace-file-row.paper-storage-folder .workspace-file-label small { display: inline; }
+
+/* Indent guides: one line per open folder, brighter when hovering its subtree. */
+.notes-sidebar .workspace-tree-children { position: relative; }
+.notes-sidebar .workspace-tree-children::before {
+  position: absolute;
+  top: 0;
+  bottom: 2px;
+  left: calc(min(var(--file-depth), 10) * var(--tree-indent) + 10px);
+  border-left: 1px solid var(--line);
+  content: "";
+  pointer-events: none;
+  z-index: 1;
+}
+.notes-sidebar .workspace-tree-children:hover::before { border-color: var(--line-strong); }
+
+/* Hover tools: "+" (new in this folder) and "⋯" (all actions). */
+.research-shell .notes-sidebar .workspace-file-row > :is(.workspace-item-actions, .workspace-open-side) { display: none; }
+.notes-sidebar .workspace-create-actions > button[data-action]:not(.tree-row-tool) { display: none; }
+.research-shell .notes-sidebar :is(.workspace-file-row, .workspace-root-head) > .workspace-create-actions { display: flex; margin: 0; padding: 0; opacity: 1; }
+.notes-sidebar .tree-row-tool {
+  display: grid;
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--subtle);
+  cursor: pointer;
+  opacity: 0;
+}
+.notes-sidebar .tree-row-tool .ui-icon { width: 15px; height: 15px; }
+.notes-sidebar .tree-row-tool:hover,
+.notes-sidebar .tree-row-tool[aria-expanded="true"] { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.notes-sidebar :is(.workspace-file-row, .workspace-root-head):is(:hover, :focus-within) .tree-row-tool,
+.notes-sidebar .tree-row-tool:focus-visible { opacity: 1; }
+
+/* Drag and drop: the target folder lights up, its subtree gets a soft tint. */
+.notes-sidebar .workspace-file-row.dragging { opacity: .4; }
+.research-shell .notes-sidebar .workspace-file-row.workspace-drag-over,
+.notes-sidebar .workspace-tree-branch:has(> .workspace-tree-children.workspace-drag-over) > .workspace-file-row,
+.notes-sidebar .workspace-root-head.workspace-drag-over,
+.notes-sidebar [data-workspace-root].workspace-drag-over > .workspace-root-head {
+  outline: 0;
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 55%, transparent);
+}
+.notes-sidebar .workspace-tree-children.workspace-drag-over { outline: 0; border-radius: 0 0 5px 5px; background: color-mix(in srgb, var(--accent) 6%, transparent); }
+
+/* Inline rename */
+.notes-sidebar :is(.workspace-file-inline-edit, .workspace-folder-inline-edit) {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 4px 2px 2px;
+}
+.notes-sidebar :is(.workspace-file-inline-edit, .workspace-folder-inline-edit) > span { display: grid; flex: 0 0 16px; width: 16px; height: 16px; place-items: center; background: transparent; color: var(--subtle); }
+.notes-sidebar :is(.workspace-file-inline-edit, .workspace-folder-inline-edit) > span .ui-icon { width: 15px; height: 15px; }
+.notes-sidebar :is(.workspace-file-inline-edit, .workspace-folder-inline-edit) input { flex: 1; height: 24px; padding: 2px 6px; border-radius: 4px; font-size: 13px; }
+
+.notes-sidebar :is(button, input):focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+
+/* Recents */
+.notes-sidebar .notes-recents { flex: 0 0 auto; padding: 6px 8px 8px; border-top: 1px solid var(--line); }
+.notes-sidebar .notes-recents > summary { padding: 4px 3px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+.notes-sidebar .notes-recents > .notes-recents-list { max-height: 144px; overflow-y: auto; scrollbar-width: thin; }
+.notes-sidebar .notes-recents-list > button { display: flex; align-items: center; gap: 7px; width: 100%; border: 0; border-radius: 5px; padding: 5px 6px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.notes-sidebar .notes-recents-list > button:hover { background: var(--hover); }
+.notes-sidebar .notes-recents-list .ui-icon { width: 14px; height: 14px; color: var(--subtle); }
+.notes-sidebar .notes-recents-list > button > span:last-child { display: flex; align-items: baseline; gap: 8px; flex: 1; min-width: 0; }
+.notes-sidebar .notes-recents-list strong { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; font-weight: 400; }
+.notes-sidebar .notes-recents-list small { flex: 0 0 auto; color: var(--subtle); font-size: 10px; }
+.research-shell .notes-sidebar-resizer:hover { background: var(--accent-soft); }

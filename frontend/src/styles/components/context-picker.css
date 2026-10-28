@@ -1,0 +1,39 @@
+/* Context picked for a conversation: chips above the message, and the picker that adds them. */
+.assistant-picked { display: flex; flex-wrap: wrap; align-items: center; gap: 5px; margin-bottom: 7px; }
+.assistant-chip { display: inline-flex; align-items: center; gap: 5px; max-width: 260px; padding: 3px 4px 3px 8px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface-soft); color: var(--ink); font-size: 11.5px; }
+.assistant-chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.assistant-chip > svg { flex-shrink: 0; color: var(--muted); }
+.assistant-chip > small { color: var(--muted); font-variant-numeric: tabular-nums; }
+.assistant-chip > button { display: grid; place-items: center; width: 17px; height: 17px; padding: 0; border: 0; border-radius: 50%; background: transparent; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
+.assistant-chip > button:hover { background: var(--line); color: var(--ink); }
+.assistant-chip.project { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); background: var(--accent-soft); }
+.assistant-chip.project > svg { color: var(--accent); }
+.assistant-add-context { display: inline-flex; align-items: center; gap: 5px; padding: 4px 9px; border: 1px dashed var(--line); border-radius: 99px; background: transparent; color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.assistant-add-context:hover, .assistant-add-context[aria-expanded="true"] { border-color: var(--accent); color: var(--accent); }
+.assistant-add-context small { padding: 0 4px; border-radius: 4px; background: var(--surface-soft); font: 10px "DM Mono", monospace; }
+
+.context-picker { position: absolute; z-index: 12; left: 8px; right: 8px; bottom: calc(100% - 2px); display: flex; flex-direction: column; max-height: min(440px, 60vh); border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 10px 30px #0000001f; overflow: hidden; }
+.context-picker-search { display: flex; align-items: center; gap: 8px; padding: 10px 12px; border-bottom: 1px solid var(--line); color: var(--muted); }
+.context-picker-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 13px; }
+.context-picker-search button { display: grid; place-items: center; padding: 3px; border: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.context-picker-kinds { display: flex; gap: 4px; padding: 8px 10px; border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: none; }
+.context-picker-kinds button { display: inline-flex; align-items: center; gap: 5px; flex: none; padding: 3px 9px; border: 1px solid transparent; border-radius: 99px; background: transparent; color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.context-picker-kinds button small { font-variant-numeric: tabular-nums; opacity: .75; }
+.context-picker-kinds button[aria-selected="true"] { border-color: var(--line); background: var(--surface-soft); color: var(--ink); }
+.context-picker-results { flex: 1; min-height: 0; overflow-y: auto; padding: 4px; }
+.context-picker-results h4 { margin: 8px 8px 3px; color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: .05em; text-transform: uppercase; }
+.context-picker-results button { display: flex; align-items: center; gap: 9px; width: 100%; padding: 7px 8px; border: 0; border-radius: 8px; background: transparent; color: var(--ink); text-align: left; cursor: pointer; }
+.context-picker-results button > svg { flex-shrink: 0; color: var(--muted); }
+.context-picker-results button > span { display: grid; flex: 1; min-width: 0; }
+.context-picker-results button strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12.5px; font-weight: 500; }
+.context-picker-results button small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 11px; }
+.context-picker-results button em { flex: none; color: var(--muted); font-size: 10.5px; font-style: normal; }
+.context-picker-results button[aria-selected="true"] { background: var(--surface-soft); }
+.context-picker-results button.chosen em { color: var(--accent); font-weight: 600; }
+.context-picker-empty { margin: 14px; color: var(--muted); font-size: 12px; }
+.context-picker footer { padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10.5px; }
+.context-picker.mention { max-height: min(340px, 50vh); }
+/* The composer lays its direct children out as rows; the picker and the chips have their own layout. */
+.assistant-composer.agent-composer > .context-picker { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; margin-top: 0; }
+.assistant-composer.agent-composer > .assistant-picked { justify-content: flex-start; margin-top: 0; }
+.context-picker-search input, .context-picker-search input:focus { width: auto; max-width: none; height: auto; padding: 0; border: 0; box-shadow: none; }

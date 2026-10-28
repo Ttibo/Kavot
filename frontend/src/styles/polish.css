@@ -1,0 +1,73 @@
+/* Final pass shared by every view: one control scale, one button family, neutral
+   surfaces and quiet destructive actions. Loaded last so it settles earlier layers. */
+:root, html:not([data-theme="dark"]) .research-shell {
+  --control-h: 30px; --control-radius: 6px; --control-font: 12.5px;
+  --danger: #c2413b; --danger-soft: #fbeceb;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23707070' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+html[data-theme="dark"], html[data-theme="dark"] .research-shell {
+  --danger: #f0857d; --danger-soft: #f0857d1f;
+  --chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23a8a8a8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+/* Buttons: neutral outline by default, one solid accent for the primary action. */
+.research-shell .button, .modal .button {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--control-h); height: auto; padding: 0 12px; border: 1px solid var(--line); border-radius: var(--control-radius);
+  background: var(--surface); color: var(--ink); font-size: var(--control-font); font-weight: 500; line-height: 1;
+  text-decoration: none; box-shadow: none; transition: background .12s, border-color .12s, color .12s;
+}
+.research-shell .button:hover:not(:disabled), .modal .button:hover:not(:disabled) { background: var(--hover); border-color: var(--line-strong); }
+.research-shell .button-primary, .modal .button-primary,
+html[data-theme] .research-shell .button-primary { background: var(--primary-fill); border-color: var(--primary-fill); color: var(--primary-ink); font-weight: 600; box-shadow: none; }
+.research-shell .button-primary:hover:not(:disabled), .modal .button-primary:hover:not(:disabled) { background: var(--primary-hover); border-color: var(--primary-hover); color: var(--primary-ink); }
+.research-shell .button:focus-visible, .modal .button:focus-visible { outline: 2px solid var(--focus-ring); outline-offset: 1px; }
+.research-shell .button:disabled, .modal .button:disabled { opacity: .5; cursor: default; }
+.research-shell .button svg, .modal .button svg { width: 14px; height: 14px; flex-shrink: 0; }
+.research-shell .button-small, .modal .button-small { min-height: 26px; padding: 0 9px; font-size: 12px; }
+
+/* Destructive actions stay quiet until hovered, instead of red boxes on every card. */
+.research-shell .button-danger, .modal .button-danger { color: var(--muted); }
+.research-shell .button-danger:hover:not(:disabled), .modal .button-danger:hover:not(:disabled) { background: var(--danger-soft); border-color: color-mix(in srgb, var(--danger) 35%, var(--line)); color: var(--danger); }
+.research-shell .collection-delete-button.icon-only, .research-shell .discovery-icon-danger { border-color: transparent; background: transparent; color: var(--subtle); }
+.research-shell .collection-delete-button.icon-only svg, .research-shell .discovery-icon-danger svg { color: inherit; stroke: currentColor; }
+.research-shell .collection-delete-button.icon-only:hover:not(:disabled), .research-shell .discovery-icon-danger:hover { border-color: transparent; background: var(--danger-soft); color: var(--danger); }
+.research-shell .watch-danger-zone .text-link { color: var(--subtle); font-size: 12px; }
+.research-shell .watch-danger-zone .text-link:hover { color: var(--danger); }
+
+/* Text links share the accent and never look like body copy. */
+.research-shell .text-link { color: var(--accent); font-weight: 500; text-decoration: none; }
+.research-shell .text-link:hover { color: var(--accent-strong); text-decoration: underline; text-underline-offset: 3px; }
+
+/* Fields and selects: same height, radius and chevron everywhere. Controls nested in a
+   wrapper that already draws the field (library search, Year/Sort pickers, editor toolbars) are left alone. */
+.research-shell :is(input:not([type="checkbox"]):not([type="radio"]):not([type="color"]):not([type="range"]):not([type="file"]), select):not(:is(.library-search, .library-select, .rich-toolbar, .editor-mode-bar, .modal) *) {
+  min-height: var(--control-h); border: 1px solid var(--line); border-radius: var(--control-radius);
+  background-color: var(--surface); color: var(--ink); font-size: var(--control-font);
+}
+:is(.research-shell, .modal) select:not(:is(.library-select, .rich-toolbar, .editor-mode-bar) *) {
+  appearance: none; -webkit-appearance: none; padding-right: 28px;
+  background-image: var(--chevron) !important; background-repeat: no-repeat !important; background-position: right 10px center !important; background-size: 10px 6px !important; cursor: pointer;
+}
+.research-shell select:not(:is(.library-select, .rich-toolbar, .editor-mode-bar, .modal) *) { padding-left: 10px; }
+.research-shell :is(input, select, textarea):not(:is(.library-search, .library-select) *):hover:not(:focus):not(:disabled) { border-color: var(--line-strong); }
+.research-shell :is(input, select, textarea):not(:is(.library-search, .library-select) *):focus { border-color: var(--accent); outline: none; box-shadow: 0 0 0 3px var(--focus-ring); }
+:is(.research-shell, .modal) :is(input[type="checkbox"], input[type="radio"]) { accent-color: var(--accent); }
+
+/* Kanban: each column is tinted with the colour set for it; cards stay on the plain surface. */
+.research-shell .kanban-column { border: 1px solid color-mix(in srgb, var(--column-accent) 30%, var(--line)); border-top: 1px solid color-mix(in srgb, var(--column-accent) 30%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--column-accent) 14%, var(--surface)); }
+html[data-theme="dark"] .research-shell .kanban-column { border: 1px solid color-mix(in srgb, var(--column-accent) 35%, var(--line)); border-top: 1px solid color-mix(in srgb, var(--column-accent) 35%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--column-accent) 20%, var(--surface)); }
+.research-shell .kanban-empty { border-color: color-mix(in srgb, var(--column-accent) 40%, var(--line)); }
+.research-shell .kanban-head { background: transparent; border-radius: 6px; padding: 6px 6px 8px; margin-bottom: 4px; }
+.research-shell .kanban-head .count-badge { background: var(--surface); color: var(--muted); border: 1px solid var(--line); }
+.research-shell .kanban-column.drag-over { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); transform: none; }
+.research-shell .task-card { border: 1px solid var(--line); border-radius: 7px; background: var(--surface); box-shadow: 0 1px 2px #0000000a; }
+.research-shell .task-card:hover { border-color: var(--line-strong); }
+.research-shell .task-card .trello-labels span { border-radius: 4px; background: color-mix(in srgb, var(--label-color, var(--accent)) 14%, transparent); color: color-mix(in srgb, var(--label-color, var(--accent)) 80%, var(--ink)); font-weight: 600; }
+.research-shell .task-card .task-scope-label { background: transparent; color: var(--subtle); padding: 0; letter-spacing: .04em; }
+.research-shell .task-card { position: relative; }
+.research-shell .task-card .collection-delete-button { position: absolute; top: 6px; right: 6px; min-height: 24px; padding: 0 8px; border-color: transparent; background: transparent; opacity: 0; }
+.research-shell .task-card:is(:hover, :focus-within) .collection-delete-button { opacity: 1; }
+
+/* Active segmented items and filter chips use the soft accent consistently. */
+.research-shell :is(.library-reading-filters button, .view-switch button, .task-view-switch button, .calendar-view-switch button, .research-view-switch button):is(.active, [aria-pressed="true"]) { background: var(--accent-soft); color: var(--accent-strong); }

@@ -1,0 +1,21 @@
+{
+  "id": "planning",
+  "name": "Planning",
+  "version": "1.0.0",
+  "requires_core": ">=2.0",
+  "description": "Tasks, the kanban board and the calendar.",
+  "removable": false,
+  "state_collections": ["tasks", "task_columns", "calendar_events"],
+  "collections": [
+    {
+      "id": "tasks", "name": "Tasks", "record_kind": "task", "position": 30,
+      "source": "databases/tasks/items/", "views": ["table", "folders", "kanban", "calendar"], "tools": [],
+      "storage": {"driver": "domain", "domain": "tasks"},
+      "state_key": "tasks", "title_field": "title",
+      "search_fields": ["title", "description", "labels"],
+      "agent_actions": {"create": "task_create", "update": "task_update", "delete": "task_delete"}
+    }
+  ],
+  "link_types": [],
+  "connectors": []
+}

@@ -1,0 +1,19 @@
+.settings-panels .workspace-map-card:first-of-type { margin-top: 18px; }
+.workspace-map-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; margin: 0 0 16px; }
+.workspace-map-stats div { padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-soft); }
+.workspace-map-stats dt { color: var(--muted); font-size: 11px; }
+.workspace-map-stats dd { margin: 2px 0 0; font: 600 16px/1.3 "DM Mono", monospace; font-variant-numeric: tabular-nums; }
+.workspace-map-toggle { display: flex; align-items: flex-start; gap: 10px; margin-bottom: 12px; cursor: pointer; }
+.workspace-map-toggle input { margin-top: 3px; }
+.workspace-map-toggle span { display: grid; gap: 2px; }
+.workspace-map-toggle small { color: var(--muted); line-height: 1.5; }
+.digest-list { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+.digest-list li { display: grid; gap: 6px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; }
+.digest-list li p { margin: 0; color: var(--ink); font-size: 13px; line-height: 1.55; }
+.digest-list li small { color: var(--muted); }
+.digest-list li .button { justify-self: start; }
+.digest-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.digest-state { flex: none; padding: 2px 8px; border-radius: 99px; font-size: 11px; font-weight: 600; }
+.digest-state.fresh { background: var(--accent-soft); color: var(--accent); }
+.digest-state.stale { background: var(--surface-soft); color: var(--amber); }
+@media (max-width: 640px) { .workspace-map-stats { grid-template-columns: minmax(0, 1fr); } }

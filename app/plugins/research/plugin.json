@@ -1,0 +1,31 @@
+{
+  "id": "research",
+  "name": "Research",
+  "version": "1.0.0",
+  "requires_core": ">=2.0",
+  "description": "Conferences with their deadlines, and datasets.",
+  "removable": true,
+  "state_collections": ["conferences", "datasets"],
+  "collections": [
+    {
+      "id": "conferences", "name": "Conferences", "record_kind": "conference", "position": 40,
+      "source": "databases/conferences/items/", "views": ["table", "calendar"], "tools": [],
+      "storage": {"driver": "domain", "domain": "research"},
+      "state_key": "conferences", "removable": true, "title_field": "name",
+      "search_fields": ["name", "acronym", "edition", "location", "notes", "url"],
+      "agent_actions": {"create": "conference_create", "update": "conference_update", "delete": "conference_delete"}
+    },
+    {
+      "id": "datasets", "name": "Datasets", "record_kind": "dataset", "position": 50,
+      "source": "databases/datasets/items/", "views": ["table", "folders"], "tools": [],
+      "storage": {"driver": "domain", "domain": "research"},
+      "state_key": "datasets", "removable": true, "title_field": "name",
+      "search_fields": ["name", "description", "license", "version", "notes", "url"],
+      "agent_actions": {"create": "dataset_create", "update": "dataset_update", "delete": "dataset_delete"}
+    }
+  ],
+  "link_types": [
+    {"id": "uses_dataset", "from": "conferences", "to": "datasets", "label": "uses dataset", "field": "dataset_ids"}
+  ],
+  "connectors": []
+}
