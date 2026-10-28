@@ -21,7 +21,6 @@ cloud-sync-pending/
 webview/
 
 # A Kavot workspace or configuration folder placed inside the repository
-/docs/
 /data/
 /downloads/
 /workspace/
