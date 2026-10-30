@@ -16,6 +16,7 @@ import { previewPaperPdfModal } from '../library/documents';
 import { canvasHiddenNodes, migrateCanvasBranchFolds, canvasWebUrl, canvasMovementNodes, canvasTemplateIcon, canvasNoteTreeOpenPaths } from './canvasModel';
 import { conferenceModal, datasetModal } from '../research/actions';
 import { newTaskModal } from '../tasks/dialogs';
+import { openItemInSheet } from '../collections/itemSheet';
 import { bindNoteReferences, noteReferencePickerMarkup } from './references';
 import { editorSession } from '../../app/editorSession';
 
@@ -983,7 +984,10 @@ export function bindCanvasEditors(root) {
         return;
       }
       if (node.collectionType && node.recordId != null) {
-        openCollectionItem({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId });
+        void openItemInSheet({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId }, () => {
+          const item = findCollectionItem({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId });
+          if (item) { Object.assign(node, collectionItemCanvasPayload(item)); renderNodes(); queueSave(); }
+        });
         return;
       }
       if (node.type === "drawing") {
@@ -1169,10 +1173,7 @@ export function bindCanvasEditors(root) {
         form.querySelector("[data-card-open-resource]")?.addEventListener("click", async () => {
           try { await flushCanvasSaves(); } catch { showStatus("Save failed · click to retry", true); return; }
           const onSaved = async () => { const item = findCollectionItem({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId }); if (item) Object.assign(node, collectionItemCanvasPayload(item)); renderNodes(); queueSave(); editCardDetails(node); };
-          if (node.collectionType === "conference") conferenceModal(Number(node.recordId), { onSaved });
-          else if (node.collectionType === "dataset") datasetModal(Number(node.recordId), { onSaved });
-          else if (node.collectionType === "task") newTaskModal(null, null, Number(node.recordId), onSaved);
-          else openCollectionItem({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId });
+          void openItemInSheet({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId }, onSaved);
         });
       }
       if (focusWriting && editorRoot) setTimeout(() => currentMarkdownBlockInput(editorRoot, true)?.focus(), 30);
@@ -1701,7 +1702,10 @@ export function bindCanvasEditors(root) {
       const node = content.nodes.find((item) => item.id === (card.dataset.mirrorOf || card.dataset.canvasNode));
       if (node?.type === "canvas") return void openEmbeddedCanvas(node).catch(error => toast(error.message, "error"));
       if (node?.type === "pdf" && node.paperId) return previewPaperPdfModal(Number(node.paperId), Number(content.projectId) || null);
-      if (node?.collectionType && node.recordId != null) return openCollectionItem({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId });
+      if (node?.collectionType && node.recordId != null) return void openItemInSheet({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId }, () => {
+        const item = findCollectionItem({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId });
+        if (item) { Object.assign(node, collectionItemCanvasPayload(item)); renderNodes(); queueSave(); }
+      });
       if (node?.type !== "note") return;
       event.preventDefault();
       editCardDetails(node, false, true);

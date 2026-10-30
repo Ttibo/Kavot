@@ -1,0 +1,13 @@
+{
+  "id": "atelier",
+  "name": "Atelier",
+  "version": "1.0.0",
+  "requires_core": ">=2.0",
+  "description": "Code workspace of a project: linked code folders, Git history, a map of the code and development agents working in Git worktrees.",
+  "removable": true,
+  "state_collections": [],
+  "collections": [],
+  "link_types": [],
+  "settings": [],
+  "connectors": []
+}

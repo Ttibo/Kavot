@@ -3,6 +3,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { flushSync } from 'react-dom';
 import { connectViews, type ViewName } from './viewBridge';
 import { EmptyState } from '../components/common';
+import { watchAtelierHosts } from '../features/atelier/mount';
 const DashboardView = lazy(() => import('../views/DashboardView').then(module => ({ default: module.DashboardView })));
 const ProjectsView = lazy(() => import('../views/ProjectsView').then(module => ({ default: module.ProjectsView })));
 const TasksView = lazy(() => import('../views/TasksView').then(module => ({ default: module.TasksView })));
@@ -26,6 +27,7 @@ class ViewErrorBoundary extends Component<{ children: ReactNode }, { error: stri
 /** Explicit DOM ownership: React owns management views; the editor engine owns
  * its content only after the React view root has been unmounted. */
 export function attachViewRouter(main: HTMLElement) {
+  watchAtelierHosts(main);
   let root: Root | undefined;
   let current: ViewName | undefined;
   connectViews(view => {

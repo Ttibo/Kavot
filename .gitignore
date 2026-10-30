@@ -70,3 +70,6 @@ Thumbs.db
 .claude/
 .vscode/
 .idea/
+
+# Private product roadmaps (local only)
+/roadmaps/

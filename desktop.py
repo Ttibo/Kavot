@@ -237,6 +237,12 @@ def main() -> None:
         )
         return selection[0] if selection else None
 
+    def pick_project_resource_file():
+        selection = window.create_file_dialog(
+            webview.FileDialog.OPEN, directory=str(Path.home())
+        )
+        return selection[0] if selection else None
+
     def open_project_resource(target: str):
         """Open a validated web address or an existing local folder for a project."""
         if not isinstance(target, str) or not target.strip():
@@ -265,6 +271,7 @@ def main() -> None:
         pick_storage_folder,
         open_external_url,
         pick_project_resource_folder,
+        pick_project_resource_file,
         open_project_resource,
     )
     install_resize_support(window)

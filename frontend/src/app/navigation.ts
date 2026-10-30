@@ -127,6 +127,8 @@ export async function navigate(view, options: { preserveProjectContext?: boolean
   if (view === "discovery") view = "papers";
   if (view === "article-watch") view = "watchers";
   const preserveProjectContext = options.preserveProjectContext === true;
+  // Leaving for another view, or opening the Workspace itself, ends the project mode.
+  if (!preserveProjectContext || view !== "notes") state.projectWorkspaceId = null;
   state.view = view;
   if (view !== "papers") state.libraryReadingPaperId = null;
   if (!preserveProjectContext) {

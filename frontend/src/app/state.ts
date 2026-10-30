@@ -90,6 +90,10 @@ export const state = {
   databases: [] as any[],
   workflows: [] as any[],
   workflowId: null as number | null,
+  /** Project whose own sidebar replaces the Workspace explorer (project mode), or null. */
+  projectWorkspaceId: null as number | null,
+  /** Last project opened in the Atelier (code folders, map and agents). */
+  atelierProjectId: null as number | null,
   databaseRecords: {} as Record<string, Array<{ id: string; values: Record<string, any>; updated_at?: string; note?: Note }>>,
   collectionId: "articles",
   /** Item open in the side panel of a collection page. */

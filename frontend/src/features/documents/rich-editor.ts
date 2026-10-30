@@ -1125,37 +1125,46 @@ export function bindMarkdownBlockEditor(
       }
     }),
   );
+  /** Send an image to the note (or next to the workspace document) and show it, at `position` if given. */
+  async function insertUploadedImage(file: File, position?: number) {
+    if (!editor.isEditable) return;
+    const form = new FormData();
+    form.append("file", file);
+    const noteId = root.closest<HTMLElement>(
+      "[data-primary-note-id],[data-secondary-note-id]",
+    );
+    const id =
+      noteId?.dataset.primaryNoteId || noteId?.dataset.secondaryNoteId;
+    const workspacePath = root.closest<HTMLElement>('[data-workspace-markdown-path]')?.dataset.workspaceMarkdownPath;
+    if (!id && workspacePath) form.append('target_path', workspacePath);
+    try {
+      const result = await api(
+        id ? `/notes/${id}/assets` : "/workspace/file",
+        { method: "POST", body: form },
+      );
+      if (!editor.isDestroyed && editor.isEditable) {
+        const chain = editor.chain().focus();
+        (position === undefined ? chain : chain.setTextSelection(Math.min(position, editor.state.doc.content.size)))
+          .setImage({ src: result.url, alt: file.name.replace(/\.[^.]+$/, '') })
+          .run();
+      }
+    } catch (error) {
+      toast((error as Error).message, "error");
+    }
+  }
   root
     .querySelector<HTMLInputElement>("[data-image-upload]")!
     .addEventListener("change", async (event) => {
       const upload = event.target as HTMLInputElement,
         file = upload.files?.[0];
-      if (!file || !editor.isEditable) return;
-      const form = new FormData();
-      form.append("file", file);
-      const noteId = root.closest<HTMLElement>(
-        "[data-primary-note-id],[data-secondary-note-id]",
-      );
-      const id =
-        noteId?.dataset.primaryNoteId || noteId?.dataset.secondaryNoteId;
-      const workspacePath = root.closest<HTMLElement>('[data-workspace-markdown-path]')?.dataset.workspaceMarkdownPath;
-      if (!id && workspacePath) form.append('target_path', workspacePath);
-      try {
-        const result = await api(
-          id ? `/notes/${id}/assets` : "/workspace/file",
-          { method: "POST", body: form },
-        );
-        if (!editor.isDestroyed && editor.isEditable)
-          editor
-            .chain()
-            .focus()
-            .setImage({ src: result.url, alt: file.name })
-            .run();
-      } catch (error) {
-        toast((error as Error).message, "error");
-      }
+      if (file) await insertUploadedImage(file);
       upload.value = "";
     });
+  // While dragging, only the kind of the files is known: accept images only, so other files keep their default.
+  const draggedImage = (transfer: DataTransfer | null) =>
+    [...(transfer?.items || [])].some((item) => item.kind === "file" && item.type.startsWith("image/"));
+  const droppedImages = (transfer: DataTransfer | null) =>
+    [...(transfer?.files || [])].filter((file) => file.type.startsWith("image/") && file.size > 0);
   let dragging: { from: number; to: number; node: any } | null = null;
   const blockHandle = document.createElement('button');
   blockHandle.type = 'button'; blockHandle.className = 'rich-block-handle'; blockHandle.dataset.dragBlock = '';
@@ -1264,7 +1273,7 @@ export function bindMarkdownBlockEditor(
     (event) => {
       if (
         editor.isEditable &&
-        (dragging || hasInternalTransfer(event.dataTransfer))
+        (dragging || hasInternalTransfer(event.dataTransfer) || draggedImage(event.dataTransfer))
       ) {
         event.preventDefault();
         event.stopPropagation();
@@ -1280,6 +1289,16 @@ export function bindMarkdownBlockEditor(
         left: event.clientX,
         top: event.clientY,
       });
+      // Images dropped from the computer are added to the note and shown where they land.
+      const images = droppedImages(event.dataTransfer);
+      if (images.length) {
+        event.preventDefault();
+        event.stopPropagation();
+        void (async () => {
+          for (const image of images.slice(0, 10)) await insertUploadedImage(image, hit?.pos);
+        })();
+        return;
+      }
       if (dragging && hit) {
         event.preventDefault();
         event.stopPropagation();

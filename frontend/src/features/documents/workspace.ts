@@ -255,7 +255,7 @@ function workspaceFileTree(nodes, depth = 0, allowCanvas = true) {
         const actions = node.virtual_paper_folder
           ? paperFolderActions
           : node.project_id
-            ? `<span class="workspace-item-actions"><button data-action="edit-project" data-project-id="${node.project_id}" title="Edit project" aria-label="Edit ${projectLabel}">✎</button><button data-action="archive-project" data-project-id="${node.project_id}" title="Archive project" aria-label="Archive ${projectLabel}">${interfaceIcon("archive")}</button><button class="danger" data-action="delete-project" data-project-id="${node.project_id}" title="Delete project" aria-label="Delete ${projectLabel}">⌫</button></span>`
+            ? `<span class="workspace-item-actions"><button data-project-area="atelier" data-project-id="${node.project_id}" title="Open the Atelier: code, map and agents" aria-label="Open the Atelier of ${projectLabel}">&lt;/&gt;</button><button data-action="edit-project" data-project-id="${node.project_id}" title="Edit project" aria-label="Edit ${projectLabel}">✎</button><button data-action="archive-project" data-project-id="${node.project_id}" title="Archive project" aria-label="Archive ${projectLabel}">${interfaceIcon("archive")}</button><button class="danger" data-action="delete-project" data-project-id="${node.project_id}" title="Delete project" aria-label="Delete ${projectLabel}">⌫</button></span>`
           : node.trash_id
             ? `<span class="workspace-item-actions"><button data-restore-trash="${node.trash_id}" title="Restore" aria-label="Restore ${escapeHtml(node.label || node.name)}">↶</button><button class="danger" data-delete-trash="${node.trash_id}" title="Delete permanently" aria-label="Delete permanently ${escapeHtml(node.label || node.name)}">×</button></span>`
             : !node.root && !node.trashed && !node.protected
@@ -456,7 +456,8 @@ export function expandWorkspacePathParents(path) {
 }
 
 function notesWorkspaceContexts() {
-  return fileExplorerNavigation();
+  // In a project, the explorer shows only that project's notes, canvases and files.
+  return fileExplorerNavigation(state.projectWorkspaceId || null);
 }
 
 /** Explorer toolbar: every document type, created in the folder that has the tree focus. */
@@ -746,6 +747,13 @@ export async function refreshRelationalNotes() {
 }
 
 function workspaceResourcePane(resource, pane = "secondary") {
+  // The Atelier is a React panel mounted into this host (see features/atelier/mount).
+  if (resource?.type === "atelier")
+    return `<section class="secondary-resource-pane atelier-resource-pane" data-${pane}-path="${escapeHtml(resource.path)}" data-pane-drop="${pane}"><div class="atelier-host" data-atelier-project="${Number(resource.projectId)}" data-atelier-section="${escapeHtml(resource.section || "project")}" data-atelier-pane="${pane}"></div></section>`;
+  // Office documents, CSV and PDF files of the workspace: a React preview (features/atelier/mount).
+  const documentPath = String(resource?.path || "");
+  if (/\.(docx|xlsx|xlsm|pptx|csv|tsv)$/i.test(documentPath) || (/\.pdf$/i.test(documentPath) && !Number(resource?.paperId || resource?.paper_id || 0)))
+    return `<section class="secondary-resource-pane atelier-resource-pane" data-${pane}-path="${escapeHtml(documentPath)}" data-pane-drop="${pane}"><div class="atelier-document-host" data-document-path="${escapeHtml(documentPath)}" data-document-url="${escapeHtml(resource.url || `/api/workspace/file?path=${encodeURIComponent(documentPath)}`)}"></div></section>`;
   if (resource?.cloudDeleted) return '<section class="note-pane"><p role="status">This document was deleted remotely.</p></section>';
   if (resource?.type === "collection-record") return collectionRecordMarkup(resource, pane);
   const node = findWorkspaceNode(resource?.path) || resource;
@@ -906,7 +914,7 @@ export function applyWorkspaceTab(pane, tab) {
     state.primaryResource = tab.resource;
   }
   else state.secondaryResource = tab.resource;
-  if (tab.type === "resource") {
+  if (tab.type === "resource" && tab.resource?.type !== "atelier") {
     const paperId = Number(tab.resource?.paperId || tab.resource?.paper_id || 0);
     if (paperId)
       rememberWorkspaceSession({
@@ -937,6 +945,11 @@ export function replaceActiveWorkspaceTab(pane, tab, newTab = false) {
   const activeIndex = tabs.findIndex(
     (item) => item.id === state.workspaceActiveTabs[pane],
   );
+  // The Atelier stays open: documents opened from it or the explorer get their own tab.
+  if (tabs[activeIndex]?.resource?.type === "atelier" && tab.resource?.type !== "atelier") {
+    tabs.splice(activeIndex + 1, 0, tab);
+    return applyWorkspaceTab(pane, tab);
+  }
   if (activeIndex >= 0) tabs.splice(activeIndex, 1, tab);
   else tabs.push(tab);
   applyWorkspaceTab(pane, tab);
@@ -1347,7 +1360,10 @@ function renderNotesWorkspace(projectId = null) {
   const editorWorkspace = `<div class="notes-main-workspace ${secondary ? "with-secondary" : ""} ${state.secondaryFirst ? "secondary-first" : ""}" style="--note-workspace-left:${state.noteWorkspaceSplitPercent}%">${panes}</div>`;
   const recentNotes = [...contextNotes].filter(item => !item.trashed_at).sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))).slice(0, 6);
   const recents = '<details class="notes-recents"><summary>Recently modified</summary><div class="notes-recents-list">' + (recentNotes.length ? recentNotes.map(item => '<button data-note="' + item.id + '" data-note-tree-scope="' + (item.paper_id ? 'paper:' + item.paper_id : item.project_id ? 'project:' + item.project_id : 'general') + '" data-note-tree-folder="' + (item.folder_id || '') + '" title="' + escapeHtml(item.title) + '"><span class="recent-note-icon">' + interfaceIcon(item.drawing ? 'draw' : 'note') + '</span><span><strong>' + escapeHtml(item.title) + '</strong><small>' + escapeHtml(formatDate(item.updated_at)) + '</small></span></button>').join('') : '<p>Your latest notes will appear here.</p>') + '</div></details>';
-  return `<section class="notes-layout" data-notes-project="${projectId || ""}" style="--notes-sidebar-width:${state.noteSidebarWidth}px"><aside class="notes-sidebar">${notesExplorerToolbar()}<div class="notes-tree" id="notes-tree">${notesWorkspaceContexts()}</div><div class="note-search-results hidden" id="note-items" aria-live="polite"></div>${recents}</aside><button class="notes-sidebar-resizer" type="button" role="separator" aria-label="Resize document sidebar" aria-orientation="vertical" aria-valuemin="230" aria-valuemax="520" aria-valuenow="${state.noteSidebarWidth}"><span></span></button>${editorWorkspace}</section>`;
+  const project = state.projectWorkspaceId ? state.projects.find(item => item.id === state.projectWorkspaceId) : null;
+  // Project mode: the project's own sidebar (sections, code folders, agents) above its files.
+  const projectHead = project ? `<div class="atelier-sidebar-host" data-atelier-project="${project.id}"></div><div class="project-sidebar-files-label">Notes &amp; files</div>` : "";
+  return `<section class="notes-layout ${project ? "project-mode" : ""}" data-notes-project="${projectId || ""}" style="--notes-sidebar-width:${state.noteSidebarWidth}px"><aside class="notes-sidebar ${project ? "project-sidebar" : ""}">${projectHead}${notesExplorerToolbar()}<div class="notes-tree" id="notes-tree">${notesWorkspaceContexts()}</div><div class="note-search-results hidden" id="note-items" aria-live="polite"></div>${project ? "" : recents}</aside><button class="notes-sidebar-resizer" type="button" role="separator" aria-label="Resize document sidebar" aria-orientation="vertical" aria-valuemin="230" aria-valuemax="520" aria-valuenow="${state.noteSidebarWidth}"><span></span></button>${editorWorkspace}</section>`;
 }
 
 export function renderNotes() {
@@ -1357,11 +1373,16 @@ export function renderNotes() {
       (pane) => [(pane as HTMLElement).dataset.workspacePane, pane],
     ),
   );
+  // The project sidebar keeps its React panel across redraws of the same project.
+  const previousProjectSidebar = main.querySelector<HTMLElement>("#main-notes-area .atelier-sidebar-host");
   main.classList.remove("overview-mode");
   main.classList.add("notes-mode");
   const projectId = activeNoteProjectId();
   main.innerHTML = `<div id="main-notes-area">${renderNotesWorkspace(projectId)}</div>`;
   const root = main.querySelector("#main-notes-area");
+  const projectSidebar = root?.querySelector<HTMLElement>(".atelier-sidebar-host");
+  if (previousProjectSidebar && projectSidebar?.dataset.atelierProject === previousProjectSidebar.dataset.atelierProject)
+    projectSidebar.replaceWith(previousProjectSidebar);
   previousPanes.forEach((previous, pane) => {
     const replacement = root?.querySelector(
       `.workspace-pane-stack[data-workspace-pane="${pane}"]`,

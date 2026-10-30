@@ -24,6 +24,7 @@ function tabLabel(state: any, tab: any) {
 
 function tabIcon(state: any, tab: any) {
   if (tab.type === 'note') return state.notes.find((note: any) => note.id === Number(tab.noteId))?.drawing ? 'canvas' : 'notes';
+  if (tab.resource?.type === 'atelier') return ({ project: 'home', code: 'code', agents: 'agents', tasks: 'tasks' } as Record<string, string>)[tab.resource.section] || 'code';
   return tab.resource?.type === 'canvas' ? 'canvas' : 'notes';
 }
 

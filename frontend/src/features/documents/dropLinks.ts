@@ -44,7 +44,11 @@ export function droppedLink(payload: string): string | null {
       }
     };
     const node = find(state.workspaceTree);
-    return node ? link(node.label || node.name, node.note_id ? `#note-${node.note_id}` : `/api/workspace/file?path=${encodeURIComponent(path)}`) : null;
+    if (!node) return null;
+    const url = `/api/workspace/file?path=${encodeURIComponent(path)}`;
+    // An image dropped into a note is shown, not linked.
+    if (node.kind === 'image' || /\.(png|jpe?g|gif|webp|svg|bmp)$/i.test(path)) return `!${link(node.label || node.name, url)}`;
+    return link(node.label || node.name, node.note_id ? `#note-${node.note_id}` : url);
   }
   return null;
 }
