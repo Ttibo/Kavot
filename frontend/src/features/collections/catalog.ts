@@ -180,18 +180,15 @@ export function collectionItemRow(item, compact = false) {
   return `<div class="collection-item-row ${compact ? "compact" : ""}" draggable="true" data-collection-drag="${escapeHtml(payload)}"><span class="collection-item-grip" title="Drag to a project canvas">⠿</span><button data-collection-open="${escapeHtml(payload)}"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(truncate(item.detail || "", compact ? 52 : 130))}</small></button><i>${escapeHtml(item.meta || "")}</i>${compact ? "" : `<button data-workspace-row-menu aria-label="Actions de ${escapeHtml(item.title)}">•••</button>`}</div>`;
 }
 
-export async function openCollectionDatabase(databaseId) {
+export async function openCollectionDatabase(databaseId, options: { newTab?: boolean; beside?: boolean } = {}) {
   if (databaseId === "notes") return navigate("notes");
   const database = collectionDatabaseDefinitions().find(
     (item) => item.id === databaseId,
   );
   if (!database) return toast("Database not found", "error");
   state.collectionId = databaseId;
-  if (databaseId === "articles") return navigate("papers");
-  if (databaseId === "tasks") return navigate("tasks");
-  if (databaseId === "conferences") return navigate("conferences");
-  if (databaseId === "datasets") return navigate("datasets");
-  return navigate("database");
+  const view = { articles: "papers", tasks: "tasks", conferences: "conferences", datasets: "datasets" }[databaseId] || "database";
+  return navigate(view, options);
 }
 
 export function renderSidebarCollections() { publish(); }

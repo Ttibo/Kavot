@@ -19,7 +19,8 @@ async function requestApi<T = any>(path: string, options: RequestInit = {}): Pro
       if (typeof error.detail === 'string') message = error.detail;
       else if (Array.isArray(error.detail)) message = error.detail.map((item: { msg: string }) => item.msg).join(', ');
     } catch { /* Keep the HTTP status when the response is not JSON. */ }
-    throw new Error(message);
+    // The status tells a conflict (409: changed elsewhere) from other failures.
+    throw Object.assign(new Error(message), { status: response.status });
   }
   return response.status === 204 ? null as T : response.json();
 }

@@ -1,19 +1,23 @@
-/** Context the user picks for a chat: projects, notes, articles, folders, collections and files. */
+/** Context the user picks for a chat: projects, notes, articles, folders, collections, files, tasks,
+ * and a project's code (changed in worktrees) and resource folders (read only). */
 
-export type PickedKind = 'project' | 'note' | 'paper' | 'paper_folder' | 'note_folder' | 'collection' | 'file';
-export type PickedItem = { key: string; kind: PickedKind; id: string | number; title: string; subtitle?: string; count?: number };
+export type PickedKind = 'project' | 'code' | 'resource' | 'task' | 'note' | 'paper' | 'paper_folder' | 'note_folder' | 'collection' | 'file';
+export type PickedItem = { key: string; kind: PickedKind; id: string | number; title: string; subtitle?: string; count?: number; project_id?: number };
+/** A folder linked to a project in the Atelier. */
+export type ProjectFolder = { id: string; name: string; path: string; kind?: 'code' | 'resources'; file?: boolean; available: boolean; is_git?: boolean; branch?: string | null };
 export type PickerResource = { id: string; title: string; path: string; kind: string };
 type PickerState = {
-  projects?: Project[]; notes?: Note[]; papers?: Paper[]; paperFolders?: PaperFolder[]; noteFolders?: NoteFolder[];
+  projects?: Project[]; notes?: Note[]; papers?: Paper[]; paperFolders?: PaperFolder[]; noteFolders?: NoteFolder[]; tasks?: any[];
   databases?: Array<{ id: string; name: string; removed?: boolean }>;
 };
 
 export const KIND_LABELS: Record<PickedKind, string> = {
-  project: 'Project', note: 'Note', paper: 'Article', paper_folder: 'Article folder', note_folder: 'Note folder',
-  collection: 'Collection', file: 'File',
+  project: 'Project', code: 'Code', resource: 'Resource', task: 'Task', note: 'Note', paper: 'Article', paper_folder: 'Article folder',
+  note_folder: 'Note folder', collection: 'Collection', file: 'File',
 };
 export const KIND_ICONS: Record<PickedKind, string> = {
-  project: 'projects', note: 'notes', paper: 'papers', paper_folder: 'folder', note_folder: 'folder', collection: 'database', file: 'local',
+  project: 'projects', code: 'code', resource: 'folder', task: 'tasks', note: 'notes', paper: 'papers', paper_folder: 'folder',
+  note_folder: 'folder', collection: 'database', file: 'local',
 };
 /** Most notes a note folder adds as sources; the agent can still explore the rest. */
 export const FOLDER_NOTE_LIMIT = 40;
@@ -44,12 +48,26 @@ export function folderNotes(state: PickerState, folderId: number): Note[] {
   return (state.notes || []).filter(note => !note.trashed_at && note.folder_id !== null && ids.has(note.folder_id));
 }
 
+/** A project's linked folders: its code (given to change, in a worktree) and its resources (read only). */
+export function folderOptions(projectId: number, projectName: string, folders: ProjectFolder[]): PickedItem[] {
+  return folders.filter(folder => folder.available).map(folder => {
+    const code = folder.kind !== 'resources' && !folder.file && !!folder.is_git;
+    return { key: `${code ? 'code' : 'resource'}:${projectId}:${folder.id}`, kind: code ? 'code' as const : 'resource' as const, id: folder.id,
+      title: folder.name, project_id: projectId, subtitle: [projectName, code ? `${folder.branch || 'Git'} · changed in a worktree` : 'read only'].join(' · ') };
+  });
+}
+
 /** Everything that can be picked, with a short description; built from what the app already loaded. */
-export function pickerOptions(state: PickerState | undefined, resources: PickerResource[]): PickedItem[] {
-  if (!state) return resources.filter(isUserFile)
-    .map(item => ({ key: `file:${item.id}`, kind: 'file' as const, id: item.id, title: item.title, subtitle: item.path }));
+export function pickerOptions(state: PickerState | undefined, resources: PickerResource[], extra: PickedItem[] = []): PickedItem[] {
+  if (!state) return [...extra, ...resources.filter(isUserFile)
+    .map(item => ({ key: `file:${item.id}`, kind: 'file' as const, id: item.id, title: item.title, subtitle: item.path }))];
   const projectName = new Map((state.projects || []).map(project => [project.id, project.name]));
-  const options: PickedItem[] = [];
+  const options: PickedItem[] = [...extra];
+  for (const task of state.tasks || []) {
+    if (task.archived_at || task.status === 'done') continue;
+    options.push({ key: `task:${task.id}`, kind: 'task', id: task.id, title: task.title || 'Untitled task', project_id: task.project_id || undefined,
+      subtitle: [task.project_id ? projectName.get(task.project_id) : '', task.status, task.due_date].filter(Boolean).join(' · ') });
+  }
   for (const project of state.projects || []) {
     if (project.status === 'archived') continue;
     options.push({ key: `project:${project.id}`, kind: 'project', id: project.id, title: project.name,
@@ -121,6 +139,7 @@ export function filterOptions(options: PickedItem[], query: string, kind: Picked
 export type PickedContext = {
   project_id?: number; project_name?: string; collection_id?: string; picked_collection?: boolean;
   resource_ids: string[]; paper_ids: number[]; focus: Record<string, unknown>[]; note_id: number | null;
+  code_folder_ids: string[]; resource_folder_ids: string[];
 };
 
 /** The request context fields that make the agent work on the picked items. */
@@ -129,9 +148,17 @@ export function pickedContext(picked: PickedItem[], state: PickerState | undefin
   const resourceIds: string[] = [];
   const paperIds = new Set<number>();
   const focus: Record<string, unknown>[] = [];
+  const codeIds: string[] = [];
+  const folderIds: string[] = [];
   const result: Partial<PickedContext> = {};
   for (const item of picked) {
-    if (item.kind === 'project') {
+    if ((item.kind === 'code' || item.kind === 'resource') && item.project_id) {
+      (item.kind === 'code' ? codeIds : folderIds).push(String(item.id));
+      result.project_id ??= item.project_id;
+      focus.push({ kind: item.kind === 'code' ? 'code folder (changed in a worktree)' : 'resource folder (read only)', title: item.title });
+    } else if (item.kind === 'task') {
+      focus.push({ kind: 'task', title: item.title, ref: `kavot://tasks/${item.id}` });
+    } else if (item.kind === 'project') {
       result.project_id = Number(item.id); result.project_name = item.title;
       focus.push({ kind: 'project', title: item.title, ref: `kavot://projects/${item.id}` });
     } else if (item.kind === 'note') {
@@ -160,7 +187,7 @@ export function pickedContext(picked: PickedItem[], state: PickerState | undefin
   for (const id of paperIds) if (available.has(`paper:${id}`)) resourceIds.push(`paper:${id}`);
   const singleNote = picked.filter(item => item.kind === 'note');
   return { ...result, resource_ids: resourceIds, paper_ids: [...paperIds], focus,
-    note_id: singleNote.length === 1 ? Number(singleNote[0].id) : null };
+    note_id: singleNote.length === 1 ? Number(singleNote[0].id) : null, code_folder_ids: codeIds, resource_folder_ids: folderIds };
 }
 
 const storageKey = (sessionId: string) => `kavot-chat-context:${sessionId}`;

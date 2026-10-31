@@ -1,3 +1,4 @@
+import { setEditorBase } from './editorBase';
 import { Editor, Extension } from "@tiptap/core";
 import StarterKit from "@tiptap/starter-kit";
 import { TableKit } from "@tiptap/extension-table";
@@ -244,6 +245,7 @@ export function setMarkdownBlockEditorContent(
   if (assetBase != null) container.dataset.assetBase = assetBase;
   const html = documentHtml(content, container.dataset.assetBase);
   source.value = html;
+  setEditorBase(source, content);
   if (s) {
     s.editor.commands.setContent(html, { emitUpdate: !silent });
     if (focusIndex != null) s.editor.commands.focus("end");
@@ -1073,12 +1075,15 @@ export function bindMarkdownBlockEditor(
       }
     });
   function applyPresentation() {
-    const note = state.notes.find((n) => String(n.id) === key(root));
+    const pane = root.closest<HTMLElement>("[data-primary-note-id],[data-secondary-note-id],[data-agent-note-id]");
+    const note = state.notes.find((n) => String(n.id) === (pane?.dataset.agentNoteId || pane?.dataset.primaryNoteId || pane?.dataset.secondaryNoteId));
     const presentation = note?.presentation || {};
     host.style.maxWidth = "none";
     host.style.margin = "0";
     host.style.width = "100%";
-    const background = { cream: "#fffaf0", slate: "#eef3f7" }[presentation.theme] || "";
+    // The page background follows the note's saved theme in light and dark app themes alike;
+    // without one the app surface shows through, so a note never renders on plain white.
+    const background = { cream: "#fffaf0", slate: "#eef3f7" }[presentation.theme] || "var(--surface)";
     host.style.background = background;
     reading.style.background = background;
   }

@@ -40,6 +40,10 @@ class Registry:
     # Reviewable agent actions: kind -> {"model": pydantic model, "state_key": str,
     # "apply": (payload, identifier, values) -> dict with the new or changed item}.
     agent_actions: dict[str, dict[str, Any]] = field(default_factory=dict)
+    # Working folders of agent conversations (see app.core.agents.sessions.Workspace): objects with
+    # prepare(session, context, mode), launch(session, run) -> Workspace | None, finish(session, run)
+    # and forget(session), each called with the sessions lock held.
+    agent_workspaces: list[Any] = field(default_factory=list)
     # Hooks on kavot.state.json: fill a new workspace, upgrade an existing one (return True if changed).
     state_initializers: list[Callable[[dict, str], None]] = field(default_factory=list)
     state_migrations: list[Callable[[dict, str], bool]] = field(default_factory=list)

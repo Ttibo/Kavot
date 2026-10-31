@@ -91,12 +91,17 @@ export async function refreshAgentArtifacts() {
     ...state.workspaceTabs.primary.map(tab => tab.resource),
     ...state.workspaceTabs.secondary.map(tab => tab.resource)].filter(Boolean));
   for (const resource of resources) {
-    if (resource.path?.endsWith('.md')) {
-      const response = await fetch(`/api/workspace/file?path=${encodeURIComponent(resource.path)}`);
+    // Documents open as workspace files (Markdown, and notes opened from a canvas or a link) are read again
+    // with their version, so their editors show the agent's text and save on top of it.
+    if (resource.type === 'markdown' || resource.path?.endsWith('.md')) {
+      const response = await fetch(`/api/workspace/file?path=${encodeURIComponent(resource.path)}`, { cache: 'no-store' });
       if (response.status === 404) { forgetWorkspaceItems({ path: resource.path }); continue; }
       if (!response.ok) throw new Error('Unable to reload an open note.');
       resource.content = await response.text();
+      resource.version = response.headers.get('X-Kavot-Version') || undefined;
     }
+    // Pages and Atelier sections refresh themselves from the state: rebuilding them would lose what they show.
+    if (['view', 'atelier'].includes(resource.type)) continue;
     if (!resource.path?.toLowerCase().endsWith('.pdf')) resource.renderVersion = Number(resource.renderVersion || 0) + 1;
   }
   window.dispatchEvent(new CustomEvent('kavot:agent-notes-updated', { detail: { notes: state.notes } }));

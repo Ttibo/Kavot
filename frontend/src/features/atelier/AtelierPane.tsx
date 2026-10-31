@@ -1,16 +1,18 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRuntime } from '../../app/runtime';
 import { publish } from '../../app/viewBridge';
 import { refreshState, toast } from '../../app/navigation';
 import { Icon } from '../../components/Icon';
 import { openNoteBeside, openProjectCanvas, switchAtelier, type AtelierSection } from '../projects/navigation';
-import { AgentsPanel } from './AgentsPanel';
+import { AgentSurface } from '../agents/AgentSurface';
 import { TasksBoard } from './TasksBoard';
 import { clearAtelierLocation, notifyAtelierChanged, setAtelierIntent, setAtelierLocation, takeAtelierIntent, useAtelierChanged, useAtelierLocations } from './intent';
 import { CodeMap } from './CodeMap';
 import { FilesPanel } from './FilesPanel';
 import { GitPanel } from './GitPanel';
-import { ACTIVE, atelierApi, openInEditor, post, relative, STATUS_LABELS, type Folder, type Overview } from './types';
+import { atelierApi, openInEditor, post, relative, type Folder, type Overview } from './types';
+import { needsAttention, STATUS_LABELS, statusOf } from '../agents/api';
+import { registerAgentContext } from '../externalAgents/context';
 import '../../styles/features/atelier.css';
 
 type Pane = 'primary' | 'secondary';
@@ -64,7 +66,7 @@ function ProjectHome({ projectId, data, pane, onCode, onAgents, onAddFolder, onR
   const code = data.folders.filter(folder => folder.kind !== 'resources');
   const resources = data.folders.filter(folder => folder.kind === 'resources');
   const openTasks = data.tasks.filter(task => task.status !== 'done');
-  const activeRuns = data.runs.filter(run => ACTIVE.includes(run.status));
+  const activeRuns = data.conversations.filter(item => needsAttention(statusOf(item)));
   const notes = [...data.notes].sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))).slice(0, 8);
   return <div className="atelier-home">
     <section className="atelier-home-intro">
@@ -110,7 +112,7 @@ function ProjectHome({ projectId, data, pane, onCode, onAgents, onAddFolder, onR
       <section className="atelier-home-block">
         <h3>Agents<button className="text-link" onClick={() => onAgents({ runId: null })}>New</button></h3>
         {activeRuns.length ? activeRuns.map(run => <button key={run.id} className="atelier-home-row" onClick={() => onAgents({ runId: run.id })}>
-          <span className={`atelier-dot ${run.status}`}/><span>{run.title}</span><small>{STATUS_LABELS[run.status]}</small></button>)
+          <span className={`atelier-dot ${statusOf(run)}`}/><span>{run.title}</span><small>{STATUS_LABELS[statusOf(run)]}</small></button>)
           : <p className="atelier-muted">No agent at work. Give a task to an agent, or start one from the Agents section.</p>}
       </section>
       <section className="atelier-home-block">
@@ -131,14 +133,15 @@ function ProjectHome({ projectId, data, pane, onCode, onAgents, onAddFolder, onR
   </div>;
 }
 
-export function AtelierPane({ projectId, section, pane }: { projectId: number; section: AtelierSection; pane: Pane }) {
+/** A section of a project in an editor tab; a Code tab opened on a linked folder (`folder`) starts on it. */
+export function AtelierPane({ projectId, section, pane, folder: initialFolder }: { projectId: number; section: AtelierSection; pane: Pane; folder?: string }) {
   const { state } = useRuntime();
-  const key = `${projectId}:${section}:${pane}`;
+  const key = `${projectId}:${section}:${pane}${initialFolder ? `:${initialFolder}` : ''}`;
   const projects = state.projects.filter((project: Project) => project.status !== 'archived' || project.id === projectId);
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState('');
   const [adding, setAdding] = useState<Kind | null>(null);
-  const [folderId, setFolderId] = useRemembered(`${key}:folder`, '');
+  const [folderId, setFolderId] = useRemembered(`${key}:folder`, initialFolder || '');
   const [codeTab, setCodeTab] = useRemembered<CodeTab>(`${key}:tab`, 'files');
   const [runId, setRunId] = useRemembered<string | null>(`${projectId}:run:${pane}`, null);
   const [taskForRun, setTaskForRun] = useState<number | null>(null);
@@ -157,7 +160,7 @@ export function AtelierPane({ projectId, section, pane }: { projectId: number; s
   useEffect(() => {
     if (data && !data.folders.some(folder => folder.id === folderId)) setFolderId(data.folders[0]?.id || '');
   }, [data]);
-  const running = data?.runs.filter(run => run.status === 'running').length || 0;
+  const running = data?.conversations.filter(item => item.active_run_id).length || 0;
   useEffect(() => {
     if (!running || section === 'agents') return;
     const timer = window.setInterval(() => { void load(); }, 4000);
@@ -203,21 +206,30 @@ export function AtelierPane({ projectId, section, pane }: { projectId: number; s
   }, [projectId, section, folderId, runId, pane]);
   useEffect(() => {
     if (section !== 'code' || !folder) return;
-    const tab = state.workspaceTabs[pane]?.find((item: any) => item.resource?.path === `atelier/${projectId}/code`);
+    const tab = state.workspaceTabs[pane]?.find((item: any) => item.resource?.path === `atelier/${projectId}/code${initialFolder ? `/${initialFolder}` : ''}`);
     const title = `${folder.kind === 'resources' ? 'Files' : 'Code'} · ${folder.name}`;
     if (tab && tab.resource.title !== title) { tab.resource.title = title; publish(); }
   }, [section, folder?.name, pane]);
 
-  // A new agent starts on the folder shown in a Code pane of this project, if any.
-  const codeFolder = Object.values(locations).find(item => item?.projectId === projectId && item.section === 'code')?.folderId;
-  return <div className="atelier-view atelier-pane">
+  // The assistant follows this pane: the project, its section and the code shown, suggested to an agent.
+  const host = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!host.current) return;
+    return registerAgentContext(host.current, () => ({
+      area: 'project', project_id: projectId, project_name: project?.name,
+      view_label: `Atelier · ${{ project: 'Overview', code: folder?.kind === 'resources' ? 'Resources' : 'Code', agents: 'Agents', tasks: 'Tasks' }[section]}${section === 'code' && folder ? ` · ${folder.name}` : ''}`,
+      ...(section === 'code' && folder ? { code_folder_id: folder.id } : {}),
+    }));
+  }, [projectId, section, folder?.id, folder?.name, project?.name]);
+  const task = taskForRun ? data?.tasks.find(item => item.id === taskForRun) : undefined;
+  return <div className="atelier-view atelier-pane" ref={host}>
     {error ? <p className="atelier-empty">{error}</p> : !data ? <p role="status" className="atelier-empty">Loading…</p>
       : adding ? <div className="atelier-centered"><h3>Link code or a resource</h3><AddFolder key={adding} projectId={projectId} kind={adding} onAdded={() => { setAdding(null); changed(); }} onCancel={() => setAdding(null)}/></div>
       : section === 'project' ? <ProjectHome projectId={projectId} data={data} pane={pane} onAddFolder={kind => setAdding(kind)} onRemoveFolder={item => void removeFolder(item)}
           onCode={(id, tab) => go('code', { folderId: id, codeTab: tab })} onAgents={({ runId: run, taskId }) => go('agents', { runId: run ?? null, taskId })}/>
       : section === 'tasks' ? <TasksBoard projectId={projectId} onAgent={taskId => go('agents', { runId: null, taskId })}/>
-      : section === 'agents' ? <AgentsPanel projectId={projectId} data={data} pane={pane} selectedRun={runId} onSelectRun={id => { setRunId(id); if (id) setTaskForRun(null); }}
-          initialFolder={codeFolder || folderId} initialTask={taskForRun} onChanged={changed}/>
+      : section === 'agents' ? <AgentSurface layout="page" projectId={projectId} pane={pane} selected={runId} onSelect={id => { setRunId(id); if (id) setTaskForRun(null); }}
+          onChanged={changed} preset={task ? [{ key: `task:${task.id}`, kind: 'task', id: task.id, title: task.title, project_id: projectId }] : undefined}/>
       : !data.folders.length ? <div className="atelier-centered"><h3>Link the project's code</h3><p className="atelier-muted">Each folder gets a file browser, its Git history, a map of the code and development agents.</p><AddFolder projectId={projectId} onAdded={changed}/></div>
       : <div className="atelier-code-section">
         <header className="atelier-code-head">

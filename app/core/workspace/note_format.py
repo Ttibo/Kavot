@@ -76,7 +76,7 @@ GUIDE = {
         },
     },
     "note_settings": {
-        "presentation": "note_properties_update presentation: {\"width\": \"narrow|comfortable|wide\", \"theme\": \"paper|cream|slate\"}",
+        "presentation": "note_properties_update presentation: {\"width\": \"narrow|comfortable|wide\", \"theme\": \"paper|cream|slate\"}; omit theme to follow the app's light/dark theme, cream and slate stay light",
         "properties": "note_properties_update properties: free key/value metadata shown at the top of the note",
         "title_and_folder": "note_organize: title, project_id, folder_id",
     },

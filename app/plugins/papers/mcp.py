@@ -7,6 +7,23 @@ from typing import Annotated, Any, Literal
 from pydantic import Field
 
 LOOKUP_LIMIT = 30
+# Search results stay in the conversation and are resent on every later call:
+# lists carry a short abstract, get_article_details gives the full one.
+ABSTRACT_PREVIEW = 300
+DETAILS_ABSTRACT = 4000
+BRIEF_NOTE = f"Abstracts cut to {ABSTRACT_PREVIEW} characters; get_article_details(ids) gives the full abstracts."
+
+
+def brief(article: dict) -> dict:
+    """One search hit: what is needed to judge relevance and cite it."""
+    authors = article.get("authors") or []
+    abstract = str(article.get("abstract") or "")
+    return {"id": article.get("id"), "title": article.get("title"), "year": article.get("year"),
+            "authors": [*authors[:3], *(["et al."] if len(authors) > 3 else [])],
+            "doi": article.get("doi"), "url": None if article.get("doi") else article.get("href"),
+            "publication": article.get("publication"), "cited_by": article.get("cited_by_count"),
+            "relation": article.get("relation"), "local_paper_id": article.get("local_paper_id"),
+            "abstract": abstract[:ABSTRACT_PREVIEW] + ("…" if len(abstract) > ABSTRACT_PREVIEW else "")}
 
 
 def install(ctx) -> None:
@@ -68,8 +85,8 @@ def install(ctx) -> None:
         result = literature.search(query, limit)
         with ctx.lock:
             ctx.active()
-            result["articles"] = literature.register(ctx.run, result["articles"])
-            return result
+            articles = literature.register(ctx.run, result["articles"])
+            return ctx.compact({"articles": [brief(a) for a in articles], "total": result.get("total"), "note": BRIEF_NOTE})
 
     @ctx.tool(annotations=ctx.network_read)
     def get_related_articles(reference_id: str | None = None,
@@ -88,8 +105,11 @@ def install(ctx) -> None:
             focus = literature.register(ctx.run, [result["focus"]] if result.get("focus") else [])
             result["focus"] = focus[0] if focus else None
             allowed = {n["id"] for n in [*result["articles"], *focus]}
-            result["edges"] = [e for e in result["edges"] if str(e.get("source")) in allowed and str(e.get("target")) in allowed]
-            return result
+            result["edges"] = [{k: e.get(k) for k in ("source", "target", "relation")} for e in result["edges"]
+                               if str(e.get("source")) in allowed and str(e.get("target")) in allowed]
+            result["articles"] = [brief(a) for a in result["articles"]]
+            result["focus"] = brief(result["focus"]) if result["focus"] else None
+            return ctx.compact({**result, "note": BRIEF_NOTE})
 
     @ctx.tool(annotations=ctx.network_read)
     def get_article_details(article_ids: Annotated[list[str], Field(min_length=1, max_length=8)]) -> dict[str, Any]:
@@ -116,6 +136,6 @@ def install(ctx) -> None:
             results = list(pool.map(literature.details, nodes))
         with ctx.lock:
             ctx.active()
-            return {"articles": literature.register(ctx.run, [
+            return {"articles": [{**a, "abstract": str(a.get("abstract") or "")[:DETAILS_ABSTRACT]} for a in literature.register(ctx.run, [
                 {**result, "id": node.get("id") or result.get("openalex_id") or identifier}
-                for identifier, node, result in zip(resolved_ids, nodes, results)]), "errors": errors}
+                for identifier, node, result in zip(resolved_ids, nodes, results)])], "errors": errors}

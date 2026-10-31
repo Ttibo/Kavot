@@ -2,6 +2,7 @@ import { flushReaderAutosave, main, state } from '../../app/state';
 import { applyWorkspaceTab, ensureWorkspaceTab, reloadNoteForOpen, workspaceNoteTab, expandWorkspacePathParents, findWorkspaceNode, flushCurrentNoteAutosave, flushSecondaryNoteAutosave, flushWorkspaceMarkdownSaves, renderNotes, replaceActiveWorkspaceTab, workspaceResourcePayload, workspaceResourceTab } from '../documents/workspace';
 import { flushCanvasSaves } from '../documents/canvas';
 import { navigate, refreshData, setActiveNavigation, toast } from '../../app/navigation';
+import { setScope } from '../../app/scope';
 
 export async function openProjectArea(projectId, area = "canvas") {
   const project = state.projects.find((item) => item.id === Number(projectId));
@@ -23,19 +24,12 @@ export async function openProjectArea(projectId, area = "canvas") {
     await flushSecondaryNoteAutosave();
     await flushCanvasSaves();
     const resource = await workspaceResourcePayload(node);
+    // Opening a project filters the interface on it; the canvas opens next to the documents already open.
+    await setScope(project.id);
     state.view = "notes";
-    state.projectWorkspaceId = project.id;
     state.selectedProject = null;
-    state.noteScope = "general";
-    state.noteFolderId = "all";
-    state.currentNoteId = null;
-    state.primaryResource = resource;
-    state.secondaryResource = null;
-    state.workspaceTabs.primary = [];
-    state.workspaceTabs.secondary = [];
-    state.workspaceActiveTabs.primary = null;
-    state.workspaceActiveTabs.secondary = null;
-    replaceActiveWorkspaceTab("primary", workspaceResourceTab(resource));
+    ensureWorkspaceTab("primary", workspaceResourceTab(resource));
+    applyWorkspaceTab("primary", workspaceResourceTab(resource));
     expandWorkspacePathParents(node.path);
     const projectDirectory = String(project.canvas_path || "").split("/")[1];
     state.expandedWorkspacePaths.add("notes");
@@ -44,7 +38,7 @@ export async function openProjectArea(projectId, area = "canvas") {
       state.expandedWorkspacePaths.add(`notes/projects/${projectDirectory}`);
     state.activeNotePane = "primary";
     main.classList.remove("reader-mode", "tasks-mode", "calendar-mode", "overview-mode");
-    setActiveNavigation("atelier");
+    setActiveNavigation();
     renderNotes();
     (main as HTMLElement).focus();
   } else if (area === "atelier") {
@@ -70,8 +64,10 @@ export async function openProjectArea(projectId, area = "canvas") {
 export type AtelierSection = "project" | "code" | "agents" | "tasks";
 const ATELIER_TITLES: Record<AtelierSection, string> = { project: "Atelier", code: "Code", agents: "Agents", tasks: "Tasks" };
 
-export function atelierResource(project: Project, section: AtelierSection = "project") {
-  return { type: "atelier", path: `atelier/${project.id}/${section}`, title: `${ATELIER_TITLES[section]} · ${project.name}`, projectId: project.id, section };
+/** A section of a project as an editor tab. Each linked folder of the Code section is a tab of its own. */
+export function atelierResource(project: Project, section: AtelierSection = "project", folderId?: string) {
+  const folder = section === "code" && folderId ? folderId : undefined;
+  return { type: "atelier", path: `atelier/${project.id}/${section}${folder ? `/${folder}` : ""}`, title: `${ATELIER_TITLES[section]} · ${project.name}`, projectId: project.id, section, folderId: folder };
 }
 
 async function flushEditors() {
@@ -90,38 +86,25 @@ function revealProject(project: Project) {
 }
 
 /** Opens a section of a project's Atelier as a tab of the Workspace editor, next to its notes and canvas. */
-export async function openAtelier(projectId: number, section: AtelierSection = "project", pane?: "primary" | "secondary") {
+export async function openAtelier(projectId: number, section: AtelierSection = "project", pane?: "primary" | "secondary", options: { newTab?: boolean; folderId?: string } = {}) {
   const project = state.projects.find((item) => item.id === Number(projectId));
   if (!project) return toast("This project no longer exists", "error");
   await flushEditors();
   state.atelierProjectId = project.id;
-  const tab = workspaceResourceTab(atelierResource(project, section));
-  // Entering a project starts its own set of tabs; inside it, sections open next to the editors.
-  if (state.view !== "notes" || state.projectWorkspaceId !== project.id) {
+  const tab = workspaceResourceTab(atelierResource(project, section, options.folderId));
+  // A project section is a tab of the editor like any document: it opens next to the tabs already there.
+  if (state.view !== "notes") {
     state.view = "notes";
-    state.projectWorkspaceId = project.id;
     state.selectedProject = null;
-    state.noteScope = "general";
-    state.noteFolderId = "all";
-    state.currentNoteId = null;
-    state.primaryResource = null;
-    state.secondaryResource = null;
-    state.workspaceTabs.primary = [];
-    state.workspaceTabs.secondary = [];
-    state.workspaceActiveTabs.primary = null;
-    state.workspaceActiveTabs.secondary = null;
-    pane = "primary";
     main.classList.remove("reader-mode", "tasks-mode", "calendar-mode", "overview-mode");
-    setActiveNavigation("atelier");
+    setActiveNavigation();
   }
   const target = pane || (state.activeNotePane === "secondary" ? "secondary" : "primary");
-  const active = state.workspaceTabs[target].find((item) => item.id === state.workspaceActiveTabs[target]);
-  // The sidebar navigates within the Atelier tab in front; other documents keep their tabs.
-  if (!pane && active?.resource?.type === "atelier") replaceActiveWorkspaceTab(target, tab);
-  else {
+  // Like any document: in the active tab, or in a new one (Ctrl/Cmd+click); into a given pane, as its own tab.
+  if (pane || options.newTab) {
     ensureWorkspaceTab(target, tab);
     applyWorkspaceTab(target, tab);
-  }
+  } else replaceActiveWorkspaceTab(target, tab);
   revealProject(project);
   renderNotes();
 }
@@ -129,8 +112,8 @@ export async function openAtelier(projectId: number, section: AtelierSection = "
 /** The pane next to `pane`: the Atelier opens notes, the canvas or another section there, side by side. */
 const besidePane = (pane: string) => pane === "secondary" ? "primary" : "secondary";
 
-export async function openAtelierBeside(projectId: number, section: AtelierSection, pane: string) {
-  await openAtelier(projectId, section, besidePane(pane));
+export async function openAtelierBeside(projectId: number, section: AtelierSection, pane: string, folderId?: string) {
+  await openAtelier(projectId, section, besidePane(pane), { folderId });
 }
 
 export async function openNoteBeside(noteId: number, pane: string) {
@@ -161,7 +144,6 @@ export function switchAtelier(projectId: number, section: AtelierSection, pane: 
   const project = state.projects.find((item) => item.id === Number(projectId));
   if (!project) return;
   state.atelierProjectId = project.id;
-  if (state.projectWorkspaceId && state.projectWorkspaceId !== project.id) state.projectWorkspaceId = project.id;
   replaceActiveWorkspaceTab(pane, workspaceResourceTab(atelierResource(project, section)));
   revealProject(project);
   renderNotes();

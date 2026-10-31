@@ -1,4 +1,5 @@
-import { escapeHtml, flushReaderAutosave, main, modalBackdrop, state } from './state';
+import { viewShown, escapeHtml, flushReaderAutosave, main, modalBackdrop, state } from './state';
+import { ensureEditor } from './tabs/pages';
 
 import { addProjectResourceModal, editProjectModal, newProjectModal } from '../features/projects/dialogs';
 
@@ -672,14 +673,12 @@ export function initializeEvents() {
 // macOS turns Ctrl+left-click into a context menu, so handle the pointer
 // gesture directly and suppress its native follow-up events.
 let ctrlDocumentClick = false;
-// In the notes tree, Ctrl+click selects several rows instead (see treeSelection).
+// Ctrl+click opens in a new tab, in the notes tree too (Ctrl+Shift selects there, see treeSelection).
 const documentOpenControl = (target: EventTarget | null) =>
-  target instanceof Element && !target.closest('#notes-tree .workspace-file-row')
-    ? target.closest<HTMLElement>('[data-note], [data-open-workspace-resource]')
-    : null;
+  target instanceof Element ? target.closest<HTMLElement>('[data-note], [data-open-workspace-resource]') : null;
 document.addEventListener("pointerdown", event => {
   const control = documentOpenControl(event.target);
-  ctrlDocumentClick = event.button === 0 && event.ctrlKey && Boolean(control);
+  ctrlDocumentClick = event.button === 0 && event.ctrlKey && !event.shiftKey && Boolean(control);
   if (!ctrlDocumentClick) return;
   event.preventDefault();
   event.stopPropagation();
@@ -791,12 +790,16 @@ document.addEventListener("click", async (event) => {
     event.preventDefault();
     return openCollectionDatabase(
       (collectionNavigation as HTMLElement).dataset.collectionNav,
+      { newTab: event.ctrlKey || event.metaKey },
     );
   }
   const nav = (event.target as HTMLElement).closest("[data-nav]");
   if (nav) {
     event.preventDefault();
-    return navigate((nav as HTMLElement).dataset.nav);
+    // From inside a pane (its new-tab launcher), the page opens in that pane.
+    const fromPane = nav.closest<HTMLElement>("[data-workspace-pane]")?.dataset.workspacePane;
+    if (fromPane === "primary" || fromPane === "secondary") state.activeNotePane = fromPane;
+    return navigate((nav as HTMLElement).dataset.nav, { newTab: event.ctrlKey || event.metaKey });
   }
   const projectArea = (event.target as HTMLElement).closest("[data-project-area]");
   if (projectArea)
@@ -947,7 +950,7 @@ document.addEventListener("click", async (event) => {
       closeModal();
       state.paperFolderFilter = "all";
       await refreshData();
-      if (state.view === "papers") renderPapers();
+      if (viewShown("papers")) renderPapers();
       else renderNotes();
       toast("Folder deleted; articles kept");
     } catch (error) {
@@ -1016,6 +1019,7 @@ document.addEventListener("click", async (event) => {
     const noteId = Number((secondaryNote as HTMLElement).dataset.openSecondaryNote);
     const drawing = await reloadNoteForOpen(noteId);
     if (!drawing) return;
+    ensureEditor();
     if (!state.primaryResource && noteId === state.currentNoteId)
       return toast(
         "This note is already open in the primary pane",
@@ -1056,7 +1060,7 @@ document.addEventListener("click", async (event) => {
         : state.activeNotePane === "secondary" && state.workspaceTabs.secondary.length
           ? "secondary"
           : "primary";
-      replaceActiveWorkspaceTab(pane, workspaceResourceTab(resource), (workspaceResource as HTMLElement).dataset.openInNewTab === "true" || (event.button === 0 && event.ctrlKey));
+      replaceActiveWorkspaceTab(pane, workspaceResourceTab(resource), (workspaceResource as HTMLElement).dataset.openInNewTab === "true" || (event.button === 0 && (event.ctrlKey || event.metaKey)));
     } catch (error) {
       return toast(error.message, "error");
     }
@@ -1144,7 +1148,7 @@ document.addEventListener("click", async (event) => {
     if (isDrawingNote(selectedNote)) {
       state.currentNoteId = selectedNote.id;
       state.primaryResource = null;
-      replaceActiveWorkspaceTab("primary", workspaceNoteTab(selectedNote), (note as HTMLElement).dataset.openInNewTab === "true" || (event.button === 0 && event.ctrlKey));
+      replaceActiveWorkspaceTab("primary", workspaceNoteTab(selectedNote), (note as HTMLElement).dataset.openInNewTab === "true" || (event.button === 0 && (event.ctrlKey || event.metaKey)));
       state.editorMode = "edit";
       if (!projectId) state.view = "notes";
       return rerenderNotesContext(projectId);
@@ -1153,7 +1157,7 @@ document.addEventListener("click", async (event) => {
       state.activeNotePane === "secondary" && state.workspaceTabs.secondary.length
         ? "secondary"
         : "primary";
-    replaceActiveWorkspaceTab(pane, workspaceNoteTab(selectedNote), (note as HTMLElement).dataset.openInNewTab === "true" || (event.button === 0 && event.ctrlKey));
+    replaceActiveWorkspaceTab(pane, workspaceNoteTab(selectedNote), (note as HTMLElement).dataset.openInNewTab === "true" || (event.button === 0 && (event.ctrlKey || event.metaKey)));
     state.editorMode = "edit";
     state.activeNotePane = pane;
     if (!projectId) state.view = "notes";
@@ -1248,7 +1252,7 @@ document.addEventListener("click", async (event) => {
         method: "DELETE",
       });
       await refreshData();
-      if (state.view === "dashboard") renderDashboard();
+      if (viewShown("dashboard")) renderDashboard();
       await openSettings("templates");
       toast("Template deleted");
     } catch (error) {
@@ -2128,3 +2132,17 @@ document.addEventListener("keydown", (event) => {
   if (event.key === "Escape" && !event.defaultPrevented) closeModal();
 });
 }
+
+// Tabs from the keyboard: Ctrl/Cmd+T opens a new tab in the active pane, Ctrl/Cmd+W closes the active tab.
+document.addEventListener("keydown", (event) => {
+  if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+  const key = event.key.toLowerCase();
+  if (key !== "t" && key !== "w") return;
+  if (document.querySelector(".modal-backdrop:not(.hidden)")) return;
+  event.preventDefault();
+  const pane = state.activeNotePane === "secondary" && state.workspaceTabs.secondary.length ? "secondary" : "primary";
+  if (key === "t") {
+    ensureEditor();
+    void createWorkspaceTab(pane);
+  } else if (state.workspaceActiveTabs[pane]) void closeWorkspaceTab(pane, state.workspaceActiveTabs[pane]);
+});

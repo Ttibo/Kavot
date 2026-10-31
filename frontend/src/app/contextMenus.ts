@@ -1,4 +1,5 @@
 import { getRuntime } from './runtime';
+import { viewShown } from './state';
 import { openShareDialog, type ShareSource } from '../components/SharingPanel';
 import { findWorkspaceNode, interfaceIcon } from '../features/documents/workspace';
 import { isTreeRowSelected, selectedTreePaths } from '../features/documents/treeSelection';
@@ -202,17 +203,26 @@ function actionsFor(target: HTMLElement): ContextAction[] {
   const column = target.closest<HTMLElement>('.kanban-column');
   if (column) return controls(column, '.kanban-head button, .kanban-add');
   const navigation = target.closest<HTMLElement>('[data-nav], [data-collection-nav], [data-project-area]');
-  if (navigation) return [control(navigation, 'Open')];
+  if (navigation) {
+    // Pages of the application open as tabs: here, in a new tab, or in the other pane.
+    const { nav: view, collectionNav: collection } = navigation.dataset;
+    const open = (options: { newTab?: boolean; beside?: boolean }) =>
+      void (collection ? runtime.openCollectionDatabase(collection, options) : runtime.navigate(view, options));
+    return [control(navigation, 'Open'), ...(view || collection ? [
+      { label: 'Open in a new tab', run: () => open({ newTab: true }) },
+      { label: 'Open to the side', run: () => open({ beside: true }) },
+    ] : [])];
+  }
   const button = target.closest<HTMLElement>('button, a[download]');
   if (button && !button.matches(':disabled')) return [control(button)];
   // Background menus expose creation and view commands only, never actions on
   // an unrelated record elsewhere on the page.
-  const scope = target.closest<HTMLElement>('.modal, [role="dialog"], #main-content, #sidebar, .agent-panel');
+  const scope = target.closest<HTMLElement>('.modal, [role="dialog"], #main-content, #sidebar');
   if (!scope) return [];
   const actions = [...scope.querySelectorAll<HTMLElement>('[data-action^="new-"], [data-action="add-project-resource"], [data-action="task-archives"], [data-action="reset-paper-filters"]')]
     .filter(el => !el.closest('.workspace-file-row, .paper-folder-row, .kanban-column') && !el.matches(':disabled') && !el.closest('.hidden'))
     .map(el => control(el));
-  if (scope.matches('#main-content') && state.view === 'calendar') actions.push({ label: 'New event', run: () => runtime.calendarEventModal() });
+  if (scope.matches('#main-content') && viewShown('calendar')) actions.push({ label: 'New event', run: () => runtime.calendarEventModal() });
   if (!scope.closest('[role="dialog"]')) actions.push(
     command('Research Home', { nav: 'dashboard' }),
     command('Workspace', { nav: 'notes' }),

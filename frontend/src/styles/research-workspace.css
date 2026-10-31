@@ -38,7 +38,7 @@ html[data-theme="dark"] {
   padding: 0; border-right: 1px solid var(--line); background: var(--sidebar-surface);
   box-shadow: none; transition: width 140ms ease, transform 160ms ease; z-index: 70;
 }
-.research-shell .research-sidebar:is(:hover,:focus-within) { width: var(--research-sidebar-width); box-shadow: none; }
+/* Hovering a collapsed ribbon must not resize it: the width animation briefly showed the buttons' hover backgrounds. */
 .research-shell .workspace {
   display: flex; flex-direction: column; height: calc(100vh - var(--titlebar-height)); min-height: 0;
   margin-left: var(--research-sidebar-width); transition: margin-left 140ms ease; overflow: hidden;
@@ -251,11 +251,6 @@ html:not([data-theme="dark"]) .research-shell {
 .research-sidebar .nav-item.active::before { display: none; }
 .research-frame { background: var(--canvas); }
 .research-shell #main-content { padding: 22px; }
-.agent-panel { position: relative; display: flex; flex: 0 0 360px; width: 360px; min-width: 0; flex-direction: column; border-left: 1px solid var(--line); background: var(--surface); }
-.agent-panel-resizer { position: absolute; top: 0; bottom: 0; left: -4px; z-index: 3; width: 8px; border: 0; background: transparent; cursor: col-resize; }
-.agent-panel-resizer::after { position: absolute; top: 50%; left: 3px; width: 2px; height: 34px; border-radius: 2px; background: transparent; content: ''; transform: translateY(-50%); }
-.agent-panel-resizer:hover::after, .agent-panel-resizer:focus-visible::after { background: var(--accent); }
-.agent-panel-body { flex: 1; min-height: 0; overflow: auto; padding: 24px 18px; }
 .agent-composer { padding: 14px 16px 16px; border-top: 1px solid var(--line); background: var(--surface); }
 .agent-composer label { display: block; margin-bottom: 7px; color: var(--muted); font-size: 10px; font-weight: 650; }
 .agent-composer textarea { display: block; box-sizing: border-box; width: 100%; min-height: 74px; resize: vertical; border: 1px solid var(--line-strong); border-radius: 9px; padding: 10px; background: var(--canvas); color: var(--ink); font: inherit; font-size: 11px; line-height: 1.45; }
@@ -313,13 +308,10 @@ html[data-theme="dark"] .research-shell .canvas-viewport { background-color: var
 .sidebar-scrim { display: none; }
 @media (max-width: 1250px) {
   :root { --research-sidebar-width: 192px; }
-  .agent-panel { flex-basis: 320px; width: 320px; }
   .research-shell .notes-layout { --notes-sidebar-width: 200px !important; }
 }
 @media (max-width: 1050px) {
-  .agent-panel { flex-basis: min(360px,100%); width: min(360px,100%); }
   .project-resource-columns { grid-template-columns: 1fr; }
-  .agent-panel-resizer { display: none; }
 }
 @media (max-width: 820px) {
   .research-shell .research-sidebar { transform: translateX(-100%); width: 230px; }
@@ -327,9 +319,6 @@ html[data-theme="dark"] .research-shell .canvas-viewport { background-color: var
   .research-shell .workspace, .research-shell.sidebar-collapsed .workspace { margin-left: 0; }
   .research-shell.sidebar-collapsed .research-sidebar { width: 230px; }
   .mobile-workspace-menu { position: fixed; top: 10px; left: 10px; display: grid; z-index: 40; width: 34px; height: 34px; place-items: center; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); box-shadow: var(--shadow-soft); cursor: pointer; }
-  .research-shell.agent-open .mobile-workspace-menu,
-  .research-shell.agent-open #main-content { display: none; }
-  .research-shell.agent-open .agent-panel { flex: 1 1 auto; width: 100%; border-left: 0; }
   .research-shell.sidebar-collapsed .research-sidebar .brand { flex: initial; width: auto; overflow: visible; }
   .research-shell.sidebar-collapsed .research-sidebar .brand > span:last-child,
 .research-shell.sidebar-collapsed .research-sidebar .nav-copy,

@@ -1,9 +1,13 @@
 import DOMPurify from "dompurify";
 import { marked } from "marked";
 
+// A tag named inside Markdown code (`<video>`, a fenced block) is text, not HTML.
+const withoutMarkdownCode = (value: string) =>
+  value.replace(/```[\s\S]*?(?:```|$)/g, "").replace(/`[^`\n]*`/g, "");
+
 export const isHtmlDocument = (value: string) =>
   /<(?:!doctype|html\b|p\b|h[1-6]\b|div\b|section\b|table\b|figure\b|ul\b|ol\b|blockquote\b|pre\b|img\b|span\b|aside\b|details\b|math\b|video\b|audio\b)/i.test(
-    value,
+    withoutMarkdownCode(value),
   );
 
 /** One inert content boundary for editor, previews and imported clipboard HTML. */

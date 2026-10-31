@@ -82,8 +82,9 @@ export function useExplorations() {
     } catch (reason) { toast((reason as Error).message, 'error'); }
   }
 
-  async function exploreIdentifier(event: FormEvent) {
-    event.preventDefault();
+  async function exploreIdentifier(event?: FormEvent, value = identifier) {
+    event?.preventDefault();
+    const identifier = value;
     if (!identifier.trim() || busy) return;
     const controller = new AbortController();
     lookup.current = controller;

@@ -105,6 +105,5 @@
 .assistant-proposal-errors p { margin: 7px 0; }
 @media (prefers-reduced-motion: reduce) { .assistant-working::before { animation: none; } .external-agent-body.agent-live-body { scroll-behavior: auto; } }
 @media (max-width: 820px) {
-  .research-shell.agent-open .agent-panel { position: fixed; inset: 0; width: 100% !important; height: 100dvh; z-index: 80; border: 0; }
   .assistant-composer.agent-composer { padding-bottom: max(12px, env(safe-area-inset-bottom)); }
 }

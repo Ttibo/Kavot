@@ -1,5 +1,9 @@
 import { collectionRecordMarkup, bindCollectionEditors, flushCollectionSaves } from '../collections/noteEditor';
 import { workspaceColor } from '../../styles/palette';
+import { iconPaths } from '../../components/Icon';
+import { reactTabPane } from '../../app/tabs/kinds';
+import { changedSinceBase, setEditorBase } from './editorBase';
+import { launcherPages, pages } from '../../app/pages';
 import { canvasTemplateIcon } from './canvasModel';
 import { escapeHtml, flushReaderAutosave, formatDate, main, noteAssetBase, noteTitleTimers, rememberWorkspaceSession, renderMarkdown, state, workspaceMarkdownTimers } from '../../app/state';
 import { collectionDatabaseDefinitions, collectionDragPayload, collectionItems, findCollectionItem } from '../collections/catalog';
@@ -456,12 +460,12 @@ export function expandWorkspacePathParents(path) {
 }
 
 function notesWorkspaceContexts() {
-  // In a project, the explorer shows only that project's notes, canvases and files.
-  return fileExplorerNavigation(state.projectWorkspaceId || null);
+  // Filtered on a project, the explorer shows only that project's notes, canvases and files.
+  return fileExplorerNavigation(state.scopeProjectId || null);
 }
 
 /** Explorer toolbar: every document type, created in the folder that has the tree focus. */
-function notesExplorerToolbar() {
+export function notesExplorerToolbar() {
   const button = (action, icon, label) =>
     `<button type="button" data-tree-create="${action}" title="${label}" aria-label="${label}">${interfaceIcon(icon)}</button>`;
   return `<div class="notes-explorer-toolbar" role="toolbar" aria-label="New documents">${button("new-note", "noteplus", "New note")}${button("new-drawing", "draw", "New Draw diagram")}${button("new-canvas", "canvas", "New canvas")}${button("new-folder", "folderplus", "New folder")}<span class="notes-explorer-toolbar-spacer"></span><button type="button" data-tree-collapse-all title="Collapse all" aria-label="Collapse all folders">${interfaceIcon("collapse")}</button></div>`;
@@ -516,6 +520,27 @@ function decorateTreeFocus() {
     canvas.disabled = !allowed;
     canvas.title = allowed ? "New canvas" : "Canvases live in General; projects use their project canvas";
   }
+}
+
+let themedPreviewsBound = false;
+/** HTML previews are separate documents: they get the app's theme so their own colors follow it. */
+function bindThemedDocumentPreviews() {
+  if (themedPreviewsBound) return;
+  themedPreviewsBound = true;
+  const syncOne = (frame: HTMLIFrameElement) => {
+    try {
+      const doc = frame.contentDocument;
+      if (doc?.documentElement)
+        doc.documentElement.dataset.theme = document.documentElement.dataset.theme === "dark" ? "dark" : "light";
+    } catch (_) { /* cross-origin or not loaded yet */ }
+  };
+  const syncAll = () => document.querySelectorAll<HTMLIFrameElement>(".secondary-document-view").forEach(syncOne);
+  // Capture phase: load does not bubble, and a frame rerendered after the change still gets the theme.
+  document.addEventListener("load", (event) => {
+    if ((event.target as Element)?.matches?.(".secondary-document-view")) syncOne(event.target as HTMLIFrameElement);
+  }, true);
+  window.addEventListener("kavot:colors-changed", syncAll);
+  syncAll();
 }
 
 let explorerBound = false;
@@ -747,13 +772,9 @@ export async function refreshRelationalNotes() {
 }
 
 function workspaceResourcePane(resource, pane = "secondary") {
-  // The Atelier is a React panel mounted into this host (see features/atelier/mount).
-  if (resource?.type === "atelier")
-    return `<section class="secondary-resource-pane atelier-resource-pane" data-${pane}-path="${escapeHtml(resource.path)}" data-pane-drop="${pane}"><div class="atelier-host" data-atelier-project="${Number(resource.projectId)}" data-atelier-section="${escapeHtml(resource.section || "project")}" data-atelier-pane="${pane}"></div></section>`;
-  // Office documents, CSV and PDF files of the workspace: a React preview (features/atelier/mount).
-  const documentPath = String(resource?.path || "");
-  if (/\.(docx|xlsx|xlsm|pptx|csv|tsv)$/i.test(documentPath) || (/\.pdf$/i.test(documentPath) && !Number(resource?.paperId || resource?.paper_id || 0)))
-    return `<section class="secondary-resource-pane atelier-resource-pane" data-${pane}-path="${escapeHtml(documentPath)}" data-pane-drop="${pane}"><div class="atelier-document-host" data-document-path="${escapeHtml(documentPath)}" data-document-url="${escapeHtml(resource.url || `/api/workspace/file?path=${encodeURIComponent(documentPath)}`)}"></div></section>`;
+  // Pages, project sections and office documents are React tabs (see app/tabs).
+  const reactTab = reactTabPane(resource, pane);
+  if (reactTab) return reactTab;
   if (resource?.cloudDeleted) return '<section class="note-pane"><p role="status">This document was deleted remotely.</p></section>';
   if (resource?.type === "collection-record") return collectionRecordMarkup(resource, pane);
   const node = findWorkspaceNode(resource?.path) || resource;
@@ -784,7 +805,7 @@ function workspaceResourcePane(resource, pane = "secondary") {
         ? `<${kind} src="${escapeHtml(url)}" controls preload="metadata" aria-label="${escapeHtml(title)}"></${kind}>`
       : kind === "pdf" && paperId
         ? pdfCaptureWorkspaceMarkup(paperId, true, url)
-      : `<iframe class="secondary-document-view" src="${escapeHtml(url)}${kind === "pdf" ? "#view=FitH" : ""}" title="${escapeHtml(title)}"></iframe>`;
+      : `<iframe class="secondary-document-view" src="${escapeHtml(url)}${kind === "pdf" ? "#view=FitH" : ""}" title="${escapeHtml(title)}" data-document-theme></iframe>`;
   return `<section class="secondary-resource-pane resource-kind-${escapeHtml(kind)}" data-${pane}-path="${escapeHtml(path)}" data-pane-drop="${pane}">${content}</section>`;
 }
 
@@ -914,7 +935,7 @@ export function applyWorkspaceTab(pane, tab) {
     state.primaryResource = tab.resource;
   }
   else state.secondaryResource = tab.resource;
-  if (tab.type === "resource" && tab.resource?.type !== "atelier") {
+  if (tab.type === "resource" && !["atelier", "view"].includes(tab.resource?.type)) {
     const paperId = Number(tab.resource?.paperId || tab.resource?.paper_id || 0);
     if (paperId)
       rememberWorkspaceSession({
@@ -945,14 +966,123 @@ export function replaceActiveWorkspaceTab(pane, tab, newTab = false) {
   const activeIndex = tabs.findIndex(
     (item) => item.id === state.workspaceActiveTabs[pane],
   );
-  // The Atelier stays open: documents opened from it or the explorer get their own tab.
-  if (tabs[activeIndex]?.resource?.type === "atelier" && tab.resource?.type !== "atelier") {
-    tabs.splice(activeIndex + 1, 0, tab);
-    return applyWorkspaceTab(pane, tab);
-  }
-  if (activeIndex >= 0) tabs.splice(activeIndex, 1, tab);
-  else tabs.push(tab);
+  if (activeIndex >= 0) {
+    // The tab remembers what it showed before: Back returns to it, in this tab only.
+    const previous = tabs[activeIndex];
+    tab.back = [...(previous.back || []), withoutHistory(previous)].slice(-TAB_HISTORY_LIMIT);
+    tab.forward = [];
+    tabs.splice(activeIndex, 1, tab);
+  } else tabs.push(tab);
   applyWorkspaceTab(pane, tab);
+}
+
+const TAB_HISTORY_LIMIT = 30;
+const withoutHistory = (tab) => ({ ...tab, back: undefined, forward: undefined });
+
+/** A navigation that shows a document in `pane` and its companion in `companionPane` (an article and its note)
+ * is one step of history: Back in the document's tab undoes both, Forward redoes both. */
+export function replaceActiveWorkspaceTabPair(pane, tab, companionPane, companion) {
+  replaceActiveWorkspaceTab(pane, tab);
+  const companionHadTab = Boolean(workspaceTabById(companionPane, state.workspaceActiveTabs[companionPane]));
+  replaceActiveWorkspaceTab(companionPane, companion);
+  state.activeNotePane = pane;
+  const entry = workspaceTabById(pane, state.workspaceActiveTabs[pane]) === tab ? tab.back?.at(-1) : null;
+  // A companion that was already open in another tab was only brought forward: nothing to undo there.
+  if (!entry || workspaceTabById(companionPane, state.workspaceActiveTabs[companionPane]) !== companion) return;
+  entry.companion = companionHadTab
+    ? { pane: companionPane, expect: companion.id }
+    : { pane: companionPane, expect: companion.id, close: true };
+}
+
+export function canNavigateTabHistory(direction: -1 | 1) {
+  const pane = state.activeNotePane === "secondary" && state.workspaceTabs.secondary.length ? "secondary" : "primary";
+  const tab = state.workspaceTabs[pane]?.find((item) => item.id === state.workspaceActiveTabs[pane]);
+  return state.view === "notes" && Boolean((direction < 0 ? tab?.back : tab?.forward)?.length);
+}
+
+/** Moves the active tab of `pane` one step in its history. Returns false when nothing changed. */
+async function stepTabHistory(pane, direction: -1 | 1) {
+  const tabs = state.workspaceTabs[pane];
+  const index = tabs.findIndex((item) => item.id === state.workspaceActiveTabs[pane]);
+  const current = tabs[index];
+  if (!current || !(direction < 0 ? current.back : current.forward)?.length) return false;
+  const back = [...(current.back || [])];
+  const forward = [...(current.forward || [])];
+  const target = { ...(direction < 0 ? back.pop() : forward.pop()) };
+  // A file is read again: going back never shows content older than the last save.
+  if (target.type === "resource" && target.resource?.path && !["view", "atelier"].includes(target.resource.type)) {
+    const node = findWorkspaceNode(target.resource.path);
+    if (!node) { toast("This file no longer exists", "error"); return false; }
+    target.resource = await workspaceResourcePayload(node);
+  }
+  if (target.type === "note" && !state.notes.some((note) => note.id === Number(target.noteId))) {
+    toast("This note no longer exists", "error");
+    return false;
+  }
+  const companion = target.companion;
+  delete target.companion;
+  const left = withoutHistory(current);
+  delete left.companion;
+  // The companion pane follows, and the step left behind remembers how to undo that too.
+  const inverse = companion ? await stepCompanion(companion, direction) : undefined;
+  if (inverse) left.companion = inverse;
+  if (direction < 0) forward.push(left);
+  else back.push(left);
+  target.back = back;
+  target.forward = forward;
+  // The same document open in another tab of the pane gives way to this one.
+  const position = tabs.indexOf(current);
+  const duplicate = tabs.findIndex((item, at) => at !== position && item.id === target.id);
+  tabs.splice(position, 1, target);
+  if (duplicate >= 0) tabs.splice(duplicate, 1);
+  applyWorkspaceTab(pane, target);
+  return true;
+}
+
+/** Applies the companion part of a history step; returns the record that undoes it, or nothing
+ * when the companion pane has moved on since (it is then left as it is). */
+async function stepCompanion(companion, direction: -1 | 1) {
+  const { pane } = companion;
+  const tabs = state.workspaceTabs[pane];
+  const active = workspaceTabById(pane, state.workspaceActiveTabs[pane]);
+  if (companion.restore) {
+    // The companion had been closed: it comes back in a tab of its own.
+    if (tabs.some((item) => item.id === companion.restore.id)) return undefined;
+    if (companion.restore.type === "note" && !state.notes.some((note) => note.id === Number(companion.restore.noteId))) return undefined;
+    const tab = { ...companion.restore };
+    tabs.push(tab);
+    applyWorkspaceTab(pane, tab);
+    return { pane, expect: tab.id, close: true };
+  }
+  if (!active || active.id !== companion.expect) return undefined;
+  if (companion.close) {
+    if (pane !== "secondary" && tabs.length < 2) return undefined;
+    const index = tabs.indexOf(active);
+    tabs.splice(index, 1);
+    const fallback = tabs[Math.min(index, tabs.length - 1)];
+    if (fallback) applyWorkspaceTab(pane, fallback);
+    else {
+      state.workspaceActiveTabs[pane] = null;
+      state.secondaryResource = null;
+      state.secondaryFirst = false;
+    }
+    return { pane, expect: null, restore: withoutHistory(active) };
+  }
+  if (!await stepTabHistory(pane, direction)) return undefined;
+  return { pane, expect: state.workspaceActiveTabs[pane] };
+}
+
+/** Back (-1) or Forward (1) in the active tab of the focused pane; the other tabs and panes are left as they are,
+ * except the companion opened with the document by the same navigation (an article's note). */
+export async function navigateTabHistory(direction: -1 | 1) {
+  if (!canNavigateTabHistory(direction)) return;
+  await flushCurrentNoteAutosave();
+  await flushSecondaryNoteAutosave();
+  await flushWorkspaceMarkdownSaves();
+  const pane = state.activeNotePane === "secondary" && state.workspaceTabs.secondary.length ? "secondary" : "primary";
+  if (!await stepTabHistory(pane, direction)) return;
+  state.activeNotePane = pane;
+  await rerenderNotesContext();
 }
 
 export function createWorkspaceTab(pane = "primary") {
@@ -1090,8 +1220,13 @@ export function splitActiveWorkspaceTab() {
   rerenderNotesContext();
 }
 
+/** A new tab: open a page of the application or start a document here. */
 function emptyWorkspacePane(pane = "primary") {
-  return `<section class="workspace-empty-pane" data-pane-drop="${pane}"><div><span>${interfaceIcon("note")}</span><h3>Open or create a note</h3><p>Select a note in the tree, or create a new note or folder.</p><div class="workspace-empty-actions"><button class="button button-primary" data-action="new-note">＋ New note</button></div></div></section>`;
+  const page = (view, icon, label) => `<button type="button" class="workspace-launch" data-nav="${view}"><svg class="ui-icon" viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="${iconPaths[icon]}"/></svg><span>${label}</span></button>`;
+  const create = (action, icon, label) => `<button type="button" class="workspace-launch" data-action="${action}">${interfaceIcon(icon)}<span>${label}</span></button>`;
+  return `<section class="workspace-empty-pane workspace-launcher" data-pane-drop="${pane}"><div><h3>New tab</h3><p>Open a page or start a document here. Ctrl+click anywhere opens in a new tab.</p>
+    <div class="workspace-launch-group"><small>Open</small>${launcherPages.map(id => page(id, pages[id].icon, pages[id].title)).join("")}</div>
+    <div class="workspace-launch-group"><small>Create</small>${create("new-note", "noteplus", "Note")}${create("new-canvas", "canvas", "Canvas")}${create("new-drawing", "draw", "Drawing")}</div></div></section>`;
 }
 
 export async function workspaceResourcePayload(node) {
@@ -1107,6 +1242,8 @@ export async function workspaceResourcePayload(node) {
     const response = await fetch(node.url, { cache: "no-store" });
     if (!response.ok) throw new Error("Unable to read this Markdown file");
     resource.content = await response.text();
+    // The version this copy was read at: a save is refused if the file changed since (see persistWorkspaceMarkdown).
+    resource.version = response.headers.get("X-Kavot-Version") || undefined;
   }
   if (node.kind === "canvas") {
     const response = await fetch(node.url, { cache: "no-store" });
@@ -1147,19 +1284,36 @@ export async function refreshOpenCloudResources(canApply: () => boolean) {
     toast('An open note was deleted remotely.', 'error');
 }
 
+const openResources = (path) => [state.primaryResource, state.secondaryResource,
+  ...state.workspaceTabs.primary.map(tab => tab.resource), ...state.workspaceTabs.secondary.map(tab => tab.resource)]
+  .filter(resource => resource?.path === path);
+
+/** Saves a document opened as a workspace file, on top of the version its editor was drawn with: when the file
+ * changed since (an agent wrote the note, another window saved it), the file is reloaded instead of overwritten.
+ * The version belongs to the editor element, so an editor redrawn away cannot save with a newer one. */
 async function persistWorkspaceMarkdown(path, editor, indicator) {
   if (!path || !editor) return;
+  if (!editor.isConnected) return;
   if (indicator) { indicator.textContent = "Saving…"; indicator.dataset.state = 'saving'; }
   try {
-    await api("/workspace/file", {
+    const saved = await api<{ version?: string }>("/workspace/file", {
       method: "PUT",
-      body: JSON.stringify({ path, content: editor.value }),
+      body: JSON.stringify({ path, content: editor.value, expected_version: editor.dataset.version || null }),
     });
-    [state.primaryResource, state.secondaryResource].forEach((resource) => {
-      if (resource?.path === path) resource.content = editor.value;
-    });
+    if (saved?.version) editor.dataset.version = saved.version;
+    openResources(path).forEach((resource) => { resource.content = editor.value; resource.version = saved?.version; });
     if (indicator) { indicator.textContent = "Saved"; indicator.dataset.state = 'saved'; }
   } catch (error) {
+    if ((error as { status?: number }).status === 409) {
+      const node = findWorkspaceNode(path);
+      if (node) {
+        const fresh = await workspaceResourcePayload(node);
+        openResources(path).forEach((resource) => Object.assign(resource, fresh, { renderVersion: (resource.renderVersion || 0) + 1 }));
+        toast("This document was changed by an agent or elsewhere: it now shows that version.", "error");
+        await rerenderNotesContext();
+        return;
+      }
+    }
     if (indicator) { indicator.textContent = "Save failed"; indicator.dataset.state = 'error'; }
     toast(error.message, "error");
   }
@@ -1252,6 +1406,9 @@ function bindWorkspaceMarkdownEditors(root) {
       const indicator = container.querySelector(
         ".workspace-markdown-save-state",
       );
+      const drawn = [state.primaryResource, state.secondaryResource, ...state.workspaceTabs.primary.map(tab => tab.resource),
+        ...state.workspaceTabs.secondary.map(tab => tab.resource)].find(resource => resource?.path === path);
+      if (editor && drawn?.version) editor.dataset.version = drawn.version;
       bindMarkdownBlockEditor(blockEditor, editor);
       bindMarkdownWritingExperience(editor);
       const queueSave = () => {
@@ -1358,12 +1515,16 @@ function renderNotesWorkspace(projectId = null) {
       : `${primaryStack}${separator}${secondaryStack}`
     : primaryStack;
   const editorWorkspace = `<div class="notes-main-workspace ${secondary ? "with-secondary" : ""} ${state.secondaryFirst ? "secondary-first" : ""}" style="--note-workspace-left:${state.noteWorkspaceSplitPercent}%">${panes}</div>`;
-  const recentNotes = [...contextNotes].filter(item => !item.trashed_at).sort((a, b) => String(b.updated_at || '').localeCompare(String(a.updated_at || ''))).slice(0, 6);
-  const recents = '<details class="notes-recents"><summary>Recently modified</summary><div class="notes-recents-list">' + (recentNotes.length ? recentNotes.map(item => '<button data-note="' + item.id + '" data-note-tree-scope="' + (item.paper_id ? 'paper:' + item.paper_id : item.project_id ? 'project:' + item.project_id : 'general') + '" data-note-tree-folder="' + (item.folder_id || '') + '" title="' + escapeHtml(item.title) + '"><span class="recent-note-icon">' + interfaceIcon(item.drawing ? 'draw' : 'note') + '</span><span><strong>' + escapeHtml(item.title) + '</strong><small>' + escapeHtml(formatDate(item.updated_at)) + '</small></span></button>').join('') : '<p>Your latest notes will appear here.</p>') + '</div></details>';
-  const project = state.projectWorkspaceId ? state.projects.find(item => item.id === state.projectWorkspaceId) : null;
-  // Project mode: the project's own sidebar (sections, code folders, agents) above its files.
-  const projectHead = project ? `<div class="atelier-sidebar-host" data-atelier-project="${project.id}"></div><div class="project-sidebar-files-label">Notes &amp; files</div>` : "";
-  return `<section class="notes-layout ${project ? "project-mode" : ""}" data-notes-project="${projectId || ""}" style="--notes-sidebar-width:${state.noteSidebarWidth}px"><aside class="notes-sidebar ${project ? "project-sidebar" : ""}">${projectHead}${notesExplorerToolbar()}<div class="notes-tree" id="notes-tree">${notesWorkspaceContexts()}</div><div class="note-search-results hidden" id="note-items" aria-live="polite"></div>${project ? "" : recents}</aside><button class="notes-sidebar-resizer" type="button" role="separator" aria-label="Resize document sidebar" aria-orientation="vertical" aria-valuemin="230" aria-valuemax="520" aria-valuenow="${state.noteSidebarWidth}"><span></span></button>${editorWorkspace}</section>`;
+  // The explorer is in the application sidebar: the Workspace view holds only the editor panes.
+  return `<section class="notes-layout notes-layout-editor" data-notes-project="${projectId || ""}">${editorWorkspace}</section>`;
+}
+
+/** Where everything scrolled inside a pane is. A pane kept across a redraw is moved back into the page, and an
+ * element moved in the document loses its scroll position (without any scroll event): it is put back after. */
+function scrollPositions(root: Element) {
+  return [root, ...root.querySelectorAll("*")]
+    .filter((element) => element.scrollTop || element.scrollLeft)
+    .map((element) => [element, element.scrollTop, element.scrollLeft] as const);
 }
 
 export function renderNotes() {
@@ -1373,16 +1534,14 @@ export function renderNotes() {
       (pane) => [(pane as HTMLElement).dataset.workspacePane, pane],
     ),
   );
-  // The project sidebar keeps its React panel across redraws of the same project.
-  const previousProjectSidebar = main.querySelector<HTMLElement>("#main-notes-area .atelier-sidebar-host");
+  const scrolled = new Map([...previousPanes.values()].map((pane) => [pane, scrollPositions(pane)]));
   main.classList.remove("overview-mode");
   main.classList.add("notes-mode");
   const projectId = activeNoteProjectId();
   main.innerHTML = `<div id="main-notes-area">${renderNotesWorkspace(projectId)}</div>`;
   const root = main.querySelector("#main-notes-area");
-  const projectSidebar = root?.querySelector<HTMLElement>(".atelier-sidebar-host");
-  if (previousProjectSidebar && projectSidebar?.dataset.atelierProject === previousProjectSidebar.dataset.atelierProject)
-    projectSidebar.replaceWith(previousProjectSidebar);
+  // The explorer lives in the application sidebar: redraw it with the editor so it shows the active files.
+  rerenderWorkspaceTree();
   previousPanes.forEach((previous, pane) => {
     const replacement = root?.querySelector(
       `.workspace-pane-stack[data-workspace-pane="${pane}"]`,
@@ -1415,6 +1574,11 @@ export function renderNotes() {
     )
       replacement.replaceWith(previous);
   });
+  // The panes kept as they were are back where they were read (a conversation, a page, a long note).
+  for (const [pane, positions] of scrolled) {
+    if (!pane.isConnected) continue;
+    for (const [element, top, left] of positions) { element.scrollTop = top; element.scrollLeft = left; }
+  }
   bindNotesWorkspace(projectId);
   void refreshRelationalNotes();
 }
@@ -1422,7 +1586,7 @@ export function renderNotes() {
 /** Redraws the explorer from the loaded tree: expanding a folder or starting a rename needs no server round trip. */
 export function rerenderWorkspaceTree() {
   const tree = document.querySelector("#notes-tree");
-  if (!tree || state.view !== "notes") return false;
+  if (!tree) return false;
   state.noteTreeScrollTop = tree.scrollTop;
   tree.innerHTML = notesWorkspaceContexts();
   decorateTreeSelection();
@@ -1434,7 +1598,7 @@ export function rerenderWorkspaceTree() {
 
 export async function refreshWorkspaceTreeOnly() {
   state.workspaceTree = await api("/workspace/tree");
-  if (rerenderWorkspaceTree()) await refreshRelationalNotes();
+  if (rerenderWorkspaceTree() && state.view === "notes") await refreshRelationalNotes();
 }
 
 export function updateWorkspaceResourcePath(previousPath, renamed) {
@@ -1677,6 +1841,31 @@ async function uploadFileIntoNote(
   }
 }
 
+/** A save made on an older version of the note than the latest known: the editor shows the latest instead.
+ * Returns the note when the save must not be sent. */
+function reloadIfChangedElsewhere(noteId: number, editor: Element | null) {
+  const latest = state.notes.find((item) => item.id === noteId);
+  if (!latest || !changedSinceBase(editor, latest.content)) return null;
+  // A redrawn editor that is gone just drops its stale save; a visible one shows the note as it is now.
+  if (editor?.isConnected) {
+    const block = editor.closest(".note-pane")?.querySelector(".markdown-block-editor");
+    if (block) setMarkdownBlockEditorContent(block, editor, latest.content, null, null, true);
+    toast("This note was changed by an agent or elsewhere: it now shows that version.", "error");
+  }
+  return latest;
+}
+
+/** A save refused because the note changed on the server (409): load that version, show it in the editor. */
+async function recoverFromConflict(noteId: number, editor: Element | null, error: unknown) {
+  if ((error as { status?: number })?.status !== 409) return null;
+  try {
+    const fresh = await api<Note>(`/notes/${noteId}`);
+    const cached = state.notes.find((item) => item.id === noteId);
+    if (cached) Object.assign(cached, fresh); else state.notes.push(fresh);
+    return reloadIfChangedElsewhere(noteId, editor) || fresh;
+  } catch { return null; }
+}
+
 // Serialize writes per note, including when it is open in both panes.
 const noteWrites = new Map<number, Promise<any>>();
 function writeNoteContent(noteId: number, content: string) {
@@ -1695,16 +1884,27 @@ function writeNoteContent(noteId: number, content: string) {
   return pending;
 }
 
-async function persistSecondaryNoteContent(noteId, content) {
+async function persistSecondaryNoteContent(noteId, content, editor: Element | null = null) {
   const indicator = document.querySelector("#secondary-note-save-state");
+  const latest = reloadIfChangedElsewhere(noteId, editor);
+  if (latest) {
+    if (indicator) { indicator.textContent = "Updated elsewhere"; (indicator as HTMLElement).dataset.state = "saved"; }
+    return latest;
+  }
   if (indicator) { indicator.textContent = "Saving…"; (indicator as HTMLElement).dataset.state = "saving"; }
   try {
     const updated = await writeNoteContent(noteId, content);
+    setEditorBase(editor, updated.content);
     const cached = state.notes.find((item) => item.id === noteId);
     if (cached) Object.assign(cached, updated);
     if (indicator) { indicator.textContent = "Saved automatically"; (indicator as HTMLElement).dataset.state = "saved"; }
     return updated;
   } catch (error) {
+    const recovered = await recoverFromConflict(noteId, editor, error);
+    if (recovered) {
+      if (indicator) { indicator.textContent = "Updated elsewhere"; (indicator as HTMLElement).dataset.state = "saved"; }
+      return recovered;
+    }
     if (indicator) { indicator.textContent = "Save failed"; (indicator as HTMLElement).dataset.state = "error"; }
     toast(error.message, "error");
     return null;
@@ -1723,7 +1923,7 @@ function queueSecondaryNoteAutosave() {
   if (indicator) { indicator.textContent = "Unsaved changes…"; (indicator as HTMLElement).dataset.state = "pending"; }
   editorSession.secondaryNoteAutosaveTimer = setTimeout(() => {
     editorSession.secondaryNoteAutosaveTimer = null;
-    persistSecondaryNoteContent(noteId, (editor as HTMLInputElement).value);
+    persistSecondaryNoteContent(noteId, (editor as HTMLInputElement).value, editor);
   }, 650);
 }
 
@@ -1737,7 +1937,7 @@ export async function flushSecondaryNoteAutosave() {
   if (!editorSession.secondaryNoteAutosaveTimer) return noteWrites.get(noteId)?.catch(() => null) || null;
   clearTimeout(editorSession.secondaryNoteAutosaveTimer);
   editorSession.secondaryNoteAutosaveTimer = null;
-  return persistSecondaryNoteContent(noteId, (editor as HTMLInputElement).value);
+  return persistSecondaryNoteContent(noteId, (editor as HTMLInputElement).value, editor);
 }
 
 function bindSecondaryResource(root) {
@@ -1751,6 +1951,7 @@ function bindSecondaryResource(root) {
           .secondaryNoteId || 0,
       ),
   );
+  setEditorBase(editor, note?.content);
   bindMarkdownBlockEditor(blockEditor, editor);
   bindMarkdownWritingExperience(editor);
   bindNoteTitleInputs(root);
@@ -1971,9 +2172,8 @@ function bindSecondaryResource(root) {
 
 /** Filter the notes explorer from the titlebar search field. */
 function applyNoteSearch(value: string) {
-  const root = document.querySelector("#main-notes-area");
-  const tree = root?.querySelector("#notes-tree");
-  const results = root?.querySelector("#note-items");
+  const tree = document.querySelector("#notes-tree");
+  const results = document.querySelector("#note-items");
   if (!tree || !results) return;
   const query = value.trim().toLowerCase();
   if (!query) {
@@ -2056,13 +2256,12 @@ function bindNotesWorkspace(projectId = null) {
   }));
   const editor = freshPrimary?.querySelector("#note-content");
   const blockEditor = freshPrimary?.querySelector("#note-block-editor");
+  setEditorBase(editor, state.notes.find((item) => item.id === state.currentNoteId)?.content);
   const noteFilter = document.querySelector<HTMLInputElement>("#note-filter");
-  const noteTree = root?.querySelector("#notes-tree");
-  if (noteTree) {
-    noteTree.scrollTop = state.noteTreeScrollTop;
-    requestAnimationFrame(() => {
-      if (noteTree.isConnected) noteTree.scrollTop = state.noteTreeScrollTop;
-    });
+  const noteTree = document.querySelector<HTMLElement>("#notes-tree");
+  // The explorer outlives the editor's redraws: listen to its scrolling once.
+  if (noteTree && noteTree.dataset.scrollBound !== "true") {
+    noteTree.dataset.scrollBound = "true";
     noteTree.addEventListener(
       "scroll",
       () => {
@@ -2086,6 +2285,7 @@ function bindNotesWorkspace(projectId = null) {
   // The search field lives in the titlebar and survives tree rerenders: reapply its query.
   bindNoteSearchOnce();
   bindNotesExplorerOnce();
+  bindThemedDocumentPreviews();
   decorateTreeSelection();
   decorateTreeFocus();
   applyNoteSearch(noteFilter?.value || "");
@@ -2521,10 +2721,13 @@ function setNoteAutosaveState(message, stateName = "") {
   (indicator as HTMLElement).dataset.state = stateName;
 }
 
-async function persistNoteContent(noteId, content, version, notify = false) {
+async function persistNoteContent(noteId, content, version, notify = false, editor: Element | null = null) {
+  const latest = reloadIfChangedElsewhere(noteId, editor);
+  if (latest) { setNoteAutosaveState("Updated elsewhere", "saved"); return latest; }
   try {
     setNoteAutosaveState("Saving…", "saving");
     const updated = await writeNoteContent(noteId, content);
+    setEditorBase(editor, updated.content);
     const cached = state.notes.find((item) => item.id === noteId);
     if (cached) Object.assign(cached, updated);
     if (version === editorSession.noteAutosaveVersion && state.currentNoteId === noteId)
@@ -2532,6 +2735,8 @@ async function persistNoteContent(noteId, content, version, notify = false) {
     if (notify) toast("Note saved");
     return updated;
   } catch (error) {
+    const recovered = await recoverFromConflict(noteId, editor, error);
+    if (recovered) { setNoteAutosaveState("Updated elsewhere", "saved"); return recovered; }
     setNoteAutosaveState("Save failed", "error");
     toast(error.message, "error");
     return null;
@@ -2699,7 +2904,7 @@ function queueCurrentNoteAutosave() {
   setNoteAutosaveState("Unsaved changes…", "pending");
   editorSession.noteAutosaveTimer = setTimeout(() => {
     editorSession.noteAutosaveTimer = null;
-    persistNoteContent(noteId, (editor as HTMLInputElement).value, version);
+    persistNoteContent(noteId, (editor as HTMLInputElement).value, version, false, editor);
   }, 650);
 }
 
@@ -2715,6 +2920,7 @@ export async function flushCurrentNoteAutosave(notify = false) {
     (editor as HTMLInputElement).value,
     editorSession.noteAutosaveVersion,
     notify,
+    editor,
   );
 }
 

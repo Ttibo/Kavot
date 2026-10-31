@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import json
 import mimetypes
 import shutil
@@ -13,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from app.core.kernel.config import settings
 from app.core.kernel.files import atomic_write_json, atomic_write_text, resolve_inside, safe_name
+from app.core.kernel.user_settings import load_preferences
 from app.models.documents import (
     NoteCreate, NoteFolderCreate, NoteFolderUpdate, NotePlacementUpdate, NoteUpdate,
     NoteTemplateApply, NoteTemplateCreate, NoteTemplatePreview, NoteTemplateUpdate,
@@ -20,7 +22,7 @@ from app.models.documents import (
 from app.core.workspace import documents, web_preview, asset_metadata
 from app.core.projects import projects
 from app.core.projects import canvas_store as canvas_tasks
-from app.core.workspace import html_documents
+from app.core.workspace import html_documents, write_guard
 from app.core.records.repository import json_values, now, store
 
 
@@ -30,6 +32,13 @@ router = APIRouter(tags=["documents"])
 class WorkspaceWrite(BaseModel):
     path: str
     content: Any
+    # The version the editor loaded (X-Kavot-Version of the read): a write over a newer version is refused.
+    expected_version: str | None = None
+
+
+def file_version(path: Path) -> str:
+    """Identifies the bytes of a workspace file, to tell an editor its copy is no longer the current one."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()[:20] if path.is_file() else ""
 
 
 class WorkspaceRename(BaseModel):
@@ -129,8 +138,14 @@ def get_note(note_id: int) -> dict[str, Any]:
     return documents.enrich_note(note, state)
 
 
+STALE_DOCUMENT = "The document changed. Reload it before applying your changes again."
+
+
 @router.patch("/notes/{note_id}")
 def update_note(note_id: int, payload: NoteUpdate) -> dict[str, Any]:
+    # Content without the version it was edited from cannot be checked: never over an agent's fresh change.
+    if payload.content is not None and payload.expected_hash is None and write_guard.blind_write_blocked(note_id):
+        raise HTTPException(409, STALE_DOCUMENT)
     return documents.update_note(note_id, payload)
 
 
@@ -338,13 +353,17 @@ def read_workspace_file(path: str):
         target = workspace_path(path)
     if not target.is_file():
         raise HTTPException(status_code=404, detail="File not found")
+    version = {"X-Kavot-Version": file_version(target)}
     if target.suffix.lower() in {".md", ".txt"}:
-        return PlainTextResponse(target.read_text(encoding="utf-8"))
+        return PlainTextResponse(target.read_text(encoding="utf-8"), headers=version)
     if target.suffix.lower() == '.html':
-        # Source is fetched as text by the editor. Direct previews are inert.
+        # Source is fetched as text by the editor. Direct previews are inert and start on the app theme;
+        # the app also rewrites data-theme live (workspace.ts), so a switch applies without a reload.
         source = target.read_text(encoding='utf-8')
         clean = html_documents.serialize(html_documents.metadata(source), html_documents.read(source, target), target, store.read())
-        return Response(clean, media_type='text/html', headers={'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data: https:; media-src 'self' https:; style-src 'unsafe-inline'"})
+        theme = load_preferences().get("theme", "light")
+        clean = clean.replace('<html lang="fr">', f'<html lang="fr" data-theme="{theme}">', 1)
+        return Response(clean, media_type='text/html', headers={**version, 'Content-Security-Policy': "sandbox; default-src 'none'; img-src 'self' data: https:; media-src 'self' https:; style-src 'unsafe-inline'"})
     return FileResponse(target, media_type=mimetypes.guess_type(target.name)[0])
 
 
@@ -352,6 +371,8 @@ def read_workspace_file(path: str):
 def write_workspace_file(payload: WorkspaceWrite) -> dict[str, Any]:
     target = workspace_path(payload.path)
     protect_generated_note(target)
+    if payload.expected_version is not None and target.suffix != ".canvas" and payload.expected_version != file_version(target):
+        raise HTTPException(409, STALE_DOCUMENT)
     if target.suffix == ".canvas":
         if not isinstance(payload.content, dict):
             raise HTTPException(status_code=422, detail="Canvas content must be an object")
@@ -361,13 +382,15 @@ def write_workspace_file(payload: WorkspaceWrite) -> dict[str, Any]:
         state = store.read()
         note = next((item for item in state["notes"] if documents.note_path(item, state) == target), None)
         if note:
+            if payload.expected_version is None and write_guard.blind_write_blocked(note['id']):
+                raise HTTPException(409, STALE_DOCUMENT)
             documents.update_note(note['id'], NoteUpdate(content=str(payload.content)))
         elif target.suffix.lower() == '.html':
             meta = html_documents.metadata(target.read_text(encoding='utf-8')) if target.exists() else {'title': target.stem}
             atomic_write_text(target, html_documents.serialize(meta, str(payload.content), target, state))
         else:
             atomic_write_text(target, str(payload.content))
-    return {"path": payload.path, "name": target.name}
+    return {"path": payload.path, "name": target.name, "version": file_version(target)}
 
 
 @router.post("/workspace/file", status_code=201)

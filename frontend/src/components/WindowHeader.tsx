@@ -2,35 +2,20 @@ import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent } f
 import { useOptionalRuntime } from '../app/runtime';
 import { subscribe } from '../app/viewBridge';
 import { Icon } from './Icon';
+import { isPage, pages } from '../app/pages';
+import { tabIcon, tabLabel } from '../app/tabs/kinds';
 import '../styles/components/window-header.css';
 
 type TitlebarTab = { id: string; label: string; icon: string; active: boolean };
 type TabGroup = { pane: string; left: number; width: number; tabs: TitlebarTab[]; draggable: boolean };
 type Titlebar = { groups: TabGroup[]; title: string; icon: string };
 
-const VIEW_LABELS: Record<string, [string, string]> = {
-  dashboard: ['Research Home', 'home'], notes: ['Workspace', 'canvas'], projects: ['Projects', 'projects'],
-  calendar: ['Calendar', 'calendar'], tasks: ['Tasks', 'tasks'], papers: ['Library', 'papers'],
-  watchers: ['Watchers', 'sparkle'], workflows: ['Workflows', 'workflow'], chat: ['Chat', 'chat'],
-  conferences: ['Conferences', 'conferences'], datasets: ['Datasets', 'database'], database: ['Collection', 'database'],
-  settings: ['Settings', 'settings'], trash: ['Trash', 'trash'],
-};
-
-function tabLabel(state: any, tab: any) {
-  if (tab.type === 'empty') return 'New tab';
-  if (tab.type === 'note') return state.notes.find((note: any) => note.id === Number(tab.noteId))?.title || 'Note';
-  return tab.resource?.title || tab.resource?.path?.split('/').pop() || 'Document';
-}
-
-function tabIcon(state: any, tab: any) {
-  if (tab.type === 'note') return state.notes.find((note: any) => note.id === Number(tab.noteId))?.drawing ? 'canvas' : 'notes';
-  if (tab.resource?.type === 'atelier') return ({ project: 'home', code: 'code', agents: 'agents', tasks: 'tasks' } as Record<string, string>)[tab.resource.section] || 'code';
-  return tab.resource?.type === 'canvas' ? 'canvas' : 'notes';
-}
+/** The title shown when no tab bar is drawn (while the application starts). */
+const viewLabel = (view: string): [string, string] => isPage(view) ? [pages[view].title, pages[view].icon] : ['Workspace', 'canvas'];
 
 /** Every editor pane's tabs move to the titlebar, each group placed above its own pane. */
 function readTitlebar(state: any, zone: HTMLElement | null): Titlebar {
-  const [viewTitle, viewIcon] = VIEW_LABELS[state?.view] || ['Kavot', 'home'];
+  const [viewTitle, viewIcon] = viewLabel(state?.view);
   const title = state?.selectedProject?.name ? `${state.selectedProject.name} · ${viewTitle}` : viewTitle;
   const groups: TabGroup[] = [];
   if (state && zone) {
@@ -45,7 +30,7 @@ function readTitlebar(state: any, zone: HTMLElement | null): Titlebar {
       const active = state.workspaceActiveTabs[pane];
       groups.push({
         pane, left, width, draggable: split,
-        tabs: state.workspaceTabs[pane].map((tab: any) => ({ id: String(tab.id), label: tabLabel(state, tab), icon: tabIcon(state, tab), active: tab.id === active })),
+        tabs: state.workspaceTabs[pane].map((tab: any) => ({ id: String(tab.id), label: tabLabel(tab, state.notes), icon: tabIcon(tab, state.notes), active: tab.id === active })),
       });
     }
   }
@@ -71,20 +56,8 @@ function editorDropTarget(event: DragEvent, state: any) {
   return target === draggedTab.pane ? null : { pane: target, element: pane, split: false };
 }
 
-/** Open Notes if needed, then put the cursor in the file search. */
-function focusNoteSearch() {
-  const started = performance.now();
-  const focus = () => {
-    const input = document.querySelector<HTMLInputElement>('#note-filter');
-    if (input) { input.focus(); input.select(); return; }
-    if (performance.now() - started < 2000) requestAnimationFrame(focus);
-  };
-  if (!document.querySelector('#note-filter')) document.querySelector<HTMLElement>('.research-sidebar [data-nav="notes"]')?.click();
-  focus();
-}
-
-export function WindowHeader({ sidebarCollapsed, onToggleSidebar, agentOpen, onToggleAgent }: {
-  sidebarCollapsed: boolean; onToggleSidebar: () => void; agentOpen: boolean; onToggleAgent: () => void;
+export function WindowHeader({ sidebarCollapsed, onToggleSidebar }: {
+  sidebarCollapsed: boolean; onToggleSidebar: () => void;
 }) {
   const runtime = useOptionalRuntime();
   const [native, setNative] = useState(false);
@@ -227,8 +200,9 @@ export function WindowHeader({ sidebarCollapsed, onToggleSidebar, agentOpen, onT
     <div className={`titlebar-lead${sidebarCollapsed ? ' is-collapsed' : ''}`}>
       <button type="button" className="titlebar-brand" data-nav="dashboard" aria-label="Kavot home" title="Research Home"><span className="brand-mark">{/* Drawn inline so it follows the accent color. */}<svg viewBox="0 0 32 36" width="14" height="16" aria-hidden="true"><path className="brand-mark-letter" d="M3 3h7v12L20 3h9L16 18l13 15h-9L10 21v12H3V3Z"/><path className="brand-mark-dot" d="m27 17 3 3-3 3-3-3 3-3Z"/></svg></span><span className="titlebar-brand-name">Kavot</span></button>
       <button type="button" className="titlebar-button" aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'} title="Sidebar (Ctrl+\)" aria-pressed={!sidebarCollapsed} onClick={onToggleSidebar}><Icon name="sidebar" size={15}/></button>
-      <button type="button" className="titlebar-button" aria-label="Back" title="Back (Alt+←)" onClick={() => window.history.back()}><Icon name="back" size={15}/></button>
-      <button type="button" className="titlebar-button" aria-label="Forward" title="Forward (Alt+→)" onClick={() => window.history.forward()}><Icon name="chevron" size={15}/></button>
+      {/* Back and Forward in the active tab only. */}
+      <button type="button" className="titlebar-button" aria-label="Back" title="Back in this tab (Alt+←)" disabled={!runtime?.canNavigateTabHistory(-1)} onClick={() => void runtime?.navigateTabHistory(-1)}><Icon name="back" size={15}/></button>
+      <button type="button" className="titlebar-button" aria-label="Forward" title="Forward in this tab (Alt+→)" disabled={!runtime?.canNavigateTabHistory(1)} onClick={() => void runtime?.navigateTabHistory(1)}><Icon name="chevron" size={15}/></button>
     </div>
     <div className="titlebar-tabs" ref={zone}>
       <div className={`titlebar-drag-fill${mac ? ' pywebview-drag-region' : ''}`}/>
@@ -250,15 +224,15 @@ export function WindowHeader({ sidebarCollapsed, onToggleSidebar, agentOpen, onT
             <button type="button" className="workspace-tab-close" data-close-workspace-tab={tab.id} data-workspace-tab-pane={group.pane} aria-label="Close tab" title="Close tab">×</button>
           </span>)}
         </div>
-        <button type="button" className="titlebar-button titlebar-new-tab" data-new-workspace-tab={group.pane} aria-label="New tab" title="New tab"><Icon name="plus" size={14}/></button>
+        <button type="button" className="titlebar-button titlebar-new-tab" data-new-workspace-tab={group.pane} aria-label="New tab" title="New tab (Ctrl+T)"><Icon name="plus" size={14}/></button>
       </div>) : <span className="titlebar-title"><Icon name={bar.icon} size={13}/><strong>{bar.title}</strong></span>}
     </div>
     {error && <span className="window-header-error" role="alert">{error}</span>}
     <div className="titlebar-trail">
-      {runtime?.state?.view === 'notes'
-        ? <label className="titlebar-search"><Icon name="search" size={13}/><input id="note-filter" type="search" placeholder="Search files…" aria-label="Search notes"/></label>
-        : <button type="button" className="titlebar-button" aria-label="Search" title="Search notes" onClick={focusNoteSearch}><Icon name="search" size={15}/></button>}
-      <button type="button" className={`titlebar-button${agentOpen ? ' is-active' : ''}`} aria-label={agentOpen ? 'Close assistant' : 'Open assistant'} title="Assistant" aria-pressed={agentOpen} onClick={onToggleAgent}><Icon name="sparkle" size={15}/></button>
+      {/* The explorer is always in the sidebar: the file search is available from every view. */}
+      <label className="titlebar-search"><Icon name="search" size={13}/><input id="note-filter" type="search" placeholder="Search files…" aria-label="Search notes"/></label>
+      {/* The agents open beside what is on screen, as a tab of the editor. */}
+      <button type="button" className="titlebar-button" aria-label="Open the agents to the side" title="Agents, to the side" onClick={() => void import('../app/tabs/pages').then(module => module.openPage('chat', { beside: true }))}><Icon name="agents" size={15}/></button>
     </div>
     {controls}
   </header>;

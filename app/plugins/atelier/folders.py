@@ -98,13 +98,12 @@ def rename(project: dict[str, Any], folder_id: str, name: str) -> dict[str, Any]
 
 
 def remove(project: dict[str, Any], folder_id: str) -> None:
+    from app.plugins.atelier.agents import in_use
     item = entry(project, folder_id)
+    if in_use(project["id"], folder_id):
+        raise HTTPException(409, "Commit or discard the agent changes in this folder first.")
     with state_store.lock:
         doc = state_store.read(project["id"])
-        used = lambda run: folder_id in {run.get("folder_id"), *(space.get("folder_id") for space in run.get("workspaces") or []),
-                                         *(item.get("folder_id") for item in run.get("resources") or [])}
-        if any(used(run) and run["status"] in {"running", "review"} for run in doc["runs"]):
-            raise HTTPException(409, "Accept or discard the agent runs of this folder first.")
         if item.get("legacy"):
             store.update("projects", project["id"], {"repository_path": "", "repository_context_enabled": False}, "Project")
         else:

@@ -108,7 +108,10 @@ def resolve_context(context: dict | None) -> tuple[list[dict], dict | None]:
             if filename and Path(filename).name == filename:
                 path = "databases/resources/files/" + filename
         if path:
-            relative = workspace_file(str(path)).relative_to(settings.storage_path.resolve()).as_posix()
+            try:
+                relative = workspace_file(str(path)).relative_to(settings.storage_path.resolve()).as_posix()
+            except HTTPException:
+                relative = None  # A tab that is not a workspace file (a page, an Atelier section) adds no source.
             if relative in by_path:
                 identifiers.append(by_path[relative]["id"])
         for identifier in identifiers:

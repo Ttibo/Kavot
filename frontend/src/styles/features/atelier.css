@@ -13,8 +13,6 @@ html[data-theme="dark"] .atelier-view { --atelier-add: #6fcf97; --atelier-del: #
 .atelier-more { align-self: center; margin: 8px auto; font-size: 12px; }
 
 /* The Atelier is a pane of the Workspace editor: it adapts to its width (side by side). */
-.atelier-resource-pane { display: flex; flex-direction: column; height: 100%; min-height: 0; padding: 0 !important; overflow: hidden; }
-.atelier-host { flex: 1; display: flex; flex-direction: column; min-height: 0; container-type: inline-size; }
 .atelier-pane { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
 .atelier-pane-head { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-bottom: 1px solid var(--line); }
 .atelier-head-spacer { flex: 1; }
@@ -281,25 +279,6 @@ html[data-theme="dark"] .atelier-view { --atelier-add: #6fcf97; --atelier-del: #
   .atelier-viewer-actions .button:not(.button-primary) { display: none; }
 }
 
-/* Project mode of the Workspace: the project's own sidebar above its notes and files */
-.project-sidebar .atelier-sidebar-host { flex-shrink: 0; }
-.project-sidebar-panel { display: flex; flex-direction: column; gap: 10px; padding: 10px 10px 4px; }
-.project-sidebar-head { display: flex; align-items: center; gap: 8px; }
-.project-sidebar-head strong { flex: 1; min-width: 0; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.project-sidebar-dot { flex-shrink: 0; width: 10px; height: 10px; border-radius: 3px; }
-.project-sidebar-description { margin: -4px 0 0 36px; color: var(--subtle); font-size: 12px; line-height: 1.4; }
-.project-sidebar-nav { display: flex; flex-direction: column; gap: 1px; }
-.project-sidebar-section { display: flex; flex-direction: column; gap: 1px; }
-.project-sidebar-section h3 { display: flex; align-items: center; justify-content: space-between; margin: 6px 8px 2px; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.project-sidebar-section h3 button { border: 0; background: none; color: var(--subtle); font-size: 14px; cursor: pointer; }
-.project-sidebar-section h3 button:hover { color: var(--ink); }
-.project-sidebar-section p { margin: 2px 8px; }
-.project-sidebar-row .atelier-run-task { opacity: 0; }
-.project-sidebar-row:hover .atelier-run-task, .project-sidebar-row .atelier-run-task:focus-visible { opacity: 1; }
-.project-sidebar-files-label { flex-shrink: 0; margin: 8px 18px 0; padding-top: 10px; border-top: 1px solid var(--line); color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-/* The sidebar header already names the project: its file tree starts with the files. */
-.project-sidebar .workspace-project-root > .workspace-root-head { display: none; }
-
 /* Folder header of the Code section */
 .atelier-code-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--canvas); }
 .atelier-code-head > svg { color: var(--accent); }
@@ -309,37 +288,7 @@ html[data-theme="dark"] .atelier-view { --atelier-add: #6fcf97; --atelier-del: #
 .atelier-code-title code { min-width: 0; overflow: hidden; color: var(--subtle); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
 .atelier-segmented button { display: inline-flex; align-items: center; gap: 5px; }
 
-/* Project sidebar rows: open here, or to the side with the button that appears on hover */
-.project-sidebar-row { display: flex; align-items: center; gap: 2px; width: 100%; min-height: 30px; padding: 0; border-radius: 6px; }
-.project-sidebar-row.static { gap: 9px; min-height: 26px; padding: 0 8px; font-size: 12.5px; }
-.project-sidebar-row.static > .text-link { flex: 1; min-width: 0; overflow: hidden; text-align: left; text-overflow: ellipsis; white-space: nowrap; }
-.project-sidebar-main { display: flex; flex: 1; align-items: center; gap: 9px; min-width: 0; height: 30px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--ink); font-size: 13px; text-align: left; cursor: pointer; }
-.project-sidebar-row.small .project-sidebar-main { height: 26px; font-size: 12.5px; }
-.project-sidebar-main > span:not([class]) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-sidebar-main small { flex-shrink: 0; color: var(--subtle); font-size: 11px; }
-.project-sidebar-main svg { flex-shrink: 0; color: var(--muted); }
-.project-sidebar-row:not(.static):hover { background: var(--surface-soft); }
-.project-sidebar-row.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
-.project-sidebar-row.active .project-sidebar-main, .project-sidebar-row.active .project-sidebar-main svg { color: var(--accent); font-weight: 600; }
-.project-sidebar-beside { flex-shrink: 0; display: grid; place-items: center; width: 26px; height: 26px; margin-right: 2px; border: 0; border-radius: 5px; background: none; color: var(--subtle); cursor: pointer; opacity: 0; }
-.project-sidebar-row:hover .project-sidebar-beside, .project-sidebar-beside:focus-visible { opacity: 1; }
-.project-sidebar-beside:hover { background: var(--surface); color: var(--accent); }
-
-/* Project switcher (the project name in the project sidebar) */
-.project-switcher { position: relative; flex: 1; min-width: 0; }
-.project-switcher-button { display: flex; align-items: center; gap: 8px; width: 100%; height: 34px; padding: 0 8px; border: 0; border-radius: 7px; background: none; color: var(--ink); text-align: left; cursor: pointer; }
-.project-switcher-button:hover, .project-switcher-button[aria-expanded="true"] { background: var(--surface-soft); }
-.project-switcher-button strong { flex: 1; min-width: 0; overflow: hidden; font-size: 15px; text-overflow: ellipsis; white-space: nowrap; }
-.project-switcher-button svg { flex-shrink: 0; color: var(--subtle); transform: rotate(90deg); }
-.project-switcher-menu { position: absolute; z-index: 40; top: calc(100% + 4px); left: 0; right: -40px; display: flex; flex-direction: column; gap: 1px; max-height: 360px; padding: 6px; overflow-y: auto; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: var(--shadow); }
-.project-switcher-menu small { padding: 4px 8px 6px; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
-.project-switcher-menu button { display: flex; align-items: center; gap: 9px; min-height: 32px; padding: 0 8px; border: 0; border-radius: 6px; background: none; color: var(--ink); font-size: 13px; text-align: left; cursor: pointer; }
-.project-switcher-menu button span:not([class]) { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.project-switcher-menu button:hover { background: var(--surface-soft); }
-.project-switcher-menu button.active { font-weight: 600; }
-.project-switcher-menu button svg { color: var(--accent); }
-.project-switcher-menu hr { width: 100%; margin: 4px 0; border: 0; border-top: 1px solid var(--line); }
-/* The pane needs no header of its own: the project sidebar navigates. */
+/* The pane needs no header of its own: the sidebar navigates. */
 .atelier-pane > * { flex: 1; min-height: 0; }
 
 /* Agent context: the folders it works in, its branch, task and notes */
@@ -446,7 +395,6 @@ button.atelier-context-chip:hover { border-color: var(--accent); color: var(--ac
 .atelier-pdf-pages canvas { max-width: 100%; height: auto; background: #fff; box-shadow: 0 1px 4px rgba(0, 0, 0, .12); }
 
 /* Documents of the workspace previewed in the editor */
-.atelier-document-host { flex: 1; display: flex; flex-direction: column; min-height: 0; }
 .atelier-document { flex: 1; display: flex; flex-direction: column; min-height: 0; background: var(--surface); }
 .atelier-document > .atelier-code { flex: 1; min-height: 0; }
 

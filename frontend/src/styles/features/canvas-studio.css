@@ -96,7 +96,7 @@ html[data-theme="dark"] .research-shell .canvas-studio { --studio-paper: #111721
 }
 @media (max-width: 1050px) {
   .canvas-workbench { grid-template-columns: minmax(0,1fr); }
-  .canvas-inspector { position: absolute; z-index: 24; right: 0; top: 0; bottom: 0; width: min(300px,85%); box-shadow: -6px 0 25px #26474e10; }
+  .canvas-inspector { position: absolute; z-index: 24; right: 0; top: 0; bottom: 0; width: min(520px,90%); box-shadow: -6px 0 25px #26474e10; }
 }
 @media (max-width: 600px) {
   .research-shell .canvas-studio .canvas-workspace-heading strong { max-width: 170px; font-size: 14px; }
@@ -216,7 +216,7 @@ html[data-theme="dark"] .research-shell .canvas-studio .canvas-viewport { backgr
 
 /* Adjustable, non-blocking card editor. */
 .research-shell .canvas-studio:not(.inspector-closed) .canvas-workbench {
-  grid-template-columns: minmax(0, 1fr) 8px min(var(--canvas-inspector-width, 380px), 720px, calc(100% - min(180px, 35%)));
+  grid-template-columns: minmax(0, 1fr) 8px min(var(--canvas-inspector-width, 600px), 960px, calc(100% - min(180px, 35%)));
 }
 .research-shell .canvas-studio.inspector-closed .canvas-workbench { grid-template-columns: minmax(0, 1fr); }
 .canvas-studio.inspector-closed :is(.canvas-inspector, .canvas-inspector-resizer) { display: none; }
@@ -226,16 +226,18 @@ html[data-theme="dark"] .research-shell .canvas-studio .canvas-viewport { backgr
 .canvas-inspector-resizer:is(:hover, :focus-visible)::after, .inspector-resizing .canvas-inspector-resizer::after { background: var(--accent); }
 .canvas-studio.inspector-resizing { cursor: col-resize; user-select: none; }
 .canvas-studio.inspector-resizing :is(iframe, .canvas-viewport) { pointer-events: none; }
-.canvas-inspector-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; padding: 12px 18px; border-bottom: 1px solid var(--line); background: var(--surface); }
-.canvas-inspector-bar strong { font-size: 12px; color: var(--muted); font-weight: 600; }
-.canvas-inspector-bar button { border: 0; border-radius: 6px; width: 28px; height: 28px; background: var(--surface-soft); color: var(--muted); font-size: 20px; cursor: pointer; }
+/* The same header as the side panels of the other views: a 38 px bar, a small label, quiet icon buttons. */
+.canvas-inspector-bar { position: sticky; top: 0; z-index: 2; display: flex; align-items: center; justify-content: space-between; min-height: 38px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.canvas-inspector-bar strong { margin-right: auto; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
+.canvas-inspector-bar button { display: grid; place-items: center; border: 0; border-radius: 6px; width: 28px; height: 28px; padding: 0; background: transparent; color: var(--muted); cursor: pointer; }
+.canvas-inspector-bar button:hover { background: var(--hover); color: var(--ink); }
 .canvas-inspector .modal-header { padding: 18px 18px 14px; border-bottom: 0; }
 .canvas-inspector .form-grid { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; padding: 0; gap: 0; overflow-y: auto; }
 .canvas-inspector .form-grid > :not(.canvas-inspector-writing) { flex-shrink: 0; }
 .canvas-inspector .form-grid > :not(.canvas-inspector-bar, .canvas-inspector-writing, [hidden]) { margin: 12px 18px; }
 .canvas-inspector:has(form) > .canvas-inspector-bar { display: none; }
 .canvas-inspector [data-canvas-inspector-content] { display: flex; flex-direction: column; flex: 1; min-height: 0; overflow: hidden; }
-.canvas-inspector-bar { gap: 10px; flex-shrink: 0; }
+.canvas-inspector-bar { gap: 4px; flex-shrink: 0; }
 .canvas-inspector-bar .canvas-detail-title { flex: 1; min-width: 0; margin: 0; }
 .canvas-inspector-bar .canvas-detail-title input { width: 100%; min-width: 0; padding: 6px 0; border-color: transparent; background: transparent; text-overflow: ellipsis; }
 .canvas-inspector-bar .canvas-detail-title input:focus { border-color: var(--accent); }
@@ -359,6 +361,11 @@ html[data-theme="dark"] .research-shell .canvas-studio .canvas-viewport { backgr
 .canvas-note-page li[data-type=taskItem] > label { display: flex; align-items: center; height: 1.65em; margin: 0; font: inherit; }
 .canvas-note-page li[data-type=taskItem] input { width: 14px; height: 14px; margin: 0; pointer-events: none; }
 .canvas-note-page li[data-type=taskItem] > div > p { margin-top: 0; }
+/* Task items written by hand or by an agent (no label, a bare checkbox, a paragraph straight in the item): the text keeps
+   the second column instead of wrapping under the checkbox, one letter per line. */
+.canvas-note-page li[data-type=taskItem] > :not(label, input) { grid-column: 2; min-width: 0; }
+.canvas-note-page li[data-type=taskItem] > span:empty { display: none; }
+.canvas-note-page li[data-type=taskItem] > input { margin-top: calc((1.65em - 14px) / 2); }
 .canvas-note-page details { border: 1px solid var(--line); border-radius: 5px; margin: 10px 0; padding: 8px; }
 .canvas-note-page summary { cursor: pointer; font-weight: 600; }
 .canvas-note-page :is(pre,code) { font-family: monospace; }
@@ -372,9 +379,9 @@ html[data-theme="dark"] .research-shell .canvas-studio .canvas-viewport { backgr
 
 /* The card editor floats over the canvas, like the side panel of a task: the board keeps its full width. */
 .research-shell .canvas-studio:not(.inspector-closed) .canvas-workbench { grid-template-columns: minmax(0, 1fr); }
-.research-shell .canvas-studio .canvas-inspector { --canvas-panel-width: min(var(--canvas-inspector-width, 380px), calc(100% - 24px));
-  position: absolute; z-index: 25; top: 12px; right: 12px; bottom: 12px; width: var(--canvas-panel-width);
-  border: 1px solid var(--line); border-radius: 10px; box-shadow: var(--shadow); overflow: hidden; }
-.research-shell .canvas-studio .canvas-inspector-resizer { position: absolute; z-index: 26; top: 12px; bottom: 12px;
-  right: calc(12px + min(var(--canvas-inspector-width, 380px), calc(100% - 24px)) - 4px); width: 8px; background: transparent; }
+.research-shell .canvas-studio .canvas-inspector { --canvas-panel-width: min(var(--canvas-inspector-width, 600px), calc(100% - 16px));
+  position: absolute; z-index: 25; top: 8px; right: 8px; bottom: 8px; width: var(--canvas-panel-width);
+  border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 10px 32px color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+.research-shell .canvas-studio .canvas-inspector-resizer { position: absolute; z-index: 26; top: 8px; bottom: 8px;
+  right: calc(8px + min(var(--canvas-inspector-width, 600px), calc(100% - 16px)) - 4px); width: 8px; background: transparent; }
 .research-shell .canvas-studio .canvas-inspector-resizer::after { background: transparent; }

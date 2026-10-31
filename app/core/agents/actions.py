@@ -185,6 +185,55 @@ def _record_values(database_id: str, values: dict):
             raise ValueError(f"Type de champ invalide : {key}")
 
 
+# Block-level changes name what they touch (a block id, a unique passage): they can be replayed on a newer
+# version of the note, so several proposals for one note can be applied one after the other.
+REBASABLE_NOTE_KINDS = {"note_update", "note_block_insert", "note_block_delete", "note_block_update"}
+
+
+def _note_values(kind: str, values: dict) -> dict:
+    if kind == 'note_update':
+        if set(values) != {"old_text", "new_text"} or not all(isinstance(v, str) for v in values.values()):
+            raise ValueError("A note change must specify old_text and new_text.")
+        return values
+    schema = {'note_block_insert': NoteBlockInsert, 'note_block_delete': NoteBlockDelete, 'note_block_update': NoteBlockChange}[kind]
+    return json_values(_validate(schema, values))
+
+
+def _note_change(kind: str, values: dict, before: str, html: bool) -> str:
+    """The note's text after a block-level change of `before`."""
+    from bs4 import BeautifulSoup
+    if kind == 'note_update':
+        old, new = values["old_text"], values["new_text"]
+        if old and before.count(old) != 1:
+            raise ValueError("The passage to change must appear exactly once in the note.")
+        return before.replace(old, new, 1) if old else before + (html_documents.fragment(new) if html else new)
+    soup = BeautifulSoup(before, 'html.parser')
+    if kind == 'note_block_insert':
+        addition = html_documents.fragment(values['html'])
+        if values.get('after_block_id') is None:
+            return before + addition
+        block = soup.find(id=values['after_block_id'])
+        if block is None:
+            raise ValueError('Block missing from the selected document.')
+        block.insert_after(BeautifulSoup(addition, 'html.parser'))
+    elif kind == 'note_block_delete':
+        for block_id in values['block_ids']:
+            block = soup.find(id=block_id)
+            if block is None:
+                raise ValueError(f'Block {block_id} missing from the selected document.')
+            block.decompose()
+    else:
+        block = soup.find(id=values['block_id'])
+        if block is None:
+            raise ValueError('Block missing from the selected document.')
+        replacement = BeautifulSoup(html_documents.fragment(values['html']), 'html.parser')
+        first = replacement.find(True)
+        if first:
+            first['id'] = values['block_id']
+        block.replace_with(replacement)
+    return str(soup)
+
+
 def prepare(action: dict, run: dict) -> dict:
     action = copy.deepcopy(action)
     kind, values = action.get("kind"), action.get("values", {})
@@ -218,39 +267,12 @@ def prepare(action: dict, run: dict) -> dict:
             if not multiple and str(target_note["note_id"]) != str(action.get("id")):
                 raise ValueError("The proposal does not match the target note. Send a request for this note.")
         before = note["text"]
-        if kind == 'note_update':
-            if set(values) != {"old_text", "new_text"} or not all(isinstance(v, str) for v in values.values()):
-                raise ValueError("A note change must specify old_text and new_text.")
-            old, new = values["old_text"], values["new_text"]
-            if old and before.count(old) != 1:
-                raise ValueError("The passage to change must appear exactly once in the note.")
-            after = before.replace(old, new, 1) if old else before + (html_documents.fragment(new) if note['path'].endswith('.html') else new)
+        if kind in REBASABLE_NOTE_KINDS:
+            values = _note_values(kind, values)
+            after = _note_change(kind, values, before, note['path'].endswith('.html'))
         elif kind == 'note_content_replace':
             values = json_values(_validate(NoteContentReplace, values))
             after = html_documents.fragment(values['content']) if note['path'].endswith('.html') else values['content']
-        elif kind == 'note_block_insert':
-            from bs4 import BeautifulSoup
-            values = json_values(_validate(NoteBlockInsert, values))
-            addition = html_documents.fragment(values['html'])
-            if values.get('after_block_id') is None:
-                after = before + addition
-            else:
-                soup = BeautifulSoup(before, 'html.parser')
-                block = soup.find(id=values['after_block_id'])
-                if block is None:
-                    raise ValueError('Block missing from the selected document.')
-                block.insert_after(BeautifulSoup(addition, 'html.parser'))
-                after = str(soup)
-        elif kind == 'note_block_delete':
-            from bs4 import BeautifulSoup
-            values = json_values(_validate(NoteBlockDelete, values))
-            soup = BeautifulSoup(before, 'html.parser')
-            for block_id in values['block_ids']:
-                block = soup.find(id=block_id)
-                if block is None:
-                    raise ValueError(f'Block {block_id} missing from the selected document.')
-                block.decompose()
-            after = str(soup)
         elif kind == 'note_script_set':
             from bs4 import BeautifulSoup
             from app.core.workspace.note_format import script_block
@@ -280,19 +302,6 @@ def prepare(action: dict, run: dict) -> dict:
                 block.insert_after(replacement)
             else:
                 soup.append(replacement)
-            after = str(soup)
-        elif kind == 'note_block_update':
-            from bs4 import BeautifulSoup
-            values = json_values(_validate(NoteBlockChange, values))
-            soup = BeautifulSoup(before, 'html.parser')
-            block = soup.find(id=values['block_id'])
-            if block is None:
-                raise ValueError('Block missing from the selected document.')
-            replacement = BeautifulSoup(html_documents.fragment(values['html']), 'html.parser')
-            first = replacement.find(True)
-            if first:
-                first['id'] = values['block_id']
-            block.replace_with(replacement)
             after = str(soup)
         else:
             values = json_values(_validate(NotePropertiesChange, values))
@@ -511,17 +520,30 @@ def apply(proposal: dict) -> dict:
             if kind == 'note_properties_update':
                 meta = html_documents.metadata(path.read_text(encoding='utf-8'))
                 current = {key: meta.get(key, {}) for key in ('properties', 'presentation')}
-            if note.get("trashed_at") or path.resolve() != workspace_file(proposal["target"]) or current != before or (action.get('expected_hash') and html_documents.fingerprint(path) != action['expected_hash']):
+            if note.get("trashed_at") or path.resolve() != workspace_file(proposal["target"]):
                 raise HTTPException(409, "The note changed since the request. Ask for a new proposal.")
+            expected = action.get('expected_hash')
+            if current != before or (expected and html_documents.fingerprint(path) != expected):
+                # Changed since (often by another proposal of the same answer): replay a block-level change on it.
+                if kind not in REBASABLE_NOTE_KINDS:
+                    raise HTTPException(409, "The note changed since the request. Ask for a new proposal.")
+                try:
+                    after = _note_change(kind, _note_values(kind, values), current, path.suffix == '.html')
+                except ValueError:
+                    raise HTTPException(409, "The note changed and this change no longer fits it. Ask for a new proposal.") from None
+                expected = html_documents.fingerprint(path)
+                proposal["after"] = after
             patch = after if kind == 'note_properties_update' else {'content': after}
-            result = documents.update_note(note["id"], NoteUpdate(**patch, expected_hash=action.get('expected_hash')))
+            result = documents.update_note(note["id"], NoteUpdate(**patch, expected_hash=expected))
+            from app.core.workspace import write_guard
+            write_guard.mark_agent_write(note["id"])
             return {"id": result["id"], "kind": kind, "path": proposal["target"]}
         if kind in {"canvas_update", "canvas_edit"}:
             path = workspace_file(action["path"])
             if read_json_object(path) != before:
                 raise HTTPException(409, "The canvas changed since the request.")
             canvas_tasks.save(path, after)
-            return {"path": action["path"]}
+            return agent_canvas.changes(before, after, action["path"])
         if kind.startswith("record_"):
             database_id = action["database_id"]
             current = databases.records(database_id)
@@ -544,7 +566,10 @@ def apply(proposal: dict) -> dict:
             placement = values.get("canvas")
             result = documents.create_note(NoteCreate(**{k: v for k, v in values.items() if k != "canvas"}))
             from app.core.kernel.config import settings
-            created = {"id": result["id"], "kind": kind, "path": documents.note_path(result, store.read()).relative_to(settings.storage_path).as_posix()}
+            # Enough to confirm the note without reading it back.
+            created = {"id": result["id"], "kind": kind, "title": result.get("title"),
+                       "path": documents.note_path(result, store.read()).relative_to(settings.storage_path).as_posix(),
+                       "project_id": result.get("project_id"), "characters": len(values.get("content") or "")}
             if placement:
                 try:
                     created["canvas"] = agent_canvas.place_new_note(result, placement)

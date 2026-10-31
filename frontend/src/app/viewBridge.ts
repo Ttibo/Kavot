@@ -1,14 +1,16 @@
-export type ViewName = 'dashboard' | 'projects' | 'papers' | 'watchers' | 'workflows' | 'chat' | 'tasks' | 'calendar' | 'conferences' | 'datasets' | 'database' | 'settings' | 'trash';
-type Renderer = (view: ViewName) => void;
-let renderer: Renderer | undefined;
-let editor: (() => void) | undefined;
+import type { PageId } from './pages';
+
+/** The editor engine and the React components share the state; this tells the components it changed. */
 let revision = 0;
-const viewVersions: Partial<Record<ViewName, number>> = {};
-export const viewVersion = (view: ViewName) => viewVersions[view] || 0;
 const listeners = new Set<() => void>();
 export const subscribe = (listener: () => void) => { listeners.add(listener); return () => { listeners.delete(listener); }; };
 export const snapshot = () => revision;
 export function publish() { revision++; listeners.forEach(listener => listener()); }
-export function connectViews(render: Renderer, prepare: () => void) { renderer = render; editor = prepare; }
-export function showView(view: ViewName) { viewVersions[view] = viewVersion(view) + 1; renderer?.(view); publish(); }
-export function prepareEditor() { editor?.(); publish(); }
+
+/** A page asked to reload its data (its calendar, its dashboard): the tabs showing it refresh. */
+const pageVersions: Partial<Record<PageId, number>> = {};
+export const viewVersion = (page: PageId) => pageVersions[page] || 0;
+export function showView(page: PageId) { pageVersions[page] = viewVersion(page) + 1; publish(); }
+
+/** Before the editor engine redraws the main area. */
+export function prepareEditor() { publish(); }

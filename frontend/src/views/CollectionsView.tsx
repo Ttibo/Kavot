@@ -15,9 +15,10 @@ import { CollectionWatchersButton } from '../features/collections/CollectionWatc
 
 const FIELD_TYPES: Record<string, PropertyType> = { text: 'text', markdown: 'text', url: 'url', email: 'email', select: 'select', number: 'number', boolean: 'boolean', date: 'date', datetime: 'date', tags: 'tags' };
 
-export function CollectionsView() {
+/** A custom collection: the one given (in an editor pane), or the one chosen in the navigation. */
+export function CollectionsView({ collectionId }: { collectionId?: string }) {
   const runtime = useRuntime(); const { state } = runtime;
-  const database = runtime.collectionDatabaseDefinitions().find((item: any) => item.id === state.collectionId);
+  const database = runtime.collectionDatabaseDefinitions().find((item: any) => item.id === (collectionId || state.collectionId));
   if (!database) return <EmptyState title="Collection not found">Choose a collection from the navigation.</EmptyState>;
   const items = runtime.collectionItems(database.id);
   const values = (item: any) => item.source.values || item.source;

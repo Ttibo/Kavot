@@ -1,0 +1,182 @@
+/* Agent conversations, the same in the assistant panel, the Chat view and the Atelier.
+   The thread, the list and the side panels reuse the Atelier's pieces (atelier.css). */
+.agent-surface { min-width: 0; min-height: 0; height: 100%; }
+.agent-surface.page { height: 100%; }
+.agent-surface .atelier-thread-layout, .agent-surface .atelier-thread { height: 100%; }
+.agent-surface.panel { position: relative; display: flex; flex-direction: column; background: var(--surface); }
+.agent-surface.panel > .atelier-thread-layout { flex: 1; min-height: 0; }
+.agent-surface.panel .atelier-messages { padding: 12px 14px 16px; }
+.agent-surface.panel .atelier-thread-head { padding: 6px 12px; }
+.agent-surface.panel .atelier-context { padding-inline: 12px; }
+.agent-surface.panel .agent-compose { margin: 0 10px 8px; }
+/* In the narrow panel, the changes and the usage cover the thread. */
+.agent-surface.panel .atelier-changes { position: absolute; inset: 38px 0 0; z-index: 5; border-left: 0; background: var(--surface); }
+.agent-surface-drawer { position: absolute; inset: 38px 0 0; z-index: 6; display: flex; background: var(--canvas); }
+.agent-surface-drawer > .atelier-run-list { flex: 1; flex-direction: column; max-height: none; overflow: hidden auto; border: 0; }
+.agent-surface-drawer .atelier-run-list h4 { display: block; }
+.agent-surface-drawer .atelier-run-item { flex: 0 0 auto; }
+
+.agent-conversations section { display: flex; flex-direction: column; gap: 1px; }
+.agent-conversation-search { margin: 4px 0 2px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; }
+.chat-engine-filter { display: flex; flex-wrap: wrap; gap: 4px; }
+.chat-engine-filter button { padding: 2px 9px; border: 1px solid var(--line); border-radius: 99px; background: transparent; color: var(--muted); font-size: 11.5px; cursor: pointer; }
+.chat-engine-filter button[aria-pressed="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.agent-conversations .chat-engine-filter { margin: 2px 0 4px; }
+.agent-conversations-empty { padding: 8px; font-size: 12px; }
+
+.agent-answer { display: flex; flex-direction: column; gap: 8px; }
+.agent-surface .external-proposals { display: grid; gap: 8px; }
+.agent-surface .assistant-change { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); font-size: 12px; }
+.agent-surface .assistant-change details > summary { cursor: pointer; color: var(--muted); }
+.agent-surface .assistant-change-actions { display: flex; gap: 6px; }
+.agent-surface .assistant-change-actions button, .agent-surface .assistant-change > button { padding: 5px 10px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+.agent-surface .assistant-change-actions button:disabled { opacity: .45; cursor: not-allowed; }
+.agent-bubble-mode { margin-right: 6px; color: var(--accent); font-weight: 600; }
+.atelier-bubble.user small > span:not(.agent-bubble-mode) { margin-right: 6px; }
+
+.agent-compose { position: relative; gap: 4px; padding: 6px 10px; margin-bottom: 10px; }
+.agent-compose textarea, .agent-compose textarea:focus { border: 0; outline: 0; box-shadow: none; min-height: 40px; }
+.agent-compose .assistant-picked { margin-bottom: 0; }
+.agent-compose .assistant-context-drawer { left: 0; right: 0; bottom: calc(100% + 6px); }
+.agent-compose .context-picker { bottom: calc(100% + 6px); }
+.agent-view-chip { border-style: dashed; }
+.agent-view-chip > svg { color: var(--accent); }
+.agent-suggestion { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); color: var(--accent); }
+.atelier-chip.static { cursor: default; }
+.agent-compose .assistant-mode-switch button { border: 0; background: transparent; color: var(--muted); font: inherit; cursor: pointer; }
+.agent-compose .assistant-mode-switch button[aria-pressed=true] { background: var(--surface); color: var(--ink); }
+.agent-compose .assistant-mode-switch button:disabled { opacity: .45; cursor: not-allowed; }
+.agent-compose .compact-model-picker { display: flex; align-items: center; gap: 2px; min-width: 0; position: relative; }
+.agent-compose .compact-model-picker > label select { max-width: 150px; }
+.agent-compose .assistant-model-options button, .agent-compose .assistant-ideas button { display: flex; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+.agent-compose .assistant-model-options button:hover, .agent-compose .assistant-ideas button:hover { background: var(--surface-soft); }
+.agent-compose .agent-error { margin: 0; font-size: 12px; }
+
+
+/* A page measures its width to choose between the list beside the thread and the compact layout. */
+.agent-surface-host { display: flex; flex: 1; min-width: 0; min-height: 0; height: 100%; }
+.agent-surface-host > .agent-surface { flex: 1; min-width: 0; }
+.agent-surface.panel.in-page { border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+
+/* The conversations column: one head line as tall as the thread's (fold, title, new), then the list.
+   Folded, the compact header of the thread brings it back. */
+.agent-list-column { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--line); background: var(--canvas); }
+.agent-list-column > .atelier-run-list { flex: 1; padding-top: 4px; border-right: 0; }
+.agent-list-head { display: flex; flex-shrink: 0; align-items: center; gap: 4px; min-height: 38px; padding: 4px 6px; border-bottom: 1px solid var(--line); }
+.agent-list-title { display: flex; flex: 1; align-items: baseline; gap: 6px; min-width: 0; overflow: hidden; color: var(--muted); font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.agent-list-title small { min-width: 0; overflow: hidden; color: var(--subtle); font-size: 11.5px; font-weight: 500; text-overflow: ellipsis; }
+.agent-list-head .agent-tool.active { color: var(--accent); }
+.agent-list-column .atelier-run-list h4:first-of-type { margin-top: 4px; }
+
+/* Conversation header, one line tall: title and status share it, the pills and menus line up on its right. */
+.agent-surface .atelier-thread-head { align-items: center; gap: 8px; min-height: 38px; padding: 4px 12px; }
+.agent-surface .atelier-thread-head > div { display: flex; align-items: baseline; gap: 8px; min-width: 0; }
+.agent-surface .atelier-thread-head h3 { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; flex: 0 1 auto; min-width: 0; margin: 0; }
+.agent-surface .atelier-thread-head p { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; display: block; margin: 0; }
+.agent-surface .atelier-thread-head p .atelier-head-sep { display: inline-block; width: 3px; height: 3px; margin: 0 6px; border-radius: 50%; background: var(--subtle); vertical-align: middle; }
+.agent-surface .atelier-thread-head .atelier-pill { height: 26px; padding: 0 9px; font-size: 12px; }
+.agent-surface .atelier-run-menu > .icon-button, .agent-tool { display: grid; width: 28px; min-width: 28px; height: 28px; padding: 0; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); font-size: 16px; line-height: 1; cursor: pointer; }
+.agent-surface .atelier-run-menu > .icon-button:hover, .agent-tool:hover { background: var(--hover); color: var(--ink); }
+.agent-tool:disabled { opacity: .4; cursor: default; }
+.agent-head-tools { display: flex; flex-shrink: 0; gap: 2px; padding-left: 6px; border-left: 1px solid var(--line); }
+/* The drawer opens under the conversation header, whichever header is shown. */
+.agent-surface.panel { position: relative; }
+.agent-surface.panel .agent-surface-drawer { inset: 38px 0 0; }
+
+/* New conversation: a slim header; the agent, model and mode are chosen in the message bar. */
+.agent-new-head h3 { display: flex; flex: 1 1 auto; align-items: center; gap: 7px; min-width: 0; color: var(--muted); font-size: 13px; font-weight: 600; }
+.agent-new-head h3 svg { flex-shrink: 0; color: var(--accent); }
+.agent-new-head h3 span { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.agent-new-head .agent-head-tools { margin-left: auto; }
+/* The button of the conversations sits on their side, at the start of the header. */
+.agent-list-tool { display: flex; flex-shrink: 0; margin-left: -6px; padding-right: 6px; border-right: 1px solid var(--line); }
+select.agent-engine-select { max-width: 150px; color: var(--ink); font-weight: 600; text-overflow: ellipsis; cursor: pointer; appearance: auto; }
+
+/* Narrow: one line still; the title is cut first, then the labels give way to their icons. */
+.research-shell .agent-surface .atelier-thread-head:not(.agent-new-head) { flex-direction: row; flex-wrap: nowrap; }
+.research-shell .agent-surface .atelier-thread-head > div { flex: 1 1 auto; min-width: 0; }
+.agent-surface .atelier-thread-head .atelier-pill .add, .agent-surface .atelier-thread-head .atelier-pill .del { margin-left: 3px; }
+
+/* The thread measures its own width (the list beside it, a split pane, the assistant panel). */
+.agent-surface .atelier-thread { container: agent-thread / inline-size; }
+.agent-surface .atelier-composer-bar { flex-wrap: nowrap; min-width: 0; }
+.agent-surface .atelier-composer-bar > * { flex-shrink: 0; }
+.agent-surface .atelier-composer-bar > .compact-model-picker { flex: 0 1 auto; min-width: 60px; }
+.agent-surface .atelier-composer-bar > .agent-engine-chip { flex-shrink: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agent-surface .atelier-composer-bar > .atelier-head-spacer { flex: 1 1 0; min-width: 0; }
+@container agent-thread (max-width: 680px) {
+  .agent-surface .agent-budget small, .agent-surface .atelier-composer-bar > .agent-engine-chip.static { display: none; }
+  .agent-surface .atelier-messages { padding-inline: 14px; }
+  .agent-surface .agent-compose { margin-inline: 10px; }
+}
+@container agent-thread (max-width: 520px) {
+  .agent-surface .atelier-composer-bar .agent-label { display: none; }
+  .agent-surface select.agent-engine-select { max-width: 96px; }
+  .agent-surface .atelier-send { width: 32px; padding: 0; justify-content: center; }
+  .agent-surface .atelier-thread-head .atelier-pill { padding: 0 7px; }
+  .agent-surface .atelier-thread-head p .atelier-head-sep, .agent-surface .atelier-thread-head p .agent-head-meta { display: none; }
+  .agent-surface .assistant-mode-switch button { padding: 4px 5px; }
+}
+@container agent-thread (max-width: 400px) {
+  .agent-surface .atelier-thread-head p, .agent-surface .atelier-thread-head .atelier-pill:not(.agent-budget) .add,
+  .agent-surface .atelier-thread-head .atelier-pill:not(.agent-budget) .del { display: none; }
+  .agent-surface .compact-model-picker > label select { max-width: 96px; }
+  /* Too narrow for one line: the send button keeps the right end of a second line. */
+  .agent-surface .atelier-composer-bar { flex-wrap: wrap; }
+}
+/* Short windows: the composer gives room back to the conversation. */
+@media (max-height: 720px) {
+  .agent-surface .agent-compose textarea { min-height: 34px; max-height: 100px; }
+  .agent-surface .agent-compose { padding: 5px 10px 6px; }
+  .agent-surface .atelier-messages { padding: 12px 20px 18px; }
+  .agent-surface .atelier-thread-empty { padding: 28px 20px 12px; }
+}
+/* The agents page never scrolls as a whole: only the conversation and the list scroll. */
+.pane-view[data-pane-view="chat"] { overflow: hidden; }
+.chat-view .chat-layout, .chat-view .agent-surface-host { min-height: 0; overflow: hidden; }
+.assistant-apply-all { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 8px 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: 10px; background: var(--accent-soft); font-size: 12.5px; }
+
+/* The wide agents page keeps its list as a column at every width it is used (it turns compact below 800 px):
+   the Atelier's narrow rule (list as a horizontal strip) does not apply to it. */
+.research-shell .agent-surface.page.atelier-agents { grid-template-columns: 260px minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+.research-shell .agent-list-column > .atelier-run-list { flex-direction: column; max-height: none; overflow: hidden auto; border-bottom: 0; }
+.research-shell .agent-list-column .atelier-run-list h4 { display: block; }
+.research-shell .agent-list-column .atelier-run-item { flex: 0 0 auto; }
+
+/* The agent's steps: grouped as "N actions" by default, all unfolded on demand. */
+.atelier-thread-tools { position: sticky; top: 0; z-index: 2; display: flex; justify-content: flex-end; margin: -6px 0 2px; pointer-events: none; }
+.atelier-thread-tools button { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); color: var(--muted); font: inherit; font-size: 11.5px; cursor: pointer; pointer-events: auto; }
+.atelier-thread-tools button[aria-pressed="true"] { border-color: var(--accent); color: var(--accent); }
+.atelier-actions { border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.atelier-actions > summary { display: flex; align-items: center; gap: 7px; padding: 6px 10px; color: var(--muted); font-size: 12px; cursor: pointer; }
+.atelier-actions > summary > span { min-width: 0; overflow: hidden; color: var(--subtle); text-overflow: ellipsis; white-space: nowrap; }
+.atelier-actions[open] > summary { border-bottom: 1px solid var(--line); }
+.atelier-actions > .atelier-tool { margin: 4px 6px; }
+/* Back to the end of the conversation while reading above. */
+.atelier-thread-scroll { position: relative; }
+.atelier-jump { position: sticky; bottom: 10px; z-index: 3; display: flex; align-items: center; gap: 5px; margin: 0 12px 0 auto; padding: 5px 11px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); box-shadow: var(--shadow-soft); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
+.atelier-jump svg { transform: rotate(90deg); }
+.atelier-jump:hover { border-color: var(--accent); color: var(--accent); }
+
+/* What the agent is doing now, on the working line. */
+.atelier-working-step { min-width: 0; margin-left: 8px; padding-left: 8px; overflow: hidden; border-left: 1px solid var(--line); color: var(--subtle); text-overflow: ellipsis; white-space: nowrap; }
+.atelier-working { min-width: 0; }
+
+/* Conversation size: the usage pill shades from green to red as the conversation, or its latest request, nears its limit. */
+.agent-budget { --budget-color: hsl(var(--budget-hue, 140) 62% 42%); }
+.agent-budget .agent-budget-dot { width: 8px; height: 8px; flex-shrink: 0; border-radius: 50%; background: var(--budget-color); }
+.agent-budget small { color: var(--subtle); font-size: 11px; }
+.agent-budget.warn, .agent-budget.over { border-color: var(--budget-color); background: hsl(var(--budget-hue) 70% 50% / .1); color: var(--ink); }
+.agent-budget.over { box-shadow: 0 0 0 1px var(--budget-color) inset; }
+.agent-budget-alert { display: flex; align-items: center; gap: 8px; margin: 0 12px 8px; padding: 8px 10px; border: 1px solid hsl(var(--budget-hue) 62% 42% / .5);
+  border-radius: 8px; background: hsl(var(--budget-hue) 70% 50% / .1); color: var(--ink); font-size: 12px; line-height: 1.4; }
+.agent-budget-alert > svg { flex-shrink: 0; color: hsl(var(--budget-hue) 62% 42%); }
+.agent-budget-alert > span { flex: 1; min-width: 0; }
+.agent-budget-alert > button:not(.icon-button) { flex-shrink: 0; padding: 4px 9px; border: 1px solid var(--line); border-radius: 6px; background: var(--surface); color: var(--ink); font: inherit; cursor: pointer; }
+.agent-budget-alert > button:not(.icon-button):hover { background: var(--hover); }
+.agent-answer-usage { display: block; margin: 3px 2px 0; color: var(--subtle); font-size: 11px; font-variant-numeric: tabular-nums; }
+.agent-answer-usage.warn { color: hsl(35 80% 40%); }
+.agent-answer-usage.over { color: var(--atelier-del, hsl(0 65% 48%)); font-weight: 600; }
+.agent-usage-summary { display: flex; align-items: flex-start; gap: 8px; margin: 0 0 10px; padding: 8px 10px; border-radius: 8px; background: hsl(var(--budget-hue, 140) 70% 50% / .1); font-size: 12px; line-height: 1.45; }
+.agent-usage-summary .agent-budget-dot { width: 8px; height: 8px; flex-shrink: 0; margin-top: 4px; border-radius: 50%; background: hsl(var(--budget-hue, 140) 62% 42%); }
+td.agent-answer-usage { display: table-cell; margin: 0; font-size: inherit; }

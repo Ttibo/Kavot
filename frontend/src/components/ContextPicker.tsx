@@ -3,10 +3,10 @@ import { Icon } from './Icon';
 import '../styles/components/context-picker.css';
 import { countByKind, filterOptions, KIND_ICONS, KIND_LABELS, type PickedItem, type PickedKind } from '../features/externalAgents/picker';
 
-const KINDS: (PickedKind | 'all')[] = ['all', 'project', 'note', 'paper', 'paper_folder', 'note_folder', 'collection', 'file'];
+const KINDS: (PickedKind | 'all')[] = ['all', 'project', 'code', 'resource', 'task', 'note', 'paper', 'paper_folder', 'note_folder', 'collection', 'file'];
 const PLURALS: Record<PickedKind | 'all', string> = {
-  all: 'All', project: 'Projects', note: 'Notes', paper: 'Articles', paper_folder: 'Article folders',
-  note_folder: 'Note folders', collection: 'Collections', file: 'Files',
+  all: 'All', project: 'Projects', code: 'Code', resource: 'Resources', task: 'Tasks', note: 'Notes', paper: 'Articles',
+  paper_folder: 'Article folders', note_folder: 'Note folders', collection: 'Collections', file: 'Files',
 };
 
 /** Search and pick what the agent should work on; the keyboard alone is enough (↑ ↓ Enter, Tab for the type). */
@@ -53,7 +53,7 @@ export function ContextPicker({ options, picked, query: initialQuery = '', menti
   let previousKind: PickedKind | null = null;
   return <div className={'context-picker' + (mention ? ' mention' : '')} role="dialog" aria-label="Add context">
     {!mention && <div className="context-picker-search"><Icon name="search" size={14}/>
-      <input ref={input} value={query} placeholder="Search a project, note, article, folder, collection…" aria-label="Search context"
+      <input ref={input} value={query} placeholder="Search a project, its code, a task, a note, an article…" aria-label="Search context"
         onChange={event => { setQuery(event.target.value); onQueryChange?.(event.target.value); }} onKeyDown={navigate}/>
       <button type="button" aria-label="Close" onClick={onClose}><Icon name="close" size={13}/></button></div>}
     <div className="context-picker-kinds" role="tablist" aria-label="Type">

@@ -34,6 +34,8 @@ export const iconPaths: Record<string, string> = {
   chat: 'M4 5h16v11H9l-5 4zM8 9h8M8 12.5h5',
   agents: 'M12 3a3 3 0 1 0 0 6 3 3 0 0 0 0-6M5 21v-2a7 7 0 0 1 14 0v2M19 4l1.5-1.5M5 4 3.5 2.5',
   trash: 'M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13M10 11v6M14 11v6',
+  eye: 'M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12M12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5',
+  open: 'M14 4h6v6M20 4l-8 8M18 14v6H4V6h6',
 };
 
 export function Icon({ name, size = 18, style }: { name: string; size?: number; style?: CSSProperties }) {

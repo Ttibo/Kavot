@@ -1,9 +1,23 @@
 import type { Runtime } from '../../app/runtime';
 import { currentProject } from '../../app/projectContext';
+import { pages } from '../../app/pages';
+import { findWorkspaceNode } from '../documents/workspace';
 
 const contexts = new Map<Element, () => Record<string, any>>();
+// A suggestion made while no conversation is on screen waits for the Agents view it opens.
+let pendingSuggestion: string | null = null;
+export function takePendingSuggestion() {
+  const text = pendingSuggestion;
+  pendingSuggestion = null;
+  return text;
+}
 export function suggestToAgent(text: string) {
-  window.dispatchEvent(new CustomEvent('kavot:assistant-suggestion', { detail: { text } }));
+  if (document.querySelector('.agent-compose')) {
+    window.dispatchEvent(new CustomEvent('kavot:assistant-suggestion', { detail: { text } }));
+    return;
+  }
+  pendingSuggestion = text;
+  void import('../../app/tabs/pages').then(module => module.openPage('chat', { beside: true }));
 }
 export function registerAgentContext(element: Element, read: () => Record<string, any>) {
   for (const owner of contexts.keys()) if (!owner.isConnected) contexts.delete(owner);
@@ -11,10 +25,10 @@ export function registerAgentContext(element: Element, read: () => Record<string
   return () => { contexts.delete(element); };
 }
 
+// What the agent is told the user is looking at: a page of the registry, or an area inside one.
 const viewNames: Record<string, string> = {
-  dashboard: 'Accueil', projects: 'Projects', project: 'Research Hub', canvas: 'Canvas', notes: 'Notes and editor',
-  papers: 'Library', reader: 'Lecteur PDF', citations: 'Graphe de citations', tasks: 'Tasks',
-  calendar: 'Calendrier', datasets: 'Datasets', conferences: 'Conferences', database: 'Collection', settings: 'Settings',
+  ...Object.fromEntries(Object.entries(pages).map(([id, page]) => [id, page.title])),
+  project: 'Research Hub', canvas: 'Canvas', notes: 'Notes and editor', reader: 'Lecteur PDF', citations: 'Graphe de citations',
 };
 export const suggestions: Record<string, string[]> = {
   dashboard: ['Where do I stand on my active projects?', 'Which reading or task should I pick up?'],
@@ -44,39 +58,68 @@ document.addEventListener('selectionchange', () => {
   }
 });
 
+type Pane = 'primary' | 'secondary';
+const activeTab = (state: any, pane: Pane) => state?.workspaceTabs?.[pane]?.find((tab: any) => tab.id === state.workspaceActiveTabs?.[pane]);
+const isAgentsTab = (tab: any) => tab?.resource?.type === 'view' && tab.resource.view === 'chat';
+
+/** The pane the user works in. Talking from the Agents tab, it is the window open beside it: its note,
+ * canvas or page is what the request is about. */
+function documentPane(state: any): Pane {
+  const focused: Pane = state?.activeNotePane === 'secondary' && state.workspaceTabs?.secondary?.length ? 'secondary' : 'primary';
+  const other: Pane = focused === 'primary' ? 'secondary' : 'primary';
+  return isAgentsTab(activeTab(state, focused)) && activeTab(state, other) ? other : focused;
+}
+
+/** The project a tab belongs to: the note's, the canvas's, the project section's. */
+function tabProject(state: any, tab: any): number | null {
+  if (tab?.type === 'note') return state.notes.find((note: any) => note.id === Number(tab.noteId))?.project_id || null;
+  const resource = tab?.resource;
+  if (resource?.type === 'atelier') return Number(resource.projectId) || null;
+  if (resource?.path) return state.projects.find((project: any) => project.canvas_path === resource.path)?.id
+    || Number(findWorkspaceNode(resource.path)?.creation_context?.project_id || findWorkspaceNode(resource.path)?.project_id) || null;
+  return null;
+}
+
 export function captureAgentContext(runtime?: Runtime) {
   const state = runtime?.state;
-  const view = state?.view || 'dashboard';
-  const active = state?.activeNotePane === 'secondary' ? state.secondaryResource : state?.primaryResource;
-  const primary = document.querySelector('#note-content') ? Number(state?.currentNoteId) || null : null;
-  const secondary = document.querySelector('#secondary-note-content') ? Number(state?.secondaryResource?.noteId) || null : null;
-  let noteId = state?.activeNotePane === 'secondary' ? secondary || primary : primary || secondary;
-  let resourcePath = view === 'notes' ? active?.path || null : null;
+  const pane = documentPane(state);
+  const tab = activeTab(state, pane);
+  const active = tab?.resource || null;
+  // A page open in that pane (Library, Tasks…) is the view the user is in; a note or a file, the editor.
+  const view = state?.view === 'notes' ? (active?.type === 'view' ? active.view : active?.type === 'atelier' ? 'project' : 'notes') : state?.view || 'dashboard';
+  let noteId: number | null = tab?.type === 'note' ? Number(tab.noteId) || null : null;
+  // Atelier and page tabs are not files: they give their own context (registerAgentContext, the view below).
+  const isFile = (resource: any) => resource?.path && !['atelier', 'view'].includes(resource.type);
+  const resourcePath = view === 'notes' && isFile(active) ? active.path : null;
   const openDocuments: Record<string, any>[] = [];
   const addDocument = (detail: Record<string, any>) => {
     if (detail.note_id || detail.paper_id || detail.resource_path || detail.url) openDocuments.push(detail);
   };
-  for (const pane of ['primary', 'secondary']) {
-    for (const tab of state?.workspaceTabs?.[pane] || []) {
-      addDocument(tab.type === 'note' ? { note_id: tab.noteId, pane } : {
-        resource_path: tab.resource?.path, paper_id: tab.resource?.paperId, title: tab.resource?.title, pane,
+  for (const side of ['primary', 'secondary']) {
+    for (const item of state?.workspaceTabs?.[side] || []) {
+      if (item.type !== 'note' && !isFile(item.resource)) continue;
+      addDocument(item.type === 'note' ? { note_id: item.noteId, pane: side } : {
+        resource_path: item.resource?.path, paper_id: item.resource?.paperId, title: item.resource?.title, pane: side,
       });
     }
   }
+  // Components on screen describe what they show (the canvas selection, the reader's article, the Atelier);
+  // the one in the document pane describes the request's subject.
   let extension: Record<string, any> = {};
   for (const [element, read] of contexts) {
     if (!element.isConnected) { contexts.delete(element); continue; }
-    if (!element.closest('[hidden]') && element.getClientRects().length) {
-      const detail = read();
-      addDocument({ note_id: detail.note_id, paper_id: detail.paper_id, resource_path: detail.resource_path, url: detail.document_url, title: detail.document_title });
-      if (!detail.canvas_path || detail.canvas_path === active?.path) extension = { ...extension, ...detail };
-    }
+    if (element.closest('[hidden]') || !element.getClientRects().length) continue;
+    const detail = read();
+    addDocument({ note_id: detail.note_id, paper_id: detail.paper_id, resource_path: detail.resource_path, url: detail.document_url, title: detail.document_title });
+    const inPane = element.closest<HTMLElement>('[data-workspace-pane]')?.dataset.workspacePane;
+    if (!inPane || inPane === pane) extension = { ...extension, ...detail };
   }
-  if (view !== 'notes') noteId = null;
   if (extension.note_id) noteId = extension.note_id;
   addDocument({ note_id: noteId, resource_path: resourcePath, paper_id: extension.paper_id || (view === 'papers' ? state?.libraryReadingPaperId : null), active: true });
   const area = extension.area || (resourcePath?.endsWith('.canvas') ? 'canvas' : view);
-  const project = currentProject(runtime);
+  // The project of what is open (a project canvas, a project note) gives the request its project context.
+  const ownProject = Number(extension.project_id) || (state ? tabProject(state, tab) : null);
+  const project = state?.projects.find((item: any) => item.id === ownProject) || currentProject(runtime);
   const filters: Record<string, any> = {};
   const keys: Record<string, string[]> = {
     papers: ['paperSearch', 'paperStatusFilter', 'paperYearFilter', 'paperFolderFilter', 'paperProjectFilter'],
@@ -88,7 +131,7 @@ export function captureAgentContext(runtime?: Runtime) {
     project_id: project?.id || null, project_name: project?.name || null,
     note_id: noteId, resource_path: resourcePath, canvas_path: resourcePath?.endsWith('.canvas') ? resourcePath : null,
     paper_id: view === 'papers' ? state?.libraryReadingPaperId || null : null,
-    collection_id: view === 'database' ? state?.collectionId : null, filters,
+    collection_id: view === 'database' ? (active?.type === 'view' && active.collectionId) || state?.collectionId : null, filters,
     calendar_range: view === 'calendar' && runtime ? runtime.calendarMonthRange(state.calendarCursor) : null,
     visible_paper_ids: view === 'papers' && runtime ? runtime.paperFilteredItems().map(item => item.id) : null,
     open_documents: openDocuments,

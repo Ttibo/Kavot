@@ -1,8 +1,10 @@
-"""Atelier: code folders, Git views, the code map and agent runs in worktrees."""
+"""Atelier: code folders, Git views, the code map and agent conversations in worktrees."""
 import subprocess
 from pathlib import Path
 
 import pytest
+
+from app.core.agents import mcp_server as agent_mcp
 
 
 def git(folder: Path, *args: str) -> str:
@@ -71,101 +73,134 @@ def test_folders_git_and_map(client, project, repository):
     assert client.get(base).json()["folders"] == []
 
 
-def fake_agent(runs, edits):
-    """An agent that writes `edits` ({workspace index: {path: content}}) and reports usage."""
-    def execute(project_id, run, prompt, config):
-        assert "Request" in prompt and "kavot/agent/" in prompt
-        for index, files in edits.items():
-            for name, content in files.items():
-                Path(run["workspaces"][index]["worktree"], name).write_text(content)
-        meter = runs.Meter("claude")
-        meter.feed({"type": "assistant", "message": {"id": "m1", "usage": {"input_tokens": 50, "output_tokens": 10}}})
-        meter.feed({"type": "result", "usage": {"input_tokens": 120, "output_tokens": 30, "cache_read_input_tokens": 400},
-                    "total_cost_usd": 0.012, "num_turns": 2, "duration_ms": 900})
-        run["usage"] = runs._add(run.get("usage") or {}, meter.value())
-        for space in run["workspaces"]:
-            space["files"] = [{k: f[k] for k in ("path", "status", "additions", "deletions")} for f in runs._changes(Path(space["worktree"]))["files"]]
-        runs._sync(run)
-        run.update(status="review", response="Done.")
-        with runs._lock:
-            runs._live.pop(run["id"], None)
-        runs._persist(project_id, run)
-    return execute
+def code_of(client, session_id):
+    return client.get(f"/api/atelier/conversations/{session_id}/code").json()
 
 
-def start_run(client, base, payload):
-    response = client.post(f"{base}/runs", json={"engine": "claude", "prompt": "Return 3", **payload})
-    assert response.status_code == 201, response.text
-    for _ in range(100):
-        current = client.get(f"{base}/runs/{response.json()['id']}").json()
-        if current["status"] != "running":
-            return current
-    raise AssertionError("The run did not finish")
-
-
-def test_run_in_worktree(client, project, repository, monkeypatch):
-    from app.plugins.atelier import runs
-    monkeypatch.setattr(runs, "_engine", lambda engine: {"model": "", "executable": ""})
-    monkeypatch.setattr(runs, "_execute", fake_agent(runs, {0: {"pkg/util.py": "def helper():\n    return 3\n", "added.py": "X = 1\n"}}))
+def test_conversation_in_worktree(client, project, repository, agent, conversation):
+    """Any conversation can be given a project's code: it changes it in a worktree, with Kavot's MCP tools."""
     base = f"/api/atelier/projects/{project['id']}"
     folder = client.post(f"{base}/folders", json={"path": str(repository)}).json()
+    agent.edits = {0: {"pkg/util.py": "def helper():\n    return 3\n", "added.py": "X = 1\n"}}
 
-    run = start_run(client, base, {"folder_id": folder["id"]})
-    assert run["status"] == "review" and run["worktree_exists"]
-    assert {f["path"] for f in run["files"]} == {"pkg/util.py", "added.py"}
-    assert run["usage"]["input"] == 120 and run["usage"]["cache_read"] == 400 and run["usage"]["cost_usd"] == 0.012
+    session_id = conversation()
+    run = agent.say(client, session_id, "Return 3", project_id=project["id"], code_folder_ids=[folder["id"]])
+    assert run["status"] == "completed" and run["usage"]["input"] == 120
+    space, command = agent.last["space"], agent.last["command"]
+    assert space.write and space.cwd == space.writable[0], "The conversation runs in its main worktree"
+    assert "Exception to the read-only rule" in agent.last["prompt"] and "kavot/agent/" in agent.last["prompt"]
+    # MCP tool guidance stays on the MCP server's own instructions, not repeated in every user message.
+    assert "get_context" not in agent.last["prompt"] and "get_context" in agent_mcp.INSTRUCTIONS, "The agent gets Kavot's MCP tools"
+    assert command[command.index("--tools") + 1].endswith("Edit,Write")
+
+    code = code_of(client, session_id)
+    assert code["status"] == "review" and code["worktree_exists"]
+    assert {f["path"] for f in code["files"]} == {"pkg/util.py", "added.py"}
+    session = client.get(f"/api/external-agents/sessions/{session_id}").json()
+    assert session["project_id"] == project["id"] and session["usage"]["cache_read"] == 400
+    assert [m["role"] for m in session["messages"]] == ["user", "assistant"]
     assert (repository / "pkg" / "util.py").read_text().endswith("return 1\n"), "The checkout must stay untouched"
-    assert {f["path"] for f in client.get(f"{base}/runs/{run['id']}/diff").json()["files"]} == {"pkg/util.py", "added.py"}
+    assert {f["path"] for f in client.get(f"/api/atelier/conversations/{session_id}/diff").json()["files"]} == {"pkg/util.py", "added.py"}
+    assert client.delete(f"/api/external-agents/sessions/{session_id}").status_code == 409, "Changes to review are kept"
+    assert client.delete(f"{base}/folders/{folder['id']}").status_code == 409, "A folder with changes to review stays linked"
 
-    accepted = client.post(f"{base}/runs/{run['id']}/accept", json={"message": "Return 3", "merge": True}).json()
+    # The next message continues in the same worktree, and /plan only reads.
+    agent.edits = {}
+    agent.say(client, session_id, "Explain the change", mode="answer")
+    assert agent.last["vendor_id"] == "vendor-session" and agent.last["space"].cwd == space.cwd
+    assert not agent.last["space"].write and "Edit" not in agent.last["command"][agent.last["command"].index("--tools") + 1]
+    assert code_of(client, session_id)["status"] == "review", "Earlier changes stay to review"
+
+    accepted = client.post(f"/api/atelier/conversations/{session_id}/accept", json={"message": "Return 3", "merge": True}).json()
     assert accepted["status"] == "merged" and not accepted["worktree_exists"]
     assert (repository / "added.py").is_file()
     assert git(repository, "log", "-1", "--format=%s").strip() == "Return 3"
+    assert [item["id"] for item in client.get(base).json()["conversations"]] == [session_id]
 
-    second = start_run(client, base, {"folder_id": folder["id"]})
-    discarded = client.post(f"{base}/runs/{second['id']}/discard").json()
-    assert discarded["status"] == "discarded" and not Path(second["worktree"]).exists()
-    assert second["branch"] not in git(repository, "branch", "--list")
-    assert client.delete(f"{base}/runs/{second['id']}").status_code == 204
-    assert [r["id"] for r in client.get(f"{base}/runs").json()] == [run["id"]]
+    second = conversation(project["id"])
+    agent.say(client, second, "Try something", code_folder_ids=[folder["id"]])
+    branch = code_of(client, second)["workspaces"][0]["branch"]
+    discarded = client.post(f"/api/atelier/conversations/{second}/discard").json()
+    assert discarded["status"] == "discarded" and not discarded["worktree_exists"]
+    assert branch not in git(repository, "branch", "--list")
+    assert client.delete(f"/api/external-agents/sessions/{second}").status_code == 204
+    assert [item["id"] for item in client.get(f"/api/external-agents/sessions?project_id={project['id']}").json()] == [session_id]
 
 
-def test_run_on_several_folders(client, project, repository, tmp_path, monkeypatch):
-    from app.plugins.atelier import runs
+def test_conversation_on_several_folders(client, project, repository, tmp_path, agent, conversation):
     frontend = make_repository(tmp_path / "front", {"index.ts": "export const a = 1;\n"})
     docs = make_repository(tmp_path / "docs", {"README.md": "# Docs\n"})
-    monkeypatch.setattr(runs, "_engine", lambda engine: {"model": "", "executable": ""})
-    # The agent changes the API and the frontend, not the docs.
-    monkeypatch.setattr(runs, "_execute", fake_agent(runs, {0: {"pkg/util.py": "def helper():\n    return 4\n"}, 1: {"index.ts": "export const a = 2;\n"}}))
     base = f"/api/atelier/projects/{project['id']}"
     api = client.post(f"{base}/folders", json={"path": str(repository), "name": "API"}).json()
     front = client.post(f"{base}/folders", json={"path": str(frontend), "name": "Frontend"}).json()
     doc = client.post(f"{base}/folders", json={"path": str(docs), "name": "Docs"}).json()
+    # The agent changes the API and the frontend, not the docs.
+    agent.edits = {0: {"pkg/util.py": "def helper():\n    return 4\n"}, 1: {"index.ts": "export const a = 2;\n"}}
 
-    run = start_run(client, base, {"folder_id": api["id"], "extra_folder_ids": [front["id"], doc["id"]]})
-    assert [space["name"] for space in run["workspaces"]] == ["API", "Frontend", "Docs"]
-    assert all(space["open"] and space["branch"] == run["branch"] for space in run["workspaces"])
-    changes = {item["name"]: [f["path"] for f in item["files"]] for item in client.get(f"{base}/runs/{run['id']}/diff").json()["folders"]}
+    session_id = conversation(project["id"])
+    agent.say(client, session_id, "Both sides", code_folder_ids=[api["id"], front["id"], doc["id"]])
+    code = code_of(client, session_id)
+    assert [space["name"] for space in code["workspaces"]] == ["API", "Frontend", "Docs"]
+    assert all(space["open"] and space["branch"] == code["workspaces"][0]["branch"] for space in code["workspaces"])
+    command = agent.last["command"]
+    assert command.count("--add-dir") == 2, "The other worktrees are opened to the agent"
+    changes = {item["name"]: [f["path"] for f in item["files"]] for item in client.get(f"/api/atelier/conversations/{session_id}/diff").json()["folders"]}
     assert changes == {"API": ["pkg/util.py"], "Frontend": ["index.ts"], "Docs": []}
-    assert client.delete(f"{base}/folders/{front['id']}").status_code == 409, "A folder in use by a run stays linked"
 
-    merged = client.post(f"{base}/runs/{run['id']}/accept", json={"message": "Both sides", "merge": True}).json()
+    merged = client.post(f"/api/atelier/conversations/{session_id}/accept", json={"message": "Both sides", "merge": True}).json()
     assert merged["status"] == "merged"
     assert (frontend / "index.ts").read_text() == "export const a = 2;\n"
     assert git(frontend, "log", "-1", "--format=%s").strip() == "Both sides"
     assert git(docs, "log", "-1", "--format=%s").strip() == "First commit"
-    assert run["branch"] not in git(docs, "branch", "--list"), "A folder without changes keeps no branch"
-    # The diff of an accepted run comes from each folder's commit.
-    after = {item["name"]: [f["path"] for f in item["files"]] for item in client.get(f"{base}/runs/{run['id']}/diff").json()["folders"]}
+    assert code["workspaces"][0]["branch"] not in git(docs, "branch", "--list"), "A folder without changes keeps no branch"
+    # The diff of merged changes comes from each folder's commit.
+    after = {item["name"]: [f["path"] for f in item["files"]] for item in client.get(f"/api/atelier/conversations/{session_id}/diff").json()["folders"]}
     assert after == {"API": ["pkg/util.py"], "Frontend": ["index.ts"], "Docs": []}
+
+    # Giving code again starts a new round, on a new branch, in the same working folder.
+    agent.edits = {0: {"pkg/util.py": "def helper():\n    return 5\n"}}
+    agent.say(client, session_id, "Again", code_folder_ids=[api["id"]])
+    again = code_of(client, session_id)
+    assert again["status"] == "review" and again["workspaces"][0]["branch"].endswith("-1")
+    assert agent.last["space"].cwd == agent.calls[0]["space"].cwd
+    client.post(f"/api/atelier/conversations/{session_id}/discard")
+
+
+def test_mcp_with_code(project, agent):
+    """The CLI of a code conversation gets Kavot's MCP server next to its file tools."""
+    from app.core.agents import mcp_server, sessions
+    from app.core.agents.workspace import Workspace
+    space = Workspace(cwd="/tmp/main", write=True, writable=["/tmp/main", "/tmp/other"], readable=["/tmp/data"])
+    for engine in ("claude", "codex", "opencode"):
+        run = {"id": "r1", "engine": engine}
+        command, environment = sessions._cli_command(run, engine, {"model": "", "effort": ""}, None, "Hello", "Title", space)
+        command = mcp_server.configure_client(engine, command, environment, mcp_server.Connection("http://127.0.0.1:1/mcp", "token"))
+        if engine == "claude":
+            assert "mcp__kavot__*" in command[command.index("--allowedTools") + 1]
+            assert command[command.index("--tools") + 1] == "Read,Glob,Grep,WebSearch,WebFetch,Edit,Write"
+            assert [command[i + 1] for i, part in enumerate(command) if part == "--add-dir"] == ["/tmp/other", "/tmp/data"]
+        elif engine == "codex":
+            assert any("writable_roots" in part and "/tmp/other" in part for part in command)
+            assert any(part.startswith("mcp_servers.kavot.url=") for part in command)
+        else:
+            import json
+            permission = json.loads(environment["OPENCODE_PERMISSION"])
+            assert permission["edit"] == "allow" and permission["kavot_*"] == "allow" and permission["external_directory"] == "allow"
+            run.get("request_path") and run["request_path"].unlink(missing_ok=True)
 
 
 def test_usage_meter():
-    from app.plugins.atelier.runs import Meter
+    from app.core.agents.usage import Meter
     codex = Meter("codex")
     codex.feed({"type": "turn.completed", "usage": {"input_tokens": 10, "cached_input_tokens": 4, "output_tokens": 3}})
-    codex.feed({"type": "turn.completed", "usage": {"input_tokens": 5, "output_tokens": 2}})
-    assert (codex.value()["input"], codex.value()["cache_read"], codex.value()["output"], codex.value()["turns"]) == (11, 4, 5, 2)
+    assert (codex.value()["input"], codex.value()["cache_read"], codex.value()["output"], codex.value()["turns"]) == (6, 4, 3, 1)
+    # A resumed thread reports its running total: the message costs the difference.
+    resumed = Meter("codex", codex.cumulative)
+    resumed.feed({"type": "turn.completed", "usage": {"input_tokens": 25, "cached_input_tokens": 12, "output_tokens": 5}})
+    assert (resumed.value()["input"], resumed.value()["cache_read"], resumed.value()["output"]) == (7, 8, 2)
+    fresh = Meter("codex", resumed.cumulative)
+    fresh.feed({"type": "turn.completed", "usage": {"input_tokens": 5, "output_tokens": 2}})
+    assert (fresh.value()["input"], fresh.value()["output"]) == (5, 2), "A smaller total starts a new thread"
     opencode = Meter("opencode")
     opencode.feed({"type": "step_finish", "part": {"tokens": {"input": 7, "output": 1, "cache": {"read": 2}}, "cost": 0.5}})
     assert opencode.value()["cost_usd"] == 0.5 and opencode.value()["cache_read"] == 2
@@ -175,13 +210,21 @@ def test_usage_meter():
     assert claude.value()["output"] == 2 and claude.value()["turns"] == 1, "A streamed message is counted once"
 
 
-def test_legacy_single_folder_run(client, project):
-    """Runs saved before several folders existed still read and close."""
-    from app.plugins.atelier import runs, store
+def test_legacy_runs_are_deleted(client, project, repository):
+    """Runs of the first Atelier are removed with their worktree; a committed branch stays."""
+    from app.core.kernel.files import read_json_object
+    from app.plugins.atelier import agents, store
+    folder = client.post(f"/api/atelier/projects/{project['id']}/folders", json={"path": str(repository)}).json()
+    worktree = store.worktrees() / "legacy0001"
+    git(repository, "worktree", "add", "-q", "-b", "kavot/agent/legacy0001", str(worktree), "HEAD")
+    git(repository, "branch", "kavot/agent/legacy0002")
     doc = store.read(project["id"])
-    doc["runs"].insert(0, {"id": "legacy0001", "title": "Old", "status": "discarded", "engine": "claude", "model": "",
-                           "folder_id": "x", "branch": "kavot/agent/legacy0001", "base_branch": "main", "base_sha": "0" * 40,
-                           "worktree": None, "files": [], "commit": None, "merged": False, "messages": [], "events": []})
+    doc["runs"] = [{"id": "legacy0001", "status": "review", "folder_id": folder["id"], "branch": "kavot/agent/legacy0001", "worktree": str(worktree)},
+                   {"id": "legacy0002", "status": "accepted", "workspaces": [{"folder_id": folder["id"], "branch": "kavot/agent/legacy0002",
+                                                                              "worktree": None, "commit": "abc"}]}]
     store.write(project["id"], doc)
-    listed = runs.listing({"id": project["id"]})[0]
-    assert listed["workspaces"][0]["branch"] == "kavot/agent/legacy0001"
+    agents.drop_legacy_runs()
+    assert "runs" not in read_json_object(store._path(project["id"]))
+    assert not worktree.exists()
+    branches = git(repository, "branch", "--list")
+    assert "legacy0001" not in branches and "legacy0002" in branches

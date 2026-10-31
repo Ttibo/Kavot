@@ -1,4 +1,4 @@
-"""UI gateway for independently installed agent CLIs."""
+"""UI gateway for independently installed agent CLIs: their settings and every agent conversation."""
 from typing import Literal
 
 from fastapi import APIRouter, File, UploadFile
@@ -17,6 +17,9 @@ class EngineSettings(BaseModel):
     executable: str = Field(default="", max_length=1000)
     model: str = Field(default="", max_length=200)
     effort: str = Field(default="", max_length=60)
+    answer_model: str = Field(default="", max_length=200)
+    answer_effort: str = Field(default="", max_length=60)
+    digest_model: str = Field(default="", max_length=200)
     access: Literal["read", "write"] = "read"
 
 
@@ -28,6 +31,11 @@ class SettingsUpdate(BaseModel):
 class SessionCreate(BaseModel):
     engine: Engine
     vendor_session_id: str | None = Field(default=None, min_length=1, max_length=120)
+    project_id: int | None = None
+
+
+class SessionRename(BaseModel):
+    title: str = Field(min_length=1, max_length=120)
 
 
 class MessageCreate(BaseModel):
@@ -95,18 +103,29 @@ def models(engine: Engine, refresh: bool = False, executable: str = ""):
 
 
 @router.get("/sessions")
-def sessions(engine: Engine):
-    return external_agents.list_sessions(engine)
+def sessions(engine: Engine | None = None, project_id: int | None = None):
+    """Conversations of every engine, or of one; of every project, or of one."""
+    return external_agents.list_sessions(engine, project_id)
 
 
 @router.post("/sessions", status_code=201)
 def create_session(payload: SessionCreate):
-    return external_agents.create_session(payload.engine, payload.vendor_session_id)
+    return external_agents.create_session(payload.engine, payload.vendor_session_id, project_id=payload.project_id)
 
 
 @router.get("/sessions/{session_id}")
 def get_session(session_id: str):
     return external_agents.get_session(session_id)
+
+
+@router.patch("/sessions/{session_id}")
+def rename_session(session_id: str, payload: SessionRename):
+    return external_agents.rename_session(session_id, payload.title)
+
+
+@router.delete("/sessions/{session_id}", status_code=204)
+def delete_session(session_id: str) -> None:
+    external_agents.delete_session(session_id)
 
 
 @router.post("/sessions/{session_id}/messages", status_code=202)

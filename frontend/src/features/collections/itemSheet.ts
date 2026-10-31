@@ -25,5 +25,6 @@ export async function openItemInSheet(reference: Reference, onSaved?: () => void
       bindCollectionEditors(body, { onSaved: () => { publish(); void onSaved?.(); } });
       return { beforeClose: async () => { await flushCollectionSaves(); return true; } };
     },
+    openInTab: async pane => { const { openCollectionInNotes } = await import('./noteEditor'); await openCollectionInNotes(target, { newTab: true, pane }); },
   });
 }

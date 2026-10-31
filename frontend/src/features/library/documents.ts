@@ -1,10 +1,10 @@
-import { escapeHtml, flushReaderAutosave, labels, main, modal, modalContent, noteAssetBase, rememberReadingProgress, renderMarkdown, state } from '../../app/state';
+import { viewShown, escapeHtml, flushReaderAutosave, labels, main, modal, modalContent, noteAssetBase, rememberReadingProgress, renderMarkdown, state } from '../../app/state';
 import { closeModal, openModal } from '../../components/dialogs/controller';
 import { collectionField, openCollectionComposer } from '../../components/dialogs/collectionComposer';
 import { paperCustomMetadata, paperFolderDescendantIds, paperFolderOptions, renderPapers } from './filters';
 import { refreshData, setActiveNavigation, toast } from '../../app/navigation';
 import { api } from '../../services/api';
-import { flushCurrentNoteAutosave, flushSecondaryNoteAutosave, refreshWorkspaceTreeOnly, renderNotes, replaceActiveWorkspaceTab, workspaceNoteTab, workspaceResourceTab } from '../documents/workspace';
+import { flushCurrentNoteAutosave, flushSecondaryNoteAutosave, refreshWorkspaceTreeOnly, renderNotes, replaceActiveWorkspaceTab, replaceActiveWorkspaceTabPair, workspaceNoteTab, workspaceResourceTab } from '../documents/workspace';
 import { currentMarkdownBlockInput, markdownBlockSourceOffset, setMarkdownBlockEditorContent } from '../documents/markdown';
 import { editorSession } from '../../app/editorSession';
 import { loadPdfEngine } from '../documents/pdfEngine';
@@ -117,7 +117,7 @@ export function paperFolderModal(folderId = null, requestedParentId = null) {
         closeModal();
         await refreshData();
         state.paperFolderFilter = String(saved.id);
-        if (state.view === "papers") renderPapers();
+        if (viewShown("papers")) renderPapers();
         else renderNotes();
         toast(folder ? "Folder updated" : "Folder created");
       } catch (error) {
@@ -842,7 +842,7 @@ export function paperPdfUploadModal(paperId) {
       // A user may have closed this dialog while the upload was running.
       if (form.isConnected) closeModal();
       await refreshData();
-      if (state.view === 'papers') renderPapers();
+      if (viewShown("papers")) renderPapers();
       toast("PDF attached to article");
     } catch (error) {
       if (form.isConnected) { errorMessage.textContent = error.message; errorMessage.hidden = false; }
@@ -953,11 +953,9 @@ export async function openPaper(paperId, projectId = null, { withNote = true } =
     state.currentNoteId = null;
   }
   const pdfResource = paperPdfWorkspaceResource(paper, pdfNode);
-  replaceActiveWorkspaceTab(pane, workspaceResourceTab(pdfResource));
-  if (withNote && note) {
-    const notePane = pane === "primary" ? "secondary" : "primary";
-    replaceActiveWorkspaceTab(notePane, workspaceNoteTab(note));
-  }
+  if (withNote && note)
+    replaceActiveWorkspaceTabPair(pane, workspaceResourceTab(pdfResource), pane === "primary" ? "secondary" : "primary", workspaceNoteTab(note));
+  else replaceActiveWorkspaceTab(pane, workspaceResourceTab(pdfResource));
   state.activeNotePane = pane;
   main.classList.remove("reader-mode", "tasks-mode", "calendar-mode");
   setActiveNavigation("notes");

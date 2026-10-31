@@ -1,4 +1,4 @@
-import { escapeHtml, formatDate, state } from '../../app/state';
+import { viewShown, escapeHtml, formatDate, state } from '../../app/state';
 import { projectOptions } from '../../components/dialogs/controller';
 import { newTaskModal } from '../tasks/dialogs';
 import { conferenceModal } from '../research/actions';
@@ -165,7 +165,7 @@ function mountEventEditor(body: HTMLElement, sheet: { close: (force?: boolean) =
     try {
       await api(event ? `/calendar/events/${event.entity_id}` : "/calendar/events", { method: event ? "PUT" : "POST", body: JSON.stringify(payload) });
       saved = JSON.stringify(fields());
-      if (state.view === "calendar") await renderCalendar();
+      if (viewShown("calendar")) await renderCalendar();
       toast(event ? "Event updated" : "Event added");
       return true;
     } catch (error) {
@@ -184,7 +184,7 @@ function mountEventEditor(body: HTMLElement, sheet: { close: (force?: boolean) =
     try {
       await api(`/calendar/events/${event.entity_id}`, { method: "DELETE" });
       await sheet.close(true);
-      if (state.view === "calendar") await renderCalendar();
+      if (viewShown("calendar")) await renderCalendar();
       toast("Event deleted");
     } catch (error) { toast(error.message, "error"); }
   });

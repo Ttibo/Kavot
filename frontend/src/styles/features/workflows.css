@@ -199,7 +199,6 @@
 .wf-step-result .wf-activity pre { max-height: 120px; margin: 4px 0 0; padding: 0; background: transparent; color: var(--muted); font-size: 11px; }
 
 
-.overlay-panel.wf-journal { top: 0; }
 .wf-journal .overlay-panel-actions .button { min-height: 26px; height: 26px; padding: 0 9px; font-size: 12px; gap: 5px; }
 .wf-journal .overlay-panel-actions .button-danger:not(:disabled):hover { border-color: color-mix(in srgb, var(--red) 40%, var(--line)); background: color-mix(in srgb, var(--red) 8%, transparent); }
 .wf-journal .overlay-panel-title { min-width: 0; margin-right: auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

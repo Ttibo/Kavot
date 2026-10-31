@@ -140,7 +140,7 @@ function TemplateEditor({ value, onChange, fields }: { value: string; onChange: 
 }
 
 /** Form for the fields and default note of a custom collection, used to create one or to edit it. */
-function CollectionSchemaForm({ database, onDone }: { database?: any; onDone: () => void }) {
+function CollectionSchemaForm({ database, onDone }: { database?: any; onDone: (created?: any) => void }) {
   const runtime = useRuntime();
   const [name, setName] = useState(database?.name || '');
   const [icon, setIcon] = useState('database');
@@ -158,13 +158,14 @@ function CollectionSchemaForm({ database, onDone }: { database?: any; onDone: ()
     event.preventDefault(); setBusy(true); setError('');
     const payloadFields = fields.map(({ locked, ...field }) => ({ ...field, name: field.name.trim(), options: field.type === 'select' ? field.options.map(option => option.trim()) : [], default: field.type === 'list' ? null : field.default ?? null,
       columns: field.type === 'list' ? field.columns.map(column => ({ ...column, name: column.name.trim(), options: column.type === 'select' ? (column.options || []).map(option => option.trim()) : [] })) : [] }));
+    let created: any;
     try {
       if (database) {
         const saved = await api<any>(`/databases/${database.id}`, { method: 'PATCH', body: JSON.stringify({ name: name.trim(), fields: payloadFields, content_template: template }) });
         Object.assign(runtime.state.databases.find((item: any) => item.id === database.id) || {}, saved);
         runtime.toast('Collection updated');
       } else {
-        const created = await api<any>('/databases', { method: 'POST', body: JSON.stringify({
+        created = await api<any>('/databases', { method: 'POST', body: JSON.stringify({
           id: `custom-${crypto.randomUUID()}`, name: name.trim(), record_kind: 'record', fields: payloadFields, content_template: template, icon,
         }) });
         runtime.state.databases.push(created);
@@ -172,7 +173,7 @@ function CollectionSchemaForm({ database, onDone }: { database?: any; onDone: ()
         runtime.toast('Collection created');
       }
       publish();
-      onDone();
+      onDone(created);
     } catch (reason) { setError((reason as Error).message); }
     finally { setBusy(false); }
   }
@@ -197,6 +198,17 @@ function CollectionSchemaForm({ database, onDone }: { database?: any; onDone: ()
     {error && <p role="alert">{error}</p>}
     <div className="form-actions"><button type="button" className="button" disabled={busy} onClick={onDone}>Cancel</button><button className="button button-primary" disabled={busy}>{busy ? 'Saving…' : database ? 'Save changes' : 'Create collection'}</button></div>
   </form>;
+}
+
+/** A new collection from anywhere (the sidebar's ＋): the same form, in its own window; the collection opens once created. */
+export function NewCollectionDialog({ onClose }: { onClose: () => void }) {
+  const runtime = useRuntime();
+  return <div className="modal-backdrop" role="presentation" onMouseDown={event => { if (event.target === event.currentTarget) onClose(); }}>
+    <section className="modal modal-wide new-collection-dialog" role="dialog" aria-modal="true" aria-label="New collection">
+      <button className="modal-close" aria-label="Close" onClick={onClose}>×</button>
+      <CollectionSchemaForm onDone={created => { onClose(); if (created) void runtime.openCollectionDatabase(created.id); }}/>
+    </section>
+  </div>;
 }
 
 function CustomCollectionCreator() {

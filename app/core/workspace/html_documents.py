@@ -214,7 +214,22 @@ def serialize(note: dict, content: str, path: Path, state: dict) -> str:
     presentation = note.get('presentation') or {}
     width = {'narrow': '700px', 'comfortable': '960px', 'wide': '1400px'}.get(presentation.get('width'), '960px')
     theme = {'paper': '#fff', 'cream': '#fffaf0', 'slate': '#eef3f7'}.get(presentation.get('theme'), '#fff')
-    style = CSS + f'body{{background:{theme}}}article{{max-width:{width}}}'
+    # Direct previews (iframe) follow the app's light/dark theme, which the app writes on <html data-theme>.
+    # The note's own theme (paper/cream/slate) stays fixed, with a dark variant for the dark app theme.
+    dark = {'paper': '#191b18', 'cream': '#262019', 'slate': '#151b20'}.get(presentation.get('theme'), '#191b18')
+    dark_ink = '#e9e9e5'
+    style = CSS + (f'body{{background:{theme}}}article{{max-width:{width}}}'
+                    f'html[data-theme="dark"] body{{background:{dark};color:{dark_ink}}}'
+                    if presentation.get('theme') else
+                    'body{background:#fff}article{max-width:960px}'
+                    f'html[data-theme="dark"] body{{background:{dark};color:{dark_ink}}}'
+                    f'html[data-theme="dark"] pre{{background:#2a2b27}}'
+                    f'html[data-theme="dark"] blockquote,html[data-theme="dark"] aside{{background:#202b2c;border-left-color:#8cecff}}'
+                    f'html[data-theme="dark"] th{{background:#24251f;color:#c2c1bb}}'
+                    f'html[data-theme="dark"] td,html[data-theme="dark"] th{{border-color:#393a36}}'
+                    f'html[data-theme="dark"] table{{border-color:#393a36}}'
+                    f'html[data-theme="dark"] hr{{border-top-color:#4a4b45}}'
+                    f'html[data-theme="dark"] a{{color:#8cecff}}')
     return f'<!doctype html>\n<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="kavot-format" content="document/1"><title>{title}</title>\n<script type="application/json" id="kavot-metadata">{encoded}</script>\n<style>{style}</style></head>\n<body><article><header data-kavot-generated="properties"><h1>{title}</h1><dl>{props}</dl></header>{drawing}\n<main data-kavot-content>{body}</main></article></body></html>\n'
 
 def insert(content: str, addition: str, cursor: int) -> str:

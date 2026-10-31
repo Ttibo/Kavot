@@ -126,17 +126,20 @@ export function FitList<T>({ items, render, className = '', listClassName = '', 
   </div>;
 }
 
-const PANEL_WIDTH_KEY = 'kavot-collection-panel-width';
+// Renamed with the wider default, so widths saved for the former 40% panel no longer apply.
+const PANEL_WIDTH_KEY = 'kavot-overlay-panel-width';
+const PANEL_WIDTH = 55;
 const PANEL_MIN_WIDTH = 25;
 const readPanelWidth = () => {
-  try { const saved = Number(localStorage.getItem(PANEL_WIDTH_KEY)); return saved >= PANEL_MIN_WIDTH && saved <= 100 ? saved : 40; }
-  catch { return 40; }
+  try { const saved = Number(localStorage.getItem(PANEL_WIDTH_KEY)); return saved >= PANEL_MIN_WIDTH && saved <= 100 ? saved : PANEL_WIDTH; }
+  catch { return PANEL_WIDTH; }
 };
 const savePanelWidth = (value: number) => { try { localStorage.setItem(PANEL_WIDTH_KEY, String(Math.round(value))); } catch { /* per-viewer preference only */ } };
 
-/** Detail panel shown over a view, on the right: 40% of the width by default,
- * resizable from its left edge and expandable to the full width. Its parent must be positioned. */
-export function OverlayPanel({ label, title, actions, onClose, closeLabel = 'Close the panel', className = '', bodyRef, children }: { label: string; title: ReactNode; actions?: ReactNode; onClose: () => void; closeLabel?: string; className?: string; bodyRef?: Ref<HTMLDivElement>; children?: ReactNode }) {
+/** Detail panel shown over a view, on the right, with the same look in every view (collection items, tasks,
+ * events, articles, journals): 55% of the width by default, resizable from its left edge and expandable to the
+ * full width. `onOpenInTab` adds the button that opens the item full size in a new tab. Its parent must be positioned. */
+export function OverlayPanel({ label, title, actions, onClose, onOpenInTab, closeLabel = 'Close the panel', className = '', bodyRef, children }: { label: string; title: ReactNode; actions?: ReactNode; onClose: () => void; onOpenInTab?: () => void; closeLabel?: string; className?: string; bodyRef?: Ref<HTMLDivElement>; children?: ReactNode }) {
   const panel = useRef<HTMLElement>(null);
   const [width, setWidth] = useState(readPanelWidth);
   const [expanded, setExpanded] = useState(false);
@@ -154,11 +157,12 @@ export function OverlayPanel({ label, title, actions, onClose, closeLabel = 'Clo
       onPointerMove={event => { if (dragging.current) resizeTo(event.clientX); }}
       onPointerUp={event => { if (!dragging.current) return; dragging.current = false; event.currentTarget.releasePointerCapture(event.pointerId); setWidth(current => { savePanelWidth(current); return current; }); }}
       onPointerCancel={() => { dragging.current = false; }}
-      onDoubleClick={() => { setExpanded(false); setWidth(40); savePanelWidth(40); }}
+      onDoubleClick={() => { setExpanded(false); setWidth(PANEL_WIDTH); savePanelWidth(PANEL_WIDTH); }}
       onKeyDown={event => { if (!['ArrowLeft', 'ArrowRight'].includes(event.key)) return; event.preventDefault(); setExpanded(false); setWidth(current => { const next = Math.max(PANEL_MIN_WIDTH, Math.min(100, current + (event.key === 'ArrowLeft' ? 5 : -5))); savePanelWidth(next); return next; }); }}/>
     <div className="overlay-panel-actions">
       <strong className="overlay-panel-title">{title}</strong>
       {actions}
+      {onOpenInTab && <button className="icon-button" aria-label="Open full size in a new tab" title="Open in a new tab" onClick={onOpenInTab}><Icon name="open" size={14}/></button>}
       <button className="icon-button" aria-label={expanded ? 'Restore the panel width' : 'Expand the panel'} aria-pressed={expanded} title={expanded ? 'Restore width' : 'Expand'} onClick={() => setExpanded(value => !value)}><Icon name="panel" size={14}/></button>
       <button className="icon-button" aria-label={closeLabel} title="Close" onClick={onClose}><Icon name="close" size={14}/></button>
     </div>

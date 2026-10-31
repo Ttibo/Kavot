@@ -14,7 +14,8 @@ from pydantic import BaseModel, Field
 
 from app.core.projects import code as project_code
 from app.core.records.repository import store as records
-from app.plugins.atelier import codemap, folders, gitview, preview, runs
+from app.core.agents import sessions
+from app.plugins.atelier import agents, codemap, folders, gitview, preview
 
 router = APIRouter(prefix="/atelier", tags=["atelier"])
 
@@ -35,33 +36,19 @@ class OpenRequest(BaseModel):
     editor: Literal["vscode", "cursor", "system", "default"] = "vscode"
 
 
-class RunCreate(BaseModel):
-    folder_id: str | None = Field(default=None, max_length=40)
-    engine: Literal["claude", "codex", "opencode"]
-    prompt: str = Field(min_length=1, max_length=20_000)
-    task_id: int | None = None
-    note_ids: list[int] = Field(default_factory=list, max_length=6)
-    model: str = Field(default="", max_length=200)
-    extra_folder_ids: list[str] = Field(default_factory=list, max_length=4)
-    resource_folder_ids: list[str] = Field(default_factory=list, max_length=6)
-
-
 class WorkspaceOpen(BaseModel):
     path: str = Field(min_length=1, max_length=2000)
 
 
-class RunMessage(BaseModel):
-    prompt: str = Field(min_length=1, max_length=20_000)
-
-
-class RunAccept(BaseModel):
+class CodeAccept(BaseModel):
     message: str = Field(default="", max_length=2000)
     merge: bool = False
 
 
 @router.get("/engines")
 def list_engines() -> list[dict[str, Any]]:
-    return runs.engines()
+    return [{"id": item["id"], "name": item["name"], "enabled": item["enabled"], "model": item["model"], "effort": item["effort"],
+             "available": bool(item["detected_path"])} for item in sessions.public_settings()["engines"]]
 
 
 def _system_open(target) -> None:
@@ -97,7 +84,7 @@ def overview(project_id: int) -> dict[str, Any]:
     return {
         "project": {key: project.get(key) for key in ("id", "name", "description", "color", "status", "canvas_path")},
         "folders": [folders.describe(item) for item in folders.listing(project)],
-        "runs": runs.listing(project),
+        "conversations": sessions.list_sessions(project_id=project_id),
         "notes": [{"id": n["id"], "title": n.get("title") or "Untitled", "updated_at": n.get("updated_at")}
                   for n in state.get("notes", []) if n.get("project_id") == project_id and not n.get("trashed_at")],
         "tasks": [{"id": t["id"], "title": t.get("title") or "", "status": t.get("status", "todo"), "priority": t.get("priority"),
@@ -198,52 +185,27 @@ def open_in_editor(project_id: int, folder_id: str, payload: OpenRequest) -> Non
         raise HTTPException(502, "No editor answered. Check that it is installed.")
 
 
-@router.get("/projects/{project_id}/runs")
-def list_runs(project_id: int) -> list[dict[str, Any]]:
-    return runs.listing(folders.project(project_id))
+# The code of an agent conversation: its changes in the worktrees, then commit, merge or discard.
+@router.get("/conversations/{session_id}/code")
+def conversation_code(session_id: str) -> dict[str, Any] | None:
+    return agents.detail(session_id)
 
 
-@router.post("/projects/{project_id}/runs", status_code=201)
-def start_run(project_id: int, payload: RunCreate) -> dict[str, Any]:
-    return runs.start(folders.project(project_id), payload.folder_id, payload.engine, payload.prompt,
-                      payload.task_id, payload.note_ids, payload.model, payload.extra_folder_ids, payload.resource_folder_ids)
+@router.get("/conversations/{session_id}/diff")
+def conversation_diff(session_id: str) -> dict[str, Any]:
+    return agents.diff(session_id)
 
 
-@router.get("/projects/{project_id}/runs/{run_id}")
-def get_run(project_id: int, run_id: str) -> dict[str, Any]:
-    return runs.get(folders.project(project_id), run_id)
+@router.post("/conversations/{session_id}/accept")
+def accept_code(session_id: str, payload: CodeAccept) -> dict[str, Any] | None:
+    return agents.accept(session_id, payload.message, payload.merge)
 
 
-@router.get("/projects/{project_id}/runs/{run_id}/diff")
-def run_diff(project_id: int, run_id: str) -> dict[str, Any]:
-    return runs.diff(folders.project(project_id), run_id)
+@router.post("/conversations/{session_id}/merge")
+def merge_code(session_id: str) -> dict[str, Any] | None:
+    return agents.merge(session_id)
 
 
-@router.post("/projects/{project_id}/runs/{run_id}/messages")
-def continue_run(project_id: int, run_id: str, payload: RunMessage) -> dict[str, Any]:
-    return runs.message(folders.project(project_id), run_id, payload.prompt)
-
-
-@router.post("/projects/{project_id}/runs/{run_id}/cancel")
-def cancel_run(project_id: int, run_id: str) -> dict[str, Any]:
-    return runs.cancel(folders.project(project_id), run_id)
-
-
-@router.post("/projects/{project_id}/runs/{run_id}/accept")
-def accept_run(project_id: int, run_id: str, payload: RunAccept) -> dict[str, Any]:
-    return runs.accept(folders.project(project_id), run_id, payload.message, payload.merge)
-
-
-@router.post("/projects/{project_id}/runs/{run_id}/merge")
-def merge_run(project_id: int, run_id: str) -> dict[str, Any]:
-    return runs.merge(folders.project(project_id), run_id)
-
-
-@router.post("/projects/{project_id}/runs/{run_id}/discard")
-def discard_run(project_id: int, run_id: str) -> dict[str, Any]:
-    return runs.discard(folders.project(project_id), run_id)
-
-
-@router.delete("/projects/{project_id}/runs/{run_id}", status_code=204)
-def forget_run(project_id: int, run_id: str) -> None:
-    runs.forget(folders.project(project_id), run_id)
+@router.post("/conversations/{session_id}/discard")
+def discard_code(session_id: str) -> dict[str, Any] | None:
+    return agents.discard(session_id)

@@ -1,5 +1,6 @@
-// Explorer-style multi-selection in the notes tree: Ctrl/Cmd toggles a row,
-// Shift selects the range from the last clicked row. Rows are tracked by their
+// Explorer-style multi-selection in the notes tree: Shift selects the range from
+// the last clicked row, Ctrl/Cmd+Shift (or Ctrl/Cmd on a folder) toggles a row.
+// Ctrl/Cmd alone on a file opens it in a new tab, like everywhere else. Rows are tracked by their
 // workspace path so the selection survives tree rerenders.
 
 const ROW = "#notes-tree .workspace-file-row[data-workspace-path]";
@@ -51,7 +52,8 @@ export function initializeTreeSelection() {
     const row = target.closest?.<HTMLElement>(ROW);
     if (!row || target.closest("input, .workspace-item-actions, .workspace-create-actions, .workspace-open-side")) return;
     const path = rowPath(row);
-    const toggle = event.ctrlKey || event.metaKey;
+    const modifier = event.ctrlKey || event.metaKey;
+    const toggle = modifier && (event.shiftKey || row.classList.contains("directory"));
     if (!toggle && !event.shiftKey) {
       selected.clear();
       if (row.matches(SELECTABLE)) selected.add(path);

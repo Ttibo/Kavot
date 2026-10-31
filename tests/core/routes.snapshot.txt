@@ -9,6 +9,7 @@ DELETE /api/databases/{database_id}
 DELETE /api/databases/{database_id}/records/{record_id}
 DELETE /api/datasets/{dataset_id}
 DELETE /api/discovery/explorations/{exploration_id}
+DELETE /api/external-agents/sessions/{session_id}
 DELETE /api/note-folders/{folder_id}
 DELETE /api/note-scripts/network/approvals
 DELETE /api/note-scripts/{script_id}
@@ -108,6 +109,7 @@ PATCH /api/conferences/{conference_id}
 PATCH /api/databases/{database_id}
 PATCH /api/databases/{database_id}/records/{record_id}
 PATCH /api/datasets/{dataset_id}
+PATCH /api/external-agents/sessions/{session_id}
 PATCH /api/external-agents/settings
 PATCH /api/note-folders/{folder_id}
 PATCH /api/note-scripts/{script_id}

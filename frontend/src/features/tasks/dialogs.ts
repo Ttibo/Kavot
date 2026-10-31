@@ -1,4 +1,4 @@
-import { escapeHtml, formatDate, labels, modal, state } from '../../app/state';
+import { viewShown, escapeHtml, formatDate, labels, modal, state } from '../../app/state';
 import { bindMarkdownBlockEditor, currentMarkdownBlockInput, markdownBlockEditorMarkup } from '../documents/markdown';
 import { closeModal, openModal, projectOptions } from '../../components/dialogs/controller';
 import { openSheet, type SheetHandle } from '../sheet/sheet';
@@ -19,6 +19,11 @@ export function newTaskModal(projectId = null, columnId = null, taskId = null, o
     title: task ? "Task" : "New task",
     label: task ? "Task editor" : "New task editor",
     mount: (body, sheet) => mountTaskEditor(body, sheet, { task, projectId, columnId, onSaved }),
+    // The task as a full page, in the item editor of its collection.
+    openInTab: task ? async (pane) => {
+      const { openCollectionInNotes } = await import('../collections/noteEditor');
+      await openCollectionInNotes({ type: 'task', id: task.id, databaseId: 'tasks' }, { newTab: true, pane });
+    } : undefined,
   });
 }
 
@@ -234,7 +239,7 @@ function mountTaskEditor(body: HTMLElement, sheet: { close: (force?: boolean) =>
         // Saving before opening a linked document: do not pull the user back to the tasks.
         if (state.view !== view) return;
         if (onSaved) await onSaved(record);
-        else if (state.view === "dashboard") renderDashboard();
+        else if (viewShown("dashboard")) renderDashboard();
         else await renderTaskContext();
       })();
       toast(task ? "Task saved" : "Task created");
@@ -254,7 +259,7 @@ function mountTaskEditor(body: HTMLElement, sheet: { close: (force?: boolean) =>
       await api(`/tasks/${task.id}/archive`, { method: "POST" });
       await sheet.close(true);
       await refreshData();
-      if (state.view === "tasks") await renderTaskContext();
+      if (viewShown("tasks")) await renderTaskContext();
       toast("Task archived");
     } catch (error) { toast(error.message, "error"); }
   });

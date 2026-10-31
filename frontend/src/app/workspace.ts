@@ -29,6 +29,8 @@ export { openSettings } from '../features/settings/actions';
 export { closeModal } from '../components/dialogs/controller';
 export { setInterfaceTheme } from './state';
 export { renderNotes } from '../features/documents/workspace';
+export { rerenderWorkspaceTree, notesExplorerToolbar, navigateTabHistory, canNavigateTabHistory } from '../features/documents/workspace';
+export { setScope, scopeProject } from './scope';
 export { openPaper } from '../features/library/documents';
 export { flushCurrentNoteAutosave } from '../features/documents/workspace';
 export { flushSecondaryNoteAutosave } from '../features/documents/workspace';

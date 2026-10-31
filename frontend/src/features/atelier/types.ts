@@ -1,4 +1,5 @@
 import { api } from '../../services/api';
+import type { Summary } from '../agents/api';
 
 export type Commit = { sha: string; short: string; author: string; date: string; refs: string[]; subject: string };
 export type Folder = {
@@ -11,32 +12,13 @@ export type Diff = {
   files: FileDiff[]; truncated: boolean; message?: string; sha?: string; author?: string; date?: string;
   folders?: { folder_id: string; name: string; files: FileDiff[]; truncated: boolean; error?: string | null }[];
 };
-export type RunFile = { path: string; status: string; additions: number; deletions: number };
 export type Usage = { input?: number; output?: number; cache_read?: number; cache_write?: number; reasoning?: number; cost_usd?: number; turns?: number; duration_ms?: number };
-export type Workspace = {
-  folder_id: string; name: string; worktree: string | null; branch: string; base_sha: string; base_branch: string;
-  files: RunFile[]; commit: string | null; merged: boolean; open?: boolean;
-};
-export type RunStatus = 'running' | 'review' | 'answered' | 'failed' | 'cancelled' | 'accepted' | 'merged' | 'discarded';
-export type Run = {
-  id: string; title: string; status: RunStatus; engine: string; model: string; folder_id: string; branch: string;
-  base_branch: string; base_sha: string; task_id: number | null; note_ids: number[]; created_at: string; updated_at: string;
-  finished_at: string | null; files: (RunFile & { folder_id?: string })[]; error: string | null; commit: string | null; merged: boolean;
-  usage?: Usage; workspaces?: Workspace[]; resources?: { folder_id: string; name: string; path: string }[];
-};
-export type RunEvent = { id: number; kind: string; label: string; detail: string; at: string };
-export type RunDetail = Run & {
-  prompt: string; response: string | null; events: RunEvent[]; worktree: string | null; worktree_exists: boolean; draft?: string;
-  usage_history?: (Usage & { at: string; prompt: string })[];
-  messages: { role: 'user' | 'assistant'; content: string; at: string }[];
-};
 export type Overview = {
   project: { id: number; name: string; description?: string; color?: string; status?: string; canvas_path?: string };
-  folders: Folder[]; runs: Run[];
+  folders: Folder[]; conversations: Summary[];
   notes: { id: number; title: string; updated_at?: string }[];
   tasks: { id: number; title: string; status: string; priority?: string; due_date?: string }[];
 };
-export type Engine = { id: 'claude' | 'codex' | 'opencode'; name: string; enabled: boolean; available: boolean; model: string };
 export type MapSymbol = { id: string; name: string; kind: string; line: number; end?: number; doc?: string; calls: string[]; called_by: string[] };
 export type MapFile = {
   path: string; lang: string; lines: number; doc: string; error?: string | null;
@@ -55,11 +37,6 @@ export const post = (body?: unknown): RequestInit => ({ method: 'POST', ...(body
 export function openInEditor(projectId: number, folderId: string, path = '', line = 1, editor: 'vscode' | 'cursor' | 'system' | 'default' = 'vscode') {
   return atelierApi(projectId, `/folders/${folderId}/open`, post({ path, line, editor }));
 }
-
-export const ACTIVE: RunStatus[] = ['running', 'review', 'answered', 'failed', 'cancelled'];
-export const STATUS_LABELS: Record<RunStatus, string> = {
-  running: 'Running', review: 'To review', answered: 'Answered', failed: 'Failed', cancelled: 'Stopped', accepted: 'Committed', merged: 'Merged', discarded: 'Discarded',
-};
 
 /** Every token the agent consumed or produced. */
 export const totalTokens = (usage?: Usage) => usage

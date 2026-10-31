@@ -398,6 +398,10 @@ def create_note(payload: Any, *, system_kind: str = "standard") -> dict[str, Any
             values["title"] = render_template(template["title_template"], project, paper, state)
             values["content"] = render_template(template["content_template"], project, paper, state)
         original_title = values["title"].strip()
+        if not str(values.get("content") or "").strip():
+            # Same starting markup as the editor's New note button: a single H1 with
+            # the title, so the page header and the body agree whatever created the note.
+            values["content"] = f"# {original_title}\n\n"
         generic = bool(re.fullmatch(r"(?:new note|nouvelle note|note)(?: \d+)?", original_title, re.IGNORECASE))
         numbered = generic or bool(template and "{{" not in template["title_template"])
         values["title"] = original_title if system_kind == "project_home" else unique_note_title(state, "Note" if generic else original_title, numbered=numbered)

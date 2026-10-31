@@ -67,44 +67,44 @@ def test_resource_folder_previews(client, project, resources):
     assert client.post(f"{url}/open", json={"path": "tool.exe", "editor": "default"}).status_code == 422
 
 
-def test_chat_with_resources(client, project, resources, monkeypatch):
-    from app.plugins.atelier import runs
-    seen = {}
-
-    def execute(project_id, run, prompt, config):
-        seen["prompt"], seen["cwd"] = prompt, run["cwd"]
-        seen["command"] = runs._command("claude", "claude", {"model": "", "effort": "", "executable": ""}, run, prompt)[0]
-        run.update(status="answered", response="It is a data folder.")
-        runs._sync(run)
-        with runs._lock:
-            runs._live.pop(run["id"], None)
-        runs._persist(project_id, run)
-
-    monkeypatch.setattr(runs, "_engine", lambda engine: {"model": "", "executable": ""})
-    monkeypatch.setattr(runs, "_execute", execute)
+def test_chat_with_resources(client, project, resources, agent, conversation):
     base = f"/api/atelier/projects/{project['id']}"
     folder = client.post(f"{base}/folders", json={"path": str(resources), "kind": "resources"}).json()
 
-    created = client.post(f"{base}/runs", json={"engine": "claude", "prompt": "What is in the data?", "resource_folder_ids": [folder["id"]]})
-    assert created.status_code == 201, created.text
-    run = client.get(f"{base}/runs/{created.json()['id']}").json()
-    assert run["status"] == "answered" and run["workspaces"] == [] and run["resources"][0]["name"] == "data"
-    assert seen["cwd"] == str(resources.resolve())
-    assert "must never change" in seen["prompt"] and "do not create or edit files" in seen["prompt"]
-    assert seen["command"][seen["command"].index("--tools") + 1] == "Read,Glob,Grep", "A chat only reads"
-    assert client.post(f"{base}/runs/{run['id']}/discard").status_code == 409
-    assert client.delete(f"{base}/folders/{folder['id']}").status_code == 204, "An answered chat does not hold its resources"
+    session_id = conversation(project["id"])
+    agent.say(client, session_id, "What is in the data?", mode="answer", resource_folder_ids=[folder["id"]])
+    space, command = agent.last["space"], agent.last["command"]
+    assert not space.write and space.readable == [str(resources.resolve())]
+    assert "agent-conversations" in space.cwd, "A conversation without code runs in an empty folder of its own"
+    assert "must never change" in agent.last["prompt"]
+    assert command[command.index("--tools") + 1] == "Read,Glob,Grep,WebSearch,WebFetch", "A chat only reads"
+    assert command[command.index("--add-dir") + 1] == str(resources.resolve())
+    code = client.get(f"/api/atelier/conversations/{session_id}/code").json()
+    assert code["workspaces"] == [] and code["resources"][0]["name"] == "data"
+    assert client.post(f"/api/atelier/conversations/{session_id}/discard").status_code == 409
+    assert client.delete(f"{base}/folders/{folder['id']}").status_code == 204, "A chat does not hold its resources"
+    assert client.post(f"{base}/folders", json={"path": str(resources), "kind": "code"}).status_code == 201
 
-    # A chat with nothing linked runs in an empty folder of its own, removed with the chat.
-    alone = client.post(f"{base}/runs", json={"engine": "claude", "prompt": "Plan the paper"}).json()
-    assert Path(seen["cwd"]).is_dir() and "chats" in seen["cwd"]
-    assert client.delete(f"{base}/runs/{alone['id']}").status_code == 204
-    assert not Path(seen["cwd"]).exists()
+    # Resources are read only, even when picked as code.
+    data = client.get(base).json()["folders"]
+    resource = next(item for item in data if item["kind"] == "code")
+    client.post(f"{base}/folders", json={"path": str(resources / "scores.csv"), "kind": "resources"})
+    single = next(item for item in client.get(base).json()["folders"] if item["kind"] == "resources")
+    other = conversation(project["id"])
+    response = client.post(f"/api/external-agents/sessions/{other}/messages", json={"text": "Edit", "mode": "propose",
+                           "context": {"project_id": project["id"], "code_folder_ids": [single["id"]]}})
+    assert response.status_code == 422
+    response = client.post(f"/api/external-agents/sessions/{other}/messages", json={"text": "Edit", "mode": "propose",
+                           "context": {"project_id": project["id"], "code_folder_ids": [resource["id"]]}})
+    assert response.status_code == 409 and "Git" in response.json()["detail"]
+
+    cwd = space.cwd
+    assert client.delete(f"/api/external-agents/sessions/{session_id}").status_code == 204
+    assert not Path(cwd).exists(), "Its folder is removed with the conversation"
 
 
-def test_single_linked_file(client, project, resources, monkeypatch):
+def test_single_linked_file(client, project, resources, agent, conversation):
     """A file can be linked alone: only it is listed and read, never its neighbours."""
-    from app.plugins.atelier import runs
     base = f"/api/atelier/projects/{project['id']}"
     item = client.post(f"{base}/folders", json={"path": str(resources / "results.xlsx"), "kind": "resources"}).json()
     assert item["file"] and item["available"] and item["name"] == "results.xlsx"
@@ -117,23 +117,12 @@ def test_single_linked_file(client, project, resources, monkeypatch):
     script = client.post(f"{base}/folders", json={"path": str(resources / "scores.csv"), "kind": "code"}).json()
     assert script["file"] and script["kind"] == "code"
 
-    seen = {}
-
-    def execute(project_id, run, prompt, config):
-        seen["prompt"], seen["cwd"] = prompt, run["cwd"]
-        seen["command"] = runs._command("claude", "claude", {"model": "", "effort": "", "executable": ""}, run, prompt)[0]
-        run.update(status="answered", response="ok")
-        with runs._lock:
-            runs._live.pop(run["id"], None)
-        runs._persist(project_id, run)
-
-    monkeypatch.setattr(runs, "_engine", lambda engine: {"model": "", "executable": ""})
-    monkeypatch.setattr(runs, "_execute", execute)
-    created = client.post(f"{base}/runs", json={"engine": "claude", "prompt": "Read it", "resource_folder_ids": [item["id"]]})
-    assert created.status_code == 201, created.text
-    assert "## File: results.xlsx" in seen["prompt"] and "sd3.5" in seen["prompt"], "The file is given as its text"
-    assert str(resources) not in " ".join(seen["command"]), "Its folder is not opened to the agent"
-    assert "chats" in seen["cwd"]
+    session_id = conversation(project["id"])
+    agent.say(client, session_id, "Read it", mode="answer", resource_folder_ids=[item["id"]])
+    assert "## File: results.xlsx" in agent.last["prompt"] and "sd3.5" in agent.last["prompt"], "The file is given as its text"
+    assert str(resources) not in " ".join(agent.last["command"]), "Its folder is not opened to the agent"
+    agent.say(client, session_id, "And now?", mode="answer")
+    assert "## File: results.xlsx" not in agent.last["prompt"], "A resumed conversation already has it"
 
 
 def test_workspace_document_preview(client, resources):

@@ -46,8 +46,7 @@ html, body { background: var(--canvas); }
 .research-shell .workspace-tab.active { border: 1px solid var(--line); border-bottom: 0; background: var(--canvas); box-shadow: none; }
 .research-shell .workspace-tab > button strong { font-size: 12px; font-weight: 450; }
 
-/* Assistant panel and modals: thin borders, no heavy elevation. */
-.research-shell .agent-panel { background: var(--sidebar-surface); }
+/* Modals: thin borders, no heavy elevation. */
 .modal { border: 1px solid var(--line); border-radius: 10px; }
 
 * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }

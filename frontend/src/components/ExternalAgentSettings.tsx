@@ -7,6 +7,7 @@ export type ExternalEngine = 'codex' | 'claude' | 'opencode';
 type ExternalEngineSettings = {
   id: ExternalEngine; name: string; enabled: boolean; executable: string;
   detected_path: string | null; model: string; effort: string; access: 'read' | 'write';
+  answer_model: string; answer_effort: string; digest_model: string;
 };
 export type ExternalAgentConfiguration = { engines: ExternalEngineSettings[] };
 type InstallPlan = { available: boolean; method?: string; command?: string; message?: string };
@@ -44,7 +45,8 @@ export function ExternalAgentSettings() {
     if (!config) return;
     setBusy(true); setError(''); setStatus('');
     try {
-      const engines = Object.fromEntries(config.engines.map(({ id, enabled, executable, model, effort, access }) => [id, { enabled, executable, model, effort, access }]));
+      const engines = Object.fromEntries(config.engines.map(({ id, enabled, executable, model, effort, access, answer_model, answer_effort, digest_model }) =>
+        [id, { enabled, executable, model, effort, access, answer_model, answer_effort, digest_model }]));
       const saved = await api<ExternalAgentConfiguration>('/external-agents/settings', { method: 'PATCH', body: JSON.stringify({ engines }) });
       setConfig(saved); setStatus('External engines saved.');
       window.dispatchEvent(new Event('kavot:external-agent-settings-updated'));
@@ -100,6 +102,12 @@ export function ExternalAgentSettings() {
         <p>{help[engine.id]}</p>
         <label>Program path<input aria-label={`Chemin ${engine.name}`} value={engine.executable} disabled={busy} onChange={event => change(engine.id, { executable: event.target.value })} placeholder={engine.detected_path || 'Detected automatically if left empty'}/></label>
         <ExternalModelPicker engine={engine.id} name={engine.name} model={engine.model} effort={engine.effort} executable={engine.executable} disabled={busy} settings onChange={(model, effort) => change(engine.id, { model, effort })}/>
+        <ExternalModelPicker engine={engine.id} name={engine.name} model={engine.answer_model} effort={engine.answer_effort} executable={engine.executable} disabled={busy} settings purpose="Questions"
+          onChange={(answer_model, answer_effort) => change(engine.id, { answer_model, answer_effort })}/>
+        <small>Used for questions (/answer) when the conversation keeps the default model. A smaller model and a lower effort cost several times less.</small>
+        {engine.id !== 'opencode' && <><ExternalModelPicker engine={engine.id} name={engine.name} model={engine.digest_model} effort="" executable={engine.executable} disabled={busy} settings purpose="Summaries" withEffort={false}
+          onChange={digest_model => change(engine.id, { digest_model })}/>
+        <small>Summarizes the notes agents read, in the background, so later requests read the summary instead of the note. Off: the chat model writes them.</small></>}
         <div className="external-engine-actions">
           <button type="button" className={`button button-small${engine.detected_path ? '' : ' button-primary'}`} disabled={busy || installs[engine.id]?.status === 'running'} onClick={() => void install(engine.id, engine.name)}>
             {installs[engine.id]?.status === 'running' ? 'Installing…' : engine.detected_path ? 'Update' : 'Install'}</button>

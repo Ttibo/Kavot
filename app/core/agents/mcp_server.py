@@ -45,30 +45,29 @@ TOKEN_ENV = "KAVOT_MCP_TOKEN"
 # "full" exposes every action as a named tool, as before the compact tool set.
 TOOLSET_ENV = "KAVOT_MCP_TOOLSET"
 PROPOSAL_LIMITS = {"propose": 30, "auto": 200}
-INSTRUCTIONS = """Kavot workspace tools (MCP). Stop as soon as you can answer.
-1. get_context: this request's scope, target and selected sources (catalogue only).
-   For an open question, explore() maps the workspace; explore(ref) goes down to a
-   project, collection or item. Each line shows its token cost: open only what you need.
-2. search(query): notes, articles and PDF pages, files, tasks, every collection item.
-   Hits are snippets with kavot:// addresses; narrow with collections or project_id.
-3. read(ref): opens one address, window by window (follow next). fields=[...] keeps
-   only some fields of a record. get_links(ref) and get_history(ref) give related
-   items and recent changes with their origin.
-read_source reads the selected sources; read_note returns a note's HTML with block
-ids and is required before editing that note. list_records/get_record list exhaustively.
-After reading a long item in full, save_digest(ref, summary, sections) so later
-requests read your summary instead of the source.
-Before a kind of task you have not done in this request, read its guide once:
-get_guide(topic), topics listed by workspace_overview (notes, canvas, collections,
-organization, planning, papers...). Do not call a read tool again for data it
-already returned in this request.
-Writes: named write tools when listed; any other change: get_action_schema(kind)
-then propose_action (list_actions lists the kinds). In propose mode a write is a
-proposal the user approves in the chat: never present it as applied. In auto mode
-it applies at once and returns status=applied with the new ID; read the object
-again before chaining edits on it. Identical retries return the existing result.
-Wait for approval before referencing a new object. Never change Kavot files
-directly and never produce a kavot-actions block. If MCP fails, report the error.
+INSTRUCTIONS = """Kavot workspace tools (MCP). Use them only as far as the request needs:
+every call and result is resent on each later call of the conversation.
+- Answer from what you already have when it is enough: general knowledge, the briefs in
+  the message, earlier results. Many requests need no tool at all.
+- Go one level deeper only when the current one does not answer. Notes have three levels:
+  get_note(id, level=1) brief (place, relations, gist, cost of the next levels), level=2
+  summary and outline with a gist per section, level=3 text (section=<block id> for one part).
+  A gist is a summary, not evidence: quote or claim details only from level 3.
+- To find things: search(query) gives snippets with kavot:// addresses, list_notes notes
+  with a gist, explore() a map of projects and collections; read(ref) opens an address.
+  get_context gives the scope and target: call it only when the message lacks them or says they changed.
+- Never reread what a tool returned earlier in this conversation (previous messages
+  included) unless the message says it changed. Never list or inspect the tool catalogue
+  more than once per conversation. Read a guide (get_guide(topic)) only before a kind of
+  task you have not done in this conversation.
+- After reading a note in full, if the result asks for it, call save_digest(ref, summary,
+  sections): allowed in every mode, it stores your summary, not the user's data.
+Writes: named write tools when listed, else get_action_schema(kind) then propose_action.
+read_note (HTML with block ids) is needed before editing an existing note, not to create one.
+In propose mode a write is a proposal the user approves: never present it as applied.
+In auto mode status=applied returns the saved object (id, title, size, canvas card):
+that is the confirmation, do not read it back. Read it again only to edit it further.
+Never change Kavot files directly or produce a kavot-actions block. If MCP fails, report it.
 """
 GUIDES = {
     "notes": """Notes are HTML documents. read_note returns the body with stable block ids and makes the
@@ -81,12 +80,15 @@ note editable in this request. Use the smallest fitting tool:
 - note_properties_update changes properties or presentation (width, theme);
 - note_script_set inserts or replaces a sandboxed script block (HTML, CSS, JS with the
   kavot.* data API).
-Call get_note_format_guide once before rich formatting: elements, styles, layouts
+Call get_note_format_guide once per conversation, only for rich formatting: elements, styles, layouts
 (columns, callouts, collapsible, tables, dividers, math, images), live collection views
 and the script API. Keep ids, styles and links outside the request. Never put <script>
 or <style> in note HTML: use note_script_set. The script library (list_scripts,
 get_script, script_create, script_update, script_delete) stores reusable scripts.
-note_create creates a note.""",
+note_create creates a note. Give it the same starting markup the editor's New note
+button writes — a single H1 with the title, then the content. Leave presentation
+unset like a note made by hand: the page then follows the app's light/dark theme.
+cream and slate are fixed light backgrounds; set them only when the user asks.""",
     "canvas": """Project canvas: get_canvas shows its cards (note_id, title) and relations. To put a NEW
 note or task on the canvas, give note_create/task_create a canvas object
 (connect_to: ["note:<id>" or card ids], label, direction): it is placed and linked as
@@ -120,7 +122,7 @@ TOOL_HINTS = {
     "record_update": "Change fields of a custom collection item; values are merged with the current ones.",
     "collection_update": "Change a custom collection: name, icon, fields (existing field types stay), content_template.",
     "canvas_edit": "Edit a project canvas (path from get_canvas): add_notes, connect (labelled arrows), move, remove_edges.",
-    "note_create": "Create a note; canvas={connect_to, label} also places it on the project canvas.",
+    "note_create": "Create a note; start content with '# Title' like the editor's New note, canvas={connect_to, label} also places it on the project canvas.",
     "note_script_set": "Insert or replace a sandboxed script block in a note (raw HTML/CSS/JS; see get_note_format_guide).",
     "script_create": "Add a reusable script (name, description, tags, html, css, js) to the script library.",
     "script_update": "Change a library script; only send the changed fields.",
@@ -284,7 +286,22 @@ def _check_scope(action: dict, run: dict) -> None:
 
 
 def visible_refs(run: dict) -> set[str]:
-    """Addresses this request may read: the same scope as the organization snapshot."""
+    """Addresses this request may read: the same scope as the organization snapshot.
+
+    Cached per organization snapshot: recomputing it rescans the whole workspace
+    (state file, every collection item file, search index) on each tool call.
+    """
+    base = run["baseline"]
+    organization = base.get("organization")
+    cached = base.get("_refs_cache")
+    if cached is not None and cached[0] is organization:
+        return cached[1]
+    refs = _compute_visible_refs(run)
+    base["_refs_cache"] = (organization, refs)
+    return refs
+
+
+def _compute_visible_refs(run: dict) -> set[str]:
     snap = collections.snapshot(run)
     excluded = set(run["context"].get("excluded_resource_ids") or [])
     refs = {f"kavot://projects/{p['id']}" for p in snap.get("projects", [])}
@@ -310,11 +327,46 @@ def _base(ref: str) -> str:
     return ref.split("#", 1)[0].removesuffix("/pdf")
 
 
+CONTEXT_ROWS = 25
+# Source fields an agent needs; a note's or article's path and link follow from its id (see "links").
+SOURCE_FIELDS = {"id", "title", "kind", "evidence", "read_only", "warnings", "extraction_path"}
+PLAIN_EVIDENCE = {"texte local", "document HTML local"}
+LINKS = {"note": "/?view=notes&note_id=<id>", "paper": "/?view=papers&paper_id=<id>",
+         "file": "/api/workspace/file?path=<url-encoded path>"}
+PROJECT_FIELDS = {"id", "name", "description", "status", "repository_context_enabled"}
+
+
 def compact_context(context: dict) -> dict:
-    """get_context without the bulk: records become id/title lists, long catalogues are capped."""
+    """get_context without the bulk: records become id/title lists, long catalogues are capped,
+    and what is listed once (a source, the project) is not repeated under other keys."""
     result = copy.deepcopy(context)
-    result["sources"] = [{k: v for k, v in source.items() if k not in {"text", "pages"}}
-                         for source in result.get("sources", [])]
+    sources = []
+    for source in result.get("sources", []):
+        kept = {k: v for k, v in source.items() if k in SOURCE_FIELDS and v not in (None, [], "")}
+        if kept.get("evidence") in PLAIN_EVIDENCE:
+            kept.pop("evidence")
+        if source.get("truncated"):
+            kept["truncated"] = True
+        if not (source.get("note_id") or source.get("paper_id")):
+            kept["path"] = source.get("path")
+        sources.append(kept)
+    result["sources"] = sources
+    if sources:
+        result["links"] = LINKS
+    listed = {source["id"] for source in sources}
+    target = result.get("target_note")
+    if isinstance(target, dict) and target.get("id") in listed:
+        result["target_note"] = {"id": target["id"], "title": target.get("title")}
+    if isinstance(result.get("open_documents"), list):
+        result["open_documents"] = [item.get("id") for item in result["open_documents"] if isinstance(item, dict)]
+    if isinstance(result.get("project"), dict):
+        result["project"] = {k: v for k, v in result["project"].items() if k in PROJECT_FIELDS}
+    project_id = result.get("project_id")
+    # The catalogue lists the other notes in scope: those in sources are already named there.
+    result["note_catalog"] = [{k: v for k, v in note.items() if v is not None and not (k == "project_id" and v == project_id)}
+                              for note in result.get("note_catalog") or [] if f"note:{note.get('id')}" not in listed]
+    if not result["note_catalog"]:
+        result.pop("note_catalog")
     records = result.pop("records", {}) or {}
     summary = {}
     for key, rows in records.items():
@@ -322,15 +374,19 @@ def compact_context(context: dict) -> dict:
             continue
         summary[key] = {"count": len(rows), "items": [
             {"id": row.get("id") or row.get("entity_id"), "title": collections._title(row) if row.get("id") else row.get("title")}
-            for row in rows[:40] if isinstance(row, dict)]}
-        if len(rows) > 40:
-            summary[key]["more"] = f"{len(rows) - 40} more: use search or list_records"
+            for row in rows[:CONTEXT_ROWS] if isinstance(row, dict)]}
+        if len(rows) > CONTEXT_ROWS:
+            summary[key]["more"] = f"{len(rows) - CONTEXT_ROWS} more: use search or list_records"
     if summary:
         result["records"] = summary
     catalog = result.get("note_catalog") or []
-    if len(catalog) > 60:
-        result["note_catalog"] = catalog[:60]
-        result["note_catalog_more"] = f"{len(catalog) - 60} more notes: use search or list_notes"
+    if len(catalog) > CONTEXT_ROWS:
+        result["note_catalog"] = catalog[:CONTEXT_ROWS]
+        result["note_catalog_more"] = f"{len(catalog) - CONTEXT_ROWS} more notes: use search or list_notes"
+    # Same values under other keys: the canvas path, the target among the open documents.
+    if result.get("resource_path") and result.get("resource_path") == result.get("canvas_path"):
+        result.pop("resource_path")
+    result.pop("captured_at", None)
     canvas = result.get("canvas")
     if isinstance(canvas, dict):
         canvas["nodes"] = [{k: v for k, v in node.items() if k in {"id", "type", "title", "noteId", "recordId", "paperId", "databaseId"}}
@@ -406,7 +462,9 @@ def create_server(run: dict, lock, emit):
     """Reuse a captured chat context and the same action validation as the UI."""
     Server, ToolAnnotations, v2 = _sdk()
     # v2 moves transport settings from the constructor to the ASGI app factory.
-    server = Server("Kavot", instructions=INSTRUCTIONS, log_level="WARNING",
+    # The rules are in the conversation's AGENTS.md when the engine repeats them per tool.
+    instructions = "Kavot workspace tools; rules in AGENTS.md." if run.get("tool_rules_in_agents") else INSTRUCTIONS
+    server = Server("Kavot", instructions=instructions, log_level="WARNING",
                     **({} if v2 else _transport_options()))
     read_only = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=False)
     network_read = ToolAnnotations(readOnlyHint=True, destructiveHint=False, openWorldHint=True)
@@ -464,7 +522,7 @@ def create_server(run: dict, lock, emit):
 
     @tool(annotations=read_only)
     def get_guide(topic: str) -> dict[str, Any]:
-        """Detailed rules for one kind of task; read once per request before doing it."""
+        """Detailed rules for one kind of task; read once per conversation before doing it."""
         with lock:
             _active(run)
             if topic not in guides:
@@ -504,7 +562,7 @@ def create_server(run: dict, lock, emit):
     @tool(annotations=read_only)
     def read(ref: Annotated[str, Field(min_length=10, max_length=300)], fields: list[str] | None = None,
              offset: Annotated[int, Field(ge=0)] = 0,
-             limit: Annotated[int, Field(ge=200, le=12000)] = 4000) -> dict[str, Any]:
+             limit: Annotated[int, Field(ge=200, le=6000)] = 3000) -> dict[str, Any]:
         """Open a kavot:// address from search, get_links or get_context.
 
         Notes return text passages from the given block (#block-id) with `next`; articles
@@ -517,7 +575,10 @@ def create_server(run: dict, lock, emit):
             if _base(ref) not in visible_refs(run):
                 raise ValueError("Address outside this request's scope or unknown. Use search to find addresses.")
             emit(run, "tool", "Item read", ref)
-            return records.read(ref, offset=offset, limit=limit, fields=fields)
+            result = records.read(ref, offset=offset, limit=limit, fields=fields)
+            if ref.startswith("kavot://notes/") and "#" not in ref and not result.get("next"):
+                return digest_hint(_base(ref), result)
+            return result
 
     @tool(annotations=read_only)
     def explore(ref: Annotated[str | None, Field(max_length=300)] = None,
@@ -587,7 +648,7 @@ def create_server(run: dict, lock, emit):
 
     @tool(annotations=read_only)
     def read_source(source_id: str, offset: Annotated[int, Field(ge=0)] = 0,
-                    limit: Annotated[int, Field(ge=1, le=16000)] = 12000,
+                    limit: Annotated[int, Field(ge=1, le=8000)] = 6000,
                     page: Annotated[int, Field(ge=1)] | None = None) -> dict[str, Any]:
         """Read a selected source by its catalogue ID, in character chunks; for PDFs pass a page (omit it to list pages)."""
         with lock:
@@ -614,10 +675,13 @@ def create_server(run: dict, lock, emit):
                     text, truncated = baseline["text"], False
             end = min(offset + limit, len(text))
             emit(run, "tool", "Source read", source["title"])
-            return {"source_id": source_id, "text": text[offset:end], "page": page,
-                    "next_offset": end if end < len(text) else None, "source_truncated": truncated,
-                    "evidence": source.get("evidence"), "href": source.get("href"),
-                    "warnings": source.get("warnings", [])}
+            result = {"source_id": source_id, "text": text[offset:end], "page": page,
+                      "next_offset": end if end < len(text) else None, "source_truncated": truncated,
+                      "evidence": source.get("evidence"), "href": source.get("href"),
+                      "warnings": source.get("warnings", [])}
+            if source.get("note_id") and end >= len(text):
+                return digest_hint(f"kavot://notes/{source['note_id']}", result)
+            return result
 
     @tool(annotations=read_only)
     def get_organization() -> dict[str, Any]:
@@ -682,15 +746,53 @@ def create_server(run: dict, lock, emit):
     def list_notes(query: str = "", project_id: int | None = None, folder_id: int | None = None,
                    offset: Annotated[int, Field(ge=0)] = 0,
                    limit: Annotated[int, Field(ge=1, le=200)] = 50) -> dict[str, Any]:
-        """Notes in scope by title or tag, project or folder: IDs and note folders."""
+        """Notes in scope by title or tag, project or folder: IDs, a one-line gist, full size in tokens, and note folders."""
         with lock:
             _active(run)
+            from app.core.digest import levels
             emit(run, "tool", "Notes listed", query or "MCP · Kavot")
-            return collections.notes(run, query, project_id, folder_id, offset, limit)
+            result = collections.notes(run, query, project_id, folder_id, offset, limit)
+            result["notes"] = [{**note, **levels.gist(note["id"])} for note in result["notes"]]
+            return result
+
+    def digest_hint(note_ref: str, result: dict) -> dict:
+        """Ask once per request for a summary of a note read in full that has no current one.
+
+        With a summary model configured, a light model writes it in the background instead.
+        """
+        from app.core.agents import digests
+        from app.core.digest import levels
+        hinted = run.setdefault("digest_hints", set())
+        if note_ref not in hinted and levels.needs_digest(note_ref):
+            hinted.add(note_ref)
+            if not digests.queue(note_ref):
+                result["digest"] = levels.SAVE_HINT
+        return result
+
+    @tool(annotations=read_only)
+    def get_note(note_id: int, level: Literal[1, 2, 3] = 1, section: str | None = None,
+                 limit: Annotated[int, Field(ge=500, le=12000)] = 6000) -> dict[str, Any]:
+        """A note at the depth the request needs: 1 brief (place, relations, gist, cost of deeper levels),
+        2 summary and outline with a gist per section, 3 text window by window (section=<block id> for one part).
+        """
+        from app.core.digest import levels
+        with lock:
+            _active(run)
+            address = levels.ref(note_id)
+            allowed = visible_refs(run)
+            if address not in allowed:
+                raise ValueError("Note outside this request's scope. Use list_notes or search.")
+            emit(run, "tool", f"Note read (level {level})", str(note_id))
+            if level == 1:
+                return levels.brief(note_id, allowed)
+            if level == 2:
+                return levels.detail(note_id, allowed)
+            result = levels.content(note_id, section, limit)
+            return digest_hint(address, result) if not section and not result.get("next") else result
 
     @tool(annotations=read_only)
     def read_note(note_id: int, offset: Annotated[int, Field(ge=0)] = 0,
-                  limit: Annotated[int, Field(ge=1, le=60000)] = 30000) -> dict[str, Any]:
+                  limit: Annotated[int, Field(ge=1, le=20000)] = 10000) -> dict[str, Any]:
         """A note's HTML body with stable block ids, in chunks; makes the note editable in this request."""
         with lock:
             _active(run)
@@ -698,10 +800,11 @@ def create_server(run: dict, lock, emit):
             text = note["text"]
             end = min(offset + limit, len(text))
             emit(run, "tool", "Note read", note.get("title") or str(note_id))
-            return {"note_id": note_id, "title": note.get("title"), "path": note["path"],
-                    "html": text[offset:end], "next_offset": end if end < len(text) else None,
-                    "properties": note.get("metadata", {}).get("properties", {}),
-                    "presentation": note.get("metadata", {}).get("presentation", {})}
+            result = {"note_id": note_id, "title": note.get("title"), "path": note["path"],
+                      "html": text[offset:end], "next_offset": end if end < len(text) else None,
+                      "properties": note.get("metadata", {}).get("properties", {}),
+                      "presentation": note.get("metadata", {}).get("presentation", {})}
+            return digest_hint(f"kavot://notes/{note_id}", result) if end >= len(text) else result
 
     @tool(annotations=read_only)
     def get_canvas(project_id: int | None = None) -> dict[str, Any]:
@@ -862,7 +965,8 @@ def create_server(run: dict, lock, emit):
                 notify_local_change()
                 emit(run, "write", "Change applied", proposal["label"] + " — " + proposal["target"])
                 return {"proposal_id": proposal["proposal_id"], "status": "applied", "result": result,
-                        "message": "Applied. Read the object again before another change to it."}
+                        "message": "Applied and saved; this result is the confirmation, do not read it back. "
+                                   "Read the object again only before another change to it."}
 
         @tool(annotations=ToolAnnotations(readOnlyHint=False, destructiveHint=automatic,
                                           idempotentHint=True, openWorldHint=False))

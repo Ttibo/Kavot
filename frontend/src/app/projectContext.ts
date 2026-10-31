@@ -11,5 +11,6 @@ export function currentProject(runtime?: Runtime) {
   };
   const id = state.view === 'notes' ? state.selectedProject?.id || (state.noteScope.startsWith('project:') ? Number(state.noteScope.slice(8)) : null)
     : Number(filters[state.view || 'dashboard']);
-  return state.projects.find(project => project.id === id) || null;
+  // Without a project of its own, the view belongs to the project of the sidebar scope.
+  return state.projects.find(project => project.id === (id || state.scopeProjectId)) || null;
 }

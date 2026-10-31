@@ -3,7 +3,8 @@ from __future__ import annotations
 
 
 def register(registry, manifest) -> None:
-    from app.plugins.atelier import routes, runs
+    from app.plugins.atelier import agents, routes
 
     registry.routers.append(routes.router)
-    runs.recover()
+    registry.agent_workspaces.append(agents)
+    agents.drop_legacy_runs()

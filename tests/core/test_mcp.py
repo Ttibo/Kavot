@@ -96,3 +96,27 @@ def test_invalid_generic_action_returns_its_schema(client):
     with pytest.raises(Exception, match="Expected request.*access_status"):
         asyncio.run(server.call_tool("propose_action", {"action": {
             "kind": "dataset_create", "label": "Add", "values": {"nme": "typo"}}}))
+
+
+def test_note_levels_and_digest_cycle(client):
+    """A note opens brief first; a full read without a summary asks for one, which later briefs show until the note changes."""
+    note = client.post("/api/notes", json={"title": "Glacier retreat", "content":
+        "<h1 id='h1'>Glacier retreat</h1><p id='p1'>Retreat rates measured from satellite images.</p>"
+        "<h2 id='h2'>Methods</h2><p id='p2'>Landsat series from 1990 to 2020.</p>"}).json()
+    server, _ = tools_of(make_run())
+    brief = json.loads(call(server, "get_note", {"note_id": note["id"]}))
+    assert brief["level"] == 1 and brief["summary"].startswith("Retreat rates") and "outline" not in brief
+    detail = json.loads(call(server, "get_note", {"note_id": note["id"], "level": 2}))
+    assert [entry["title"] for entry in detail["outline"]][:2] == ["Glacier retreat", "Methods"]
+    full = json.loads(call(server, "get_note", {"note_id": note["id"], "level": 3}))
+    assert "save_digest" in full["digest"]
+    again = json.loads(call(server, "get_note", {"note_id": note["id"], "level": 3}))
+    assert "digest" not in again, "asked once per request"
+    anchor = detail["outline"][1]["ref"].split("#", 1)[1]
+    call(server, "save_digest", {"ref": brief["ref"], "summary": "Satellite-based retreat rates, 1990-2020.",
+                                 "sections": {anchor: "Landsat time series."}})
+    brief = json.loads(call(server, "get_note", {"note_id": note["id"]}))
+    assert brief["summary_source"] == "agent digest"
+    assert json.loads(call(server, "get_note", {"note_id": note["id"], "level": 2}))["outline"][1]["gist"] == "Landsat time series."
+    client.patch(f"/api/notes/{note['id']}", json={"content": "<h1>Glacier retreat</h1><p>Rewritten.</p>"})
+    assert json.loads(call(server, "get_note", {"note_id": note["id"]}))["summary_source"].startswith("opening sentences (the agent digest is outdated")

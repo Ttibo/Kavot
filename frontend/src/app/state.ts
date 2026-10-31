@@ -90,8 +90,8 @@ export const state = {
   databases: [] as any[],
   workflows: [] as any[],
   workflowId: null as number | null,
-  /** Project whose own sidebar replaces the Workspace explorer (project mode), or null. */
-  projectWorkspaceId: null as number | null,
+  /** Project the whole interface is filtered on (sidebar trees, tasks, library…), or null for the whole workspace. */
+  scopeProjectId: (Number(localStorage.getItem("kavot-scope-project")) || null) as number | null,
   /** Last project opened in the Atelier (code folders, map and agents). */
   atelierProjectId: null as number | null,
   databaseRecords: {} as Record<string, Array<{ id: string; values: Record<string, any>; updated_at?: string; note?: Note }>>,
@@ -166,6 +166,12 @@ export let modalBackdrop = document.querySelector<HTMLElement>("#modal-backdrop"
 export let modal = document.querySelector<HTMLElement>("#modal");
 
 export let modalContent = document.querySelector<HTMLElement>("#modal-content");
+
+/** A page of the application is on screen: as the page, or as the active tab of an editor pane. */
+export function viewShown(view: string) {
+  return state.view === view || (["primary", "secondary"] as const).some(pane =>
+    state.workspaceTabs[pane]?.find(tab => tab.id === state.workspaceActiveTabs[pane])?.resource?.view === view);
+}
 
 export function bindInterfaceElements() {
   main = document.querySelector<HTMLElement>("#main-content");

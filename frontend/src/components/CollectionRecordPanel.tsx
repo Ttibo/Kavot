@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { useRuntime } from '../app/runtime';
 import { publish } from '../app/viewBridge';
 import { OverlayPanel } from './ViewLayout';
+import { paneOf } from '../features/sheet/sheet';
 import { findCollectionItem } from '../features/collections/catalog';
 import { bindCollectionEditors, collectionRecordMarkup, discardNewCollectionDraft, flushCollectionSaves, isNewCollectionItem, openCollectionInNotes } from '../features/collections/noteEditor';
 
@@ -26,9 +27,14 @@ export function CollectionWithPanel({ databaseId, children }: { databaseId: stri
   useEffect(() => () => { if (state.collectionPanel?.databaseId === databaseId) state.collectionPanel = null; }, [databaseId]);
   const close = () => { state.collectionPanel = null; publish(); };
   const isNew = reference && isNewCollectionItem(reference);
+  const openInTab = () => {
+    const target = reference, pane = paneOf(host.current)?.dataset.workspacePane;
+    close();
+    void openCollectionInNotes(target, { newTab: true, pane });
+  };
   return <div className={`collection-split ${reference ? 'has-panel' : ''}`}>
     <div className="collection-split-main">{children}</div>
     {reference && <OverlayPanel className="collection-record-panel" label={isNew ? 'New item editor' : 'Item editor'} title={isNew ? 'New item' : 'Item'} closeLabel="Close the item" onClose={close} bodyRef={host}
-      actions={!isNew && <button className="button button-small" onClick={() => { const target = reference; close(); void openCollectionInNotes(target); }}>Open in Notes</button>}/>}
+      onOpenInTab={isNew ? undefined : openInTab}/>}
   </div>;
 }

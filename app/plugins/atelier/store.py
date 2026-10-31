@@ -1,4 +1,4 @@
-"""Per-project Atelier state: linked code folders and agent runs.
+"""Per-project Atelier state: linked code folders, and the worktrees of agent conversations.
 
 Folder paths and worktrees only make sense on this computer, so the state lives in
 the configuration folder (one directory per workspace), not in the synced workspace.
@@ -34,7 +34,6 @@ def read(project_id: int) -> dict[str, Any]:
     with lock:
         doc = read_json_object(_path(project_id)) or {}
         doc.setdefault("folders", [])
-        doc.setdefault("runs", [])
         return doc
 
 

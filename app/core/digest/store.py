@@ -74,6 +74,10 @@ def save(ref: str, summary: str, *, sections: dict[str, str] | None = None, keyw
     from app.core.search.index import ensure_fresh
     item = ensure_fresh().item(collection, item_id)
     anchors = {p["anchor"] for p in item["passages"]}
+    if collection == "notes":
+        # A note's outline points at its heading blocks, inside the indexed passages.
+        from app.core.records.api import note_text
+        anchors |= {block for passage in note_text(item_id)[1] for block in passage["blocks"]}
     unknown = [anchor for anchor in sections if anchor not in anchors]
     if unknown:
         raise ValueError(f"Unknown section anchors {unknown[:5]}; use anchors from explore or read.")

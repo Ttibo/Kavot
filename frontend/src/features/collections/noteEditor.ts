@@ -37,7 +37,8 @@ function newItemValues(ref) {
   return values;
 }
 
-export async function openCollectionInNotes(reference) {
+/** Opens a collection item as a full-size tab: in the active tab of `pane`, or in a new tab of it. */
+export async function openCollectionInNotes(reference, { newTab = false, pane = 'primary' }: { newTab?: boolean; pane?: string } = {}) {
   await flushCurrentNoteAutosave();
   await flushSecondaryNoteAutosave();
   await flushWorkspaceMarkdownSaves();
@@ -48,10 +49,10 @@ export async function openCollectionInNotes(reference) {
   if (item.type === 'paper' || item.type === 'note') {
     const note = item.type === 'paper' ? await loadReadingNote(item.source) : item.source;
     state.notes = [...state.notes.filter(n => n.id !== note.id), note];
-    replaceActiveWorkspaceTab('primary', workspaceNoteTab(note));
+    replaceActiveWorkspaceTab(pane, workspaceNoteTab(note), newTab);
     return rerenderNotesContext();
   }
-  replaceActiveWorkspaceTab('primary', workspaceResourceTab({ type: 'collection-record', path: `collection/${keyFor(reference)}`, title: item.title, content: reference }));
+  replaceActiveWorkspaceTab(pane, workspaceResourceTab({ type: 'collection-record', path: `collection/${keyFor(reference)}`, title: item.title, content: reference }), newTab);
   rerenderNotesContext();
 }
 

@@ -37,7 +37,8 @@ A title, an abstract or a citation does not prove the full text. Point out what 
 A PDF and its extraction are a single source. Never make up page numbers.
 Canvas links are relations directed and annotated by the user. Respect their direction
 and label; card positions are not scientific evidence. Distinguish
-existing links from proposed links. Compare the project's relevant notes and articles.
+existing links from proposed links. For a question about the project, start from the
+briefs of its relevant notes and articles and open only those that matter.
 In the citation graph, rank by the question, the relation, the abstract, recency,
 presence in the library and access to the text. Citation count alone does not measure
 quality. Explain each candidate; importing stays a separate proposal.
@@ -53,7 +54,8 @@ If a repository is linked to the project and relevant to the request, cite repos
 each finding. Do not invent inaccessible content.
 For a request unrelated to code, do not explore these sources.
 Collections: follow the actual schema and cite IDs. Check for duplicates before creating.
-Read Kavot sources with read_source. If an excerpt is still truncated after pagination,
+Read Kavot sources through MCP only as deep as the request needs: briefs first, then
+get_note levels or read_source. If an excerpt is still truncated after pagination,
 report its partial coverage. Do not bypass MCP by reading the workspace directly.
 """
 
@@ -221,7 +223,7 @@ def prepare(context: dict | None, prompt: str, *, include_sources: bool = True) 
         if item and item not in resources and identifier not in excluded:
             resources.append(item)
     resources = [item for item in resources if item["id"] not in excluded or (target and item["id"] == target["id"])]
-    sources, remaining = [], 180_000
+    sources, remaining = [], 90_000
     for item in resources:
         source = {**item, "source_id": item["id"], "href": _href(item)}
         if not include_sources:
@@ -237,7 +239,7 @@ def prepare(context: dict | None, prompt: str, *, include_sources: bool = True) 
                 source["pages"] = []
                 for page in extraction.get("pages", []):
                     text = str(page.get("text", ""))
-                    count = min(len(text), max(0, remaining), 16000)
+                    count = min(len(text), max(0, remaining), 8000)
                     source["pages"].append({"page": page["page"], "text": text[:count], "truncated": count < len(text)})
                     remaining -= count
                 source["warnings"] = extraction.get("warnings", [])
@@ -245,7 +247,7 @@ def prepare(context: dict | None, prompt: str, *, include_sources: bool = True) 
             if path.suffix.lower() == '.html':
                 from app.core.workspace import html_documents
                 text = html_documents.read(path.read_text(encoding='utf-8'), path)
-                count = min(len(text), 30000, max(0, remaining))
+                count = min(len(text), 20000, max(0, remaining))
                 source.update(text=text[:count], truncated=len(text) > count, evidence='document HTML local', content_format='html')
                 if project_overview.is_overview(path):
                     source.update(read_only=True, evidence='generated projection of the canvas, not independent evidence')
@@ -253,8 +255,8 @@ def prepare(context: dict | None, prompt: str, *, include_sources: bool = True) 
                 sources.append(source)
                 continue
             with path.open(encoding="utf-8", errors="replace") as handle:
-                text = handle.read(min(30000, max(0, remaining)) + 1)
-            count = min(len(text), 30000, max(0, remaining))
+                text = handle.read(min(20000, max(0, remaining)) + 1)
+            count = min(len(text), 20000, max(0, remaining))
             source.update(text=text[:count], truncated=len(text) > count, evidence="texte local")
             if project_overview.is_overview(path):
                 source.update(read_only=True, evidence="generated projection of the canvas, not independent evidence")

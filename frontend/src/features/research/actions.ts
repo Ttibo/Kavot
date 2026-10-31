@@ -1,4 +1,4 @@
-import { escapeHtml, state } from '../../app/state';
+import { viewShown, escapeHtml, state } from '../../app/state';
 import { refreshData, render, toast } from '../../app/navigation';
 import { closeModal } from '../../components/dialogs/controller';
 import { collectionField, collectionInput, openCollectionComposer } from '../../components/dialogs/collectionComposer';
@@ -21,7 +21,7 @@ export const datasetStatusLabels = {
   archived: "Archived",
 };
 
-function registryProject(filter = state.view === "datasets" ? state.datasetProjectFilter : state.conferenceProjectFilter) {
+function registryProject(filter = viewShown("datasets") ? state.datasetProjectFilter : state.conferenceProjectFilter) {
   if (filter === "all") return null;
   return state.projects.find(
     (item) => item.id === Number(filter),
@@ -39,8 +39,8 @@ function relationCheckboxes(items, selectedIds, name, emptyLabel) {
 }
 
 function renderRegistryReturnView() {
-  if (state.view === "conferences") return renderConferences();
-  if (state.view === "datasets") return renderDatasets();
+  if (viewShown("conferences")) return renderConferences();
+  if (viewShown("datasets")) return renderDatasets();
   return render();
 }
 

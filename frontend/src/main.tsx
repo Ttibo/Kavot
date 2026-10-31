@@ -5,6 +5,7 @@ import { AppShell } from './components/AppShell';
 import { setRuntime } from './app/runtime';
 import './app/colors';
 import { publish } from './app/viewBridge';
+import { canonicalView, isPage } from './app/pages';
 import './styles/integration.css';
 import './styles/research-workspace.css';
 import './styles/features/library-refined.css';
@@ -40,7 +41,9 @@ async function start() {
     menus.initializeAppContextMenus();
     await runtime.refreshData();
     publish();
-    runtime.render();
+    // The start page opens as the first tab of the editor (Home when the saved view is not a page).
+    const start = canonicalView(runtime.state.view);
+    await runtime.navigate(isPage(start) || start === 'notes' ? start : 'dashboard');
     cloud.startCloudRefresh(runtime);
   } catch (error) {
     console.error('Unable to initialize Kavot', error);

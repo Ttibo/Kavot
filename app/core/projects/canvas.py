@@ -197,8 +197,27 @@ def edit(content: dict, values: dict, notes: list[dict], tasks: list[dict] | Non
     return result
 
 
-def place_new_note(note: dict, placement: dict, kind: str = "note") -> str | None:
-    """After a note or task is created, add it to its project canvas and link it. Returns the canvas path."""
+def changes(before: dict, after: dict, relative: str) -> dict:
+    """What an edit added, moved or removed: the agent's confirmation, so it needs no get_canvas to check."""
+    def card(n: dict) -> dict:
+        return {k: n.get(k) for k in ("id", "noteId", "recordId", "x", "y", "width", "height") if n.get(k) is not None}
+
+    def arrow(e: dict) -> dict:
+        return {"id": e["id"], "from": e.get("fromNode"), "to": e.get("toNode"), "label": e.get("label") or None}
+    old_nodes = {n["id"]: n for n in before.get("nodes", [])}
+    old_edges = {e["id"] for e in before.get("edges", [])}
+    new_edges = {e["id"] for e in after.get("edges", [])}
+    result = {"path": relative,
+              "added_cards": [card(n) for n in after.get("nodes", []) if n["id"] not in old_nodes],
+              "moved_cards": [card(n) for n in after.get("nodes", []) if n["id"] in old_nodes and
+                              (n.get("x"), n.get("y")) != (old_nodes[n["id"]].get("x"), old_nodes[n["id"]].get("y"))],
+              "added_edges": [arrow(e) for e in after.get("edges", []) if e["id"] not in old_edges],
+              "removed_edges": sorted(old_edges - new_edges)}
+    return {key: value for key, value in result.items() if value}
+
+
+def place_new_note(note: dict, placement: dict, kind: str = "note") -> dict | None:
+    """After a note or task is created, add it to its project canvas and link it. Returns what was added."""
     if not note.get("project_id"):
         return None
     from app.core.projects import canvas_store as canvas_tasks
@@ -210,9 +229,10 @@ def place_new_note(note: dict, placement: dict, kind: str = "note") -> str | Non
     else:
         x, y = _free_spot(content["nodes"], targets[0] if targets else None)
     card = _task_card(note, x, y) if kind == "task" else _note_card(note, x, y)
+    before = {"nodes": list(content["nodes"]), "edges": list(content["edges"])}
     content["nodes"].append(card)
     for target in targets:
         source, end = (card, target) if placement.get("direction", "from_new") == "from_new" else (target, card)
         content["edges"].append(_edge(source, end, placement.get("label", "")))
     canvas_tasks.save(settings.storage_path / relative, content)
-    return relative
+    return changes(before, content, relative)

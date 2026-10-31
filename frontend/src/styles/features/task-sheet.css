@@ -77,7 +77,9 @@
 /* In the side panel: one column — title, details, then the description. */
 .research-main { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; }
 .research-main > #main-content { flex: 1; }
-.research-shell .overlay-panel.record-sheet { top: 10px; right: 10px; bottom: 10px; z-index: 40; }
+/* The record panel sits in a frame laid over the pane it was opened from; only the panel takes clicks. */
+.record-sheet-frame { position: absolute; z-index: 40; pointer-events: none; }
+.record-sheet-frame > .overlay-panel { pointer-events: auto; }
 .record-sheet .overlay-panel-body { overflow: hidden; }
 .task-sheet.in-panel .task-sheet-header { padding: 14px 20px 10px; }
 .task-sheet.in-panel .task-sheet-body { display: flex; flex-direction: column; overflow-y: auto; }

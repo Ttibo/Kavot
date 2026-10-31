@@ -1,3 +1,4 @@
+import { changedSinceBase, setEditorBase } from './editorBase';
 import { canvasTextCss, canvasTextControls } from './canvasText';
 import { renderPdfPreviews } from './pdfPreview';
 import { mediaPreview, mediaKind } from './mediaPreview';
@@ -7,7 +8,8 @@ import { showContextMenu } from '../../components/contextMenu';
 import { registerAgentContext, suggestToAgent, suggestions } from '../externalAgents/context';
 import { escapeHtml, noteAssetBase, renderMarkdown, state, truncate } from '../../app/state';
 import { api } from '../../services/api';
-import { flushSecondaryNoteAutosave, flushWorkspaceMarkdownSaves, findWorkspaceNode, interfaceIcon, noteContextLabel, refreshRelationalNotes, refreshWorkspaceTreeOnly, replaceActiveWorkspaceTab, rerenderNotesContext, workspaceResourcePayload, workspaceResourceTab } from './workspace';
+import { flushSecondaryNoteAutosave, flushWorkspaceMarkdownSaves, findWorkspaceNode, interfaceIcon, noteContextLabel, refreshRelationalNotes, refreshWorkspaceTreeOnly, reloadNoteForOpen, replaceActiveWorkspaceTab, rerenderNotesContext, workspaceNoteTab, workspaceResourcePayload, workspaceResourceTab } from './workspace';
+import { iconPaths } from '../../components/Icon';
 import { collectionItems, collectionDragPayload, collectionItemCanvasPayload, findCollectionItem, openCollectionItem, parseCollectionDragPayload } from '../collections/catalog';
 import { refreshData, toast } from '../../app/navigation';
 import { bindMarkdownBlockEditor, currentMarkdownBlockInput, markdownBlockEditorMarkup, setMarkdownBlockEditorContent } from './markdown';
@@ -89,6 +91,11 @@ async function openEmbeddedCanvas(node) {
   await rerenderNotesContext();
 }
 
+// The side inspector (note preview and quick edit): its default and largest width, in pixels.
+const INSPECTOR_WIDTH = 600, INSPECTOR_MAX_WIDTH = 960;
+const INSPECTOR_WIDTH_KEY = "kavot-canvas-inspector-width-v2";
+// The inspector's header buttons use the icons of the other side panels, so all look alike.
+const panelIcon = (name: string) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${iconPaths[name]}"/></svg>`;
 // A shown canvas is a frame holding the source's own cards at full size, so each can be linked from here.
 const EMBED_PADDING = 40;
 const EMBED_HEADER = 72;
@@ -557,7 +564,7 @@ export function canvasEditorMarkup(resource, pane = "primary") {
         <div class="canvas-navigation-dock"><div class="canvas-minimap"><svg data-canvas-minimap role="img" aria-label="Canvas overview; click to navigate"></svg></div><div class="canvas-zoom-tools"><button data-canvas-zoom="out" aria-label="Zoom out">${interfaceIcon("zoomout")}</button><output data-canvas-zoom-label>100 %</output><button data-canvas-zoom="in" aria-label="Zoom in">${interfaceIcon("zoomin")}</button><button data-canvas-zoom="fit" aria-label="Fit canvas" title="Fit canvas">${interfaceIcon("fit")}</button></div></div>
       </div>
       <div class="canvas-inspector-resizer" data-canvas-inspector-resizer role="separator" aria-label="Resize card details" aria-orientation="vertical" tabindex="0" title="Drag to resize · double-click to reset"></div>
-      <aside class="canvas-inspector" aria-label="Card details"><div class="canvas-inspector-bar"><strong>Card details</strong><button type="button" data-canvas-inspector-close aria-label="Close card details">×</button></div><div data-canvas-inspector-content><div class="canvas-inspector-empty"><h3>Your thinking, in detail</h3><p>Select a card to edit its title and content.</p></div></div></aside>
+      <aside class="canvas-inspector" aria-label="Card details"><div class="canvas-inspector-bar"><strong>Card details</strong><button type="button" class="icon-button" data-canvas-inspector-close aria-label="Close card details" title="Close">${panelIcon("close")}</button></div><div data-canvas-inspector-content><div class="canvas-inspector-empty"><h3>Your thinking, in detail</h3><p>Select a card to edit its title and content.</p></div></div></aside>
     </div>
   </section>`;
 }
@@ -640,10 +647,12 @@ export function bindCanvasEditors(root) {
     const workbench = container.querySelector(".canvas-workbench") as HTMLElement;
     const resizeHandle = container.querySelector("[data-canvas-inspector-resizer]") as HTMLElement;
     const sidebarToggle = container.querySelector("[data-canvas-inspector-toggle]") as HTMLButtonElement;
-    const storedWidth = Number(localStorage.getItem("kavot-canvas-inspector-width"));
-    let preferredWidth = Number.isFinite(storedWidth) && storedWidth > 0 ? storedWidth : 380;
+    // A wide inspector by default: a note opened there can be read and edited without expanding it.
+    // The key changed with the default, so widths saved for the former narrow panel no longer apply.
+    const storedWidth = Number(localStorage.getItem(INSPECTOR_WIDTH_KEY));
+    let preferredWidth = Number.isFinite(storedWidth) && storedWidth > 0 ? storedWidth : INSPECTOR_WIDTH;
     const resizeBounds = () => {
-      const max = Math.min(720, workbench.clientWidth - Math.min(180, workbench.clientWidth * .35));
+      const max = Math.min(INSPECTOR_MAX_WIDTH, workbench.clientWidth - Math.min(180, workbench.clientWidth * .35));
       return { min: Math.min(280, max), max };
     };
     const setInspectorWidth = (width: number, persist = false) => {
@@ -653,7 +662,7 @@ export function bindCanvasEditors(root) {
       resizeHandle.setAttribute("aria-valuemin", String(Math.round(min)));
       resizeHandle.setAttribute("aria-valuemax", String(Math.round(max)));
       resizeHandle.setAttribute("aria-valuenow", String(actual));
-      if (persist) { preferredWidth = actual; localStorage.setItem("kavot-canvas-inspector-width", String(actual)); }
+      if (persist) { preferredWidth = actual; localStorage.setItem(INSPECTOR_WIDTH_KEY, String(actual)); }
       return actual;
     };
     setInspectorWidth(preferredWidth);
@@ -671,7 +680,7 @@ export function bindCanvasEditors(root) {
     sidebarToggle.addEventListener("click", () => container.classList.contains("inspector-closed") ? openInspector() : closeInspector());
     container.addEventListener("click", event => { if ((event.target as HTMLElement).closest("[data-canvas-inspector-close]")) void closeInspector(); });
     resizeHandle.addEventListener("focus", () => setInspectorWidth(preferredWidth));
-    resizeHandle.addEventListener("dblclick", () => { setInspectorWidth(380, true); renderMinimap(); });
+    resizeHandle.addEventListener("dblclick", () => { setInspectorWidth(INSPECTOR_WIDTH, true); renderMinimap(); });
     resizeHandle.addEventListener("keydown", event => {
       if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
       event.preventDefault();
@@ -699,6 +708,8 @@ export function bindCanvasEditors(root) {
       resizeHandle.addEventListener("pointercancel", finish);
     });
     const inspectorDrafts = new Map();
+    // The version of each card's note its inspector edits from, kept with an unsaved draft: saves send it.
+    const inspectorBases = new Map<string, string | undefined>();
     let selectedNodeId = null;
     let selectedEdgeId = null;
     registerAgentContext(container, () => {
@@ -1025,7 +1036,7 @@ export function bindCanvasEditors(root) {
       const draft = inspectorDrafts.get(node.id);
       const noteEditor = !isNewLink ? `<section class="canvas-inspector-writing" aria-label="Write card notes">${noteReferencePickerMarkup()}${markdownBlockEditorMarkup(draft?.content ?? note?.content ?? (node.type === "text" ? node.text : node.cardNotes) ?? "", { sourceId: "canvas-inspector-source", editorId: "canvas-inspector-editor", assetBase: note ? noteAssetBase(note) : "", ariaLabel: "Contenu HTML de la note" })}</section>` : "";
       const panelTag = isNewLink ? "form" : "section";
-      const markup = `<${panelTag} id="${isNewLink ? "canvas-new-link-form" : "canvas-details-form"}" class="form-grid"><header class="canvas-inspector-bar"><label class="form-field full canvas-detail-title"><span class="sr-only">Title</span><input aria-label="Title" name="title" required maxlength="240" value="${escapeHtml(draft?.title ?? note?.title ?? node.title ?? "")}"></label><button type="button" data-canvas-inspector-close aria-label="Close card details">×</button></header>${isNewLink ? "<h2>Add web link</h2>" : '<button type="button" class="canvas-detail-save-state" data-detail-save-state hidden aria-live="polite">Saved automatically</button>'}${node.type === "link" ? `<label class="form-field full">Web address<input name="url" type="url" required placeholder="https://…" value="${escapeHtml(node.url || "")}"></label>` : ""}${node.type === "image" ? `<img class="canvas-inspector-image" src="${escapeHtml(node.url || "")}" alt="${escapeHtml(node.title || "Image")}">` : node.type === "link" && !isNewLink ? canvasNodePreview(node) : ""}${node.collectionType ? `<button type="button" class="button button-small" data-card-open-resource>Edit ${escapeHtml(node.collectionType)} record ↗</button>` : ""}${node.type === "text" ? canvasTextControls(node) : ""}${noteEditor}${isNewLink ? '<div class="form-actions"><button class="button button-primary">Add link</button></div>' : ""}</${panelTag}>`;
+      const markup = `<${panelTag} id="${isNewLink ? "canvas-new-link-form" : "canvas-details-form"}" class="form-grid"><header class="canvas-inspector-bar"><label class="form-field full canvas-detail-title"><span class="sr-only">Title</span><input aria-label="Title" name="title" required maxlength="240" value="${escapeHtml(draft?.title ?? note?.title ?? node.title ?? "")}"></label>${!isNewLink && (note || node.collectionType) ? `<button type="button" class="icon-button" data-canvas-open-tab aria-label="Open full size in a new tab" title="Open in a new tab">${panelIcon("open")}</button>` : ""}<button type="button" class="icon-button" data-canvas-inspector-close aria-label="Close card details" title="Close">${panelIcon("close")}</button></header>${isNewLink ? "<h2>Add web link</h2>" : '<button type="button" class="canvas-detail-save-state" data-detail-save-state hidden aria-live="polite">Saved automatically</button>'}${node.type === "link" ? `<label class="form-field full">Web address<input name="url" type="url" required placeholder="https://…" value="${escapeHtml(node.url || "")}"></label>` : ""}${node.type === "image" ? `<img class="canvas-inspector-image" src="${escapeHtml(node.url || "")}" alt="${escapeHtml(node.title || "Image")}">` : node.type === "link" && !isNewLink ? canvasNodePreview(node) : ""}${node.collectionType ? `<button type="button" class="button button-small" data-card-open-resource>Edit ${escapeHtml(node.collectionType)} record ↗</button>` : ""}${node.type === "text" ? canvasTextControls(node) : ""}${noteEditor}${isNewLink ? '<div class="form-actions"><button class="button button-primary">Add link</button></div>' : ""}</${panelTag}>`;
       inspector.innerHTML = markup;
       if (!isNewLink) {
         inspector.querySelector('.canvas-inspector-bar').insertAdjacentHTML('beforeend', '<button type="button" data-agent-card-menu aria-label="Assistant for this card" title="Assistant for this card">✦</button>');
@@ -1066,6 +1077,7 @@ export function bindCanvasEditors(root) {
         editorRoot = form.querySelector("#canvas-inspector-editor");
         if (note) editorRoot.dataset.agentNoteId = String(note.id);
         bindMarkdownBlockEditor(editorRoot, source);
+        if (note && !draft) { setEditorBase(source, note.content); inspectorBases.set(node.id, note.content_hash); }
         bindNoteReferences(form, editorRoot, note?.id);
       }
       let savedTitle = note?.title || node.title;
@@ -1117,7 +1129,28 @@ export function bindCanvasEditors(root) {
             if (!title || (node.type === "link" && !canvasWebUrl(String(data.url || "")))) throw new Error(!title ? "Enter a title to save your changes" : "Enter an http or https web address");
             if (!content.nodes.includes(node)) return;
             if (note) {
-              const saved = await api<Note>(`/notes/${note.id}`, { method: "PATCH", body: JSON.stringify({ title, content: data.content }) });
+              // Changed elsewhere since the inspector opened (an agent, another window): never write over it.
+              const latest = state.notes.find(item => item.id === note.id);
+              const reload = async () => {
+                canvasDetailSaves.delete(detailKey); inspectorDrafts.delete(node.id);
+                const fresh = await api<Note>(`/notes/${note.id}`);
+                Object.assign(note, fresh);
+                if (latest && latest !== note) Object.assign(latest, fresh);
+                inspectorBases.set(node.id, fresh.content_hash);
+                if (source?.isConnected && editorRoot) setMarkdownBlockEditorContent(editorRoot, source, fresh.content, null, null, true);
+                showStatus("Changed elsewhere · reloaded");
+                toast("This note was changed by an agent or elsewhere: the card now shows that version.", "error");
+              };
+              if (latest && data.content !== latest.content && changedSinceBase(source, latest.content)) return reload();
+              let saved: Note;
+              try {
+                saved = await api<Note>(`/notes/${note.id}`, { method: "PATCH", body: JSON.stringify({ title, content: data.content, expected_hash: inspectorBases.get(node.id) ?? note.content_hash }) });
+              } catch (error) {
+                if ((error as { status?: number }).status === 409) return reload();
+                throw error;
+              }
+              setEditorBase(source, saved.content);
+              inspectorBases.set(node.id, saved.content_hash);
               // A late response must never replace newer text or reset the cursor.
               if (canvasDetailSaves.get(detailKey) === entry) Object.assign(note, saved);
               if (savedTitle !== title) { savedTitle = title; await refreshWorkspaceTreeOnly(); }
@@ -1170,6 +1203,18 @@ export function bindCanvasEditors(root) {
         catch (error) { toast(error.message, "error"); }
       });
       if (!isNewLink) {
+        form.querySelector("[data-canvas-open-tab]")?.addEventListener("click", async () => {
+          try { await flushCanvasSaves(); } catch { showStatus("Save failed · click to retry", true); return; }
+          // Full size, in a new tab of the pane holding this canvas.
+          const pane = (container.closest("[data-workspace-pane]") as HTMLElement | null)?.dataset.workspacePane || "primary";
+          if (note) {
+            const fresh = await reloadNoteForOpen(note.id);
+            if (fresh) { replaceActiveWorkspaceTab(pane, workspaceNoteTab(fresh), true); rerenderNotesContext(); }
+            return;
+          }
+          const { openCollectionInNotes } = await import("../collections/noteEditor");
+          await openCollectionInNotes({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId }, { newTab: true, pane });
+        });
         form.querySelector("[data-card-open-resource]")?.addEventListener("click", async () => {
           try { await flushCanvasSaves(); } catch { showStatus("Save failed · click to retry", true); return; }
           const onSaved = async () => { const item = findCollectionItem({ type: node.collectionType, id: node.recordId, databaseId: node.databaseId }); if (item) Object.assign(node, collectionItemCanvasPayload(item)); renderNodes(); queueSave(); editCardDetails(node); };

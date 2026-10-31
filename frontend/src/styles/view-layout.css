@@ -195,20 +195,24 @@
 .research-shell .discovery-view .view-panel-head .library-search { width: 220px; height: 28px; min-height: 28px; margin: 0; }
 .research-shell .discovery-view .view-panel-head .library-select select { height: 28px; min-height: 28px; font-size: 12px; }
 
-/* Collection item editor: an overlay over the list, 40% wide by default, resizable and expandable. */
+/* The side panel of every view (collection items, tasks, events, articles, journals): one look everywhere,
+   a card floating over the right of its view, 55% wide by default, resizable and expandable. */
 .research-shell .collection-split, .research-shell .collection-split.has-panel { position: relative; display: flex; align-items: stretch; gap: 0; grid-template-columns: none; }
 .research-shell .collection-split > .collection-split-main { flex: 1; min-width: 0; min-height: 0; display: flex; }
-.research-shell .overlay-panel { position: absolute; z-index: 30; top: 60px; right: 0; bottom: 0; height: auto; min-height: 0; min-width: 320px; max-width: 100%; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+.research-shell .overlay-panel { position: absolute; z-index: 30; top: 8px; right: 8px; bottom: 8px; height: auto; min-height: 0; min-width: 320px; max-width: calc(100% - 16px); display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 10px 32px color-mix(in srgb, var(--ink) 12%, transparent); overflow: hidden; }
+.research-shell .overlay-panel.is-expanded { left: 8px; width: auto !important; }
 .research-shell .overlay-panel-resizer { position: absolute; z-index: 2; top: 0; bottom: 0; left: 0; width: 6px; cursor: col-resize; touch-action: none; }
 .research-shell .overlay-panel-resizer:hover, .research-shell .overlay-panel-resizer:focus-visible { background: color-mix(in srgb, var(--accent) 35%, transparent); outline: none; }
 .research-shell .overlay-panel.is-expanded .overlay-panel-resizer { cursor: default; }
-.research-shell .overlay-panel-actions { display: flex; align-items: center; gap: 6px; min-height: 38px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--line); }
+.research-shell .overlay-panel-actions { display: flex; flex-shrink: 0; align-items: center; gap: 4px; min-height: 38px; padding: 4px 8px 4px 14px; border-bottom: 1px solid var(--line); background: var(--surface); }
+.research-shell .overlay-panel-actions .icon-button { display: grid; width: 28px; height: 28px; padding: 0; place-items: center; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
+.research-shell .overlay-panel-actions .icon-button:hover { background: var(--hover); color: var(--ink); }
 .research-shell .overlay-panel-title { margin-right: auto; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .03em; text-transform: uppercase; }
 .research-shell .overlay-panel-actions .icon-button[aria-pressed="true"] { background: var(--accent-soft); color: var(--accent); }
 .research-shell .overlay-panel-body { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow-y: auto; }
 .research-shell .overlay-panel-body > .collection-record-editor { flex: 1; min-height: 0; }
 @media (max-width: 820px) {
-  .research-shell .overlay-panel { width: 100% !important; min-width: 0; }
+  .research-shell .overlay-panel { left: 0; right: 0; top: 0; bottom: 0; width: auto !important; max-width: none; min-width: 0; border-radius: 0; }
 }
 .research-shell .view-pagination.is-idle { visibility: hidden; }
 /* A collection browser is the page body: it fills the height left under the header so its pages can fit. */

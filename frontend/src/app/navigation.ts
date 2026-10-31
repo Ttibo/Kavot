@@ -2,17 +2,15 @@ import { refreshCanvasCollections } from '../features/collections/canvasCollecti
 import { api } from '../services/api';
 import { applyFontSizes } from './typography';
 import { applyColors } from './colors';
-import { flushReaderAutosave, main, setInterfaceTheme, state } from './state';
-import { renderDatabaseCollection, renderSidebarCollections } from '../features/collections/catalog';
+import { flushReaderAutosave, main, setInterfaceTheme, state, viewShown } from './state';
+import { renderSidebarCollections } from '../features/collections/catalog';
 import { flushCurrentNoteAutosave, flushSecondaryNoteAutosave, flushWorkspaceMarkdownSaves, renderNotes } from '../features/documents/workspace';
 import { flushCanvasSaves, refreshCanvasTemplatePresentation } from '../features/documents/canvas';
-import { renderDashboard, renderProjects } from './viewActions';
-import { showView } from './viewBridge';
-import { renderPapers } from '../features/library/filters';
-import { renderTasks } from '../features/tasks/actions';
-import { renderCalendar } from '../features/calendar/actions';
-import { renderConferences, renderDatasets } from '../features/research/actions';
-import { renderSettings } from '../features/settings/actions';
+import { publish } from './viewBridge';
+import { applyScopeFilters } from './scope';
+import { ensureEditor, openPage } from './tabs/pages';
+import { canonicalView, isPage } from './pages';
+import { openSettings } from '../features/settings/actions';
 
 export function toast(message, type = "success") {
   const item = document.createElement("div");
@@ -62,7 +60,7 @@ export function refreshData(): Promise<void> {
 /** Reload only the collections a mutation can change, instead of the whole workspace. */
 export async function refreshState(sources: StateSource[]) {
   const keys = new Set<StateSource>(sources);
-  if (state.view === "dashboard") keys.add("dashboard");
+  if (viewShown("dashboard")) keys.add("dashboard");
   const loaded = await Promise.all([...keys].map(async (key) => [key, await api(stateSources[key])] as const));
   Object.assign(state, Object.fromEntries(loaded));
   if (keys.has("databases")) await loadDatabaseRecords(state.databases);
@@ -97,6 +95,7 @@ async function loadAllData() {
   applyFontSizes(preferences?.font_sizes);
   applyColors(preferences);
   await loadDatabaseRecords(state.databases);
+  applyScopeFilters();
   refreshCanvasTemplatePresentation();
   refreshCanvasCollections();
   renderSidebarCollections();
@@ -109,83 +108,44 @@ async function loadAllData() {
   });
 }
 
-export function setActiveNavigation(view) {
-  document
-    .querySelectorAll("[data-nav]")
-    .forEach((button) =>
-      button.classList.toggle("active", (button as HTMLElement).dataset.nav === view),
-    );
+/** The sidebar highlights the current view from the state: it only needs to redraw. */
+export function setActiveNavigation(_view?) {
+  publish();
 }
 
-export async function navigate(view, options: { preserveProjectContext?: boolean } = {}) {
+/** Opens a page of the application as a tab of the editor (in the active tab, a new one, or the other pane),
+ * or shows the editor itself (`notes`). Settings open in their window. */
+export async function navigate(view, options: { preserveProjectContext?: boolean; newTab?: boolean; beside?: boolean } = {}) {
   await flushCurrentNoteAutosave();
   await flushSecondaryNoteAutosave();
   await flushReaderAutosave();
   await flushWorkspaceMarkdownSaves();
   await flushCanvasSaves();
-  if (view === "projects") view = "notes";
-  if (view === "discovery") view = "papers";
-  if (view === "article-watch") view = "watchers";
-  const preserveProjectContext = options.preserveProjectContext === true;
-  // Leaving for another view, or opening the Workspace itself, ends the project mode.
-  if (!preserveProjectContext || view !== "notes") state.projectWorkspaceId = null;
-  state.view = view;
+  view = canonicalView(view);
+  if (view === "settings") return openSettings();
   if (view !== "papers") state.libraryReadingPaperId = null;
-  if (!preserveProjectContext) {
+  if (!options.preserveProjectContext) {
     state.selectedProject = null;
-    state.taskProjectFilter = "all";
-    state.paperProjectFilter = "all";
-    state.conferenceProjectFilter = "all";
-    state.datasetProjectFilter = "all";
-    state.calendarProjectFilter = "all";
+    // Pages open filtered on the project of the sidebar scope, or on the whole workspace.
+    applyScopeFilters();
     state.paperProjectContext = null;
-    if (view === "notes") {
-      state.noteScope = "general";
-      state.noteFolderId = "all";
-      state.currentNoteId = null;
-      state.primaryResource = null;
-      state.secondaryResource = null;
-      state.workspaceTabs.primary = [];
-      state.workspaceTabs.secondary = [];
-      state.workspaceActiveTabs.primary = null;
-      state.workspaceActiveTabs.secondary = null;
-      state.activeNotePane = "primary";
-      state.expandedWorkspacePaths.add("notes/general");
-    }
   }
-  main.classList.remove(
-    "reader-mode",
-    "notes-mode",
-    "tasks-mode",
-    "calendar-mode",
-    "overview-mode",
-  );
-  setActiveNavigation(view);
   // The React shell can be reconciling while a navigation command is handled.
   // Closing the mobile drawer is cosmetic, so it must never abort navigation
   // when the sidebar has briefly been detached.
   document.querySelector("#sidebar")?.classList.remove("open");
-  if (view === "dashboard") state.dashboard = await api("/dashboard");
+  if (isPage(view)) {
+    if (view === "dashboard") state.dashboard = await api("/dashboard");
+    return openPage(view, { collectionId: view === "database" ? state.collectionId : undefined, newTab: options.newTab, beside: options.beside });
+  }
+  // The editor keeps its open tabs: the explorer of the sidebar opens documents into them.
+  state.expandedWorkspacePaths.add("notes/general");
   render();
   (main as HTMLElement).focus();
 }
 
+/** Redraws the main area: the editor and its tabs (pages in tabs refresh with it). */
 export function render() {
-  const renderers = {
-    dashboard: renderDashboard,
-    projects: renderProjects,
-    papers: renderPapers,
-    watchers: () => showView("watchers"),
-    workflows: () => showView("workflows"),
-    chat: () => showView("chat"),
-    trash: () => showView("trash"),
-    tasks: renderTasks,
-    notes: renderNotes,
-    calendar: renderCalendar,
-    database: renderDatabaseCollection,
-    conferences: renderConferences,
-    datasets: renderDatasets,
-    settings: renderSettings,
-  };
-  (renderers[state.view] || renderDashboard)();
+  ensureEditor();
+  renderNotes();
 }

@@ -296,6 +296,10 @@
 .rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > label { display: flex; align-items: center; justify-content: center; height: 1.65em; width: 16px; padding: 0; margin: 0; }
 .rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > label input { width: 14px; height: 14px; margin: 0; padding: 0; accent-color: var(--accent); }
 .rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > div { min-width: 0; }
+/* Task items without TipTap's label (written by an agent): the text keeps the second column. */
+.rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > :not(label, input) { grid-column: 2; min-width: 0; }
+.rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > span:empty { display: none; }
+.rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > input { width: 14px; height: 14px; margin: calc((1.65em - 14px) / 2) 0 0; accent-color: var(--accent); }
 .rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > div > p:first-child { margin-top: 0; }
 .rich-editor :is(.rich-content, .continuous-reading) li[data-type="taskItem"] > div > p:last-child { margin-bottom: 0; }
 .rich-editor :is(.rich-content, .continuous-reading) a { color: var(--accent); text-decoration: underline; text-underline-offset: 3px; }

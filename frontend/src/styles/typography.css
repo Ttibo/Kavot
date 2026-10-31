@@ -10,7 +10,7 @@ html[data-font-editor] :is(.continuous-reading, .markdown-preview, .markdown-blo
 html[data-font-editor] :is(.continuous-reading, .markdown-preview, .markdown-block-render, .relational-note-content) h3 { font-size: 1.3em; }
 html[data-font-tables] :is(.workspace-data-table, .review-data-table, .library-table, .data-table) :is(th, td, input, button),
 html[data-font-tables] :is(.collection-item-row strong, .collection-item-row small, .task-list-title strong, .task-list-title small, .resource-card h3) { font-size: var(--font-tables) !important; }
-html[data-font-assistant] .agent-panel :is(.markdown-preview, .assistant-message, .agent-message, textarea, .chat-message, .message-content) { font-size: var(--font-assistant) !important; }
+html[data-font-assistant] .agent-surface :is(.markdown-preview, .assistant-message, .agent-message, textarea, .chat-message, .message-content) { font-size: var(--font-assistant) !important; }
 .typography-settings fieldset { border: 0; padding: 0; margin: 18px 0; display: grid; gap: 14px; min-width: 0; }
 .typography-setting { display: grid; grid-template-columns: minmax(0, 1fr) auto 50px; gap: 12px; align-items: center; }
 .typography-setting small { display: block; margin-top: 4px; color: var(--muted); }
