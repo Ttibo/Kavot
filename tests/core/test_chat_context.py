@@ -8,24 +8,19 @@ def test_chat_without_picks_has_no_automatic_sources(client):
     assert resources == [] and snapshot["sources"] == []
 
 
-def test_picked_articles_and_collection_become_the_context(client):
+def test_picked_articles_become_the_context(client):
     first = client.post("/api/papers", data={"title": "Picked article", "abstract": "About ice."})
     assert first.status_code in (200, 201), first.text
     picked = first.json()
     client.post("/api/papers", data={"title": "Other article"})
-    client.post("/api/databases", json={"id": "samples", "name": "Samples", "record_kind": "sample"})
-    client.post("/api/databases/samples/records", json={"values": {"title": "Core A"}})
-    focus = [{"kind": "article", "title": "Picked article", "ref": f"kavot://articles/{picked['id']}"},
-             {"kind": "collection", "title": "Samples", "ref": "kavot://collections/samples"}]
-    snapshot, _, _ = agent_context.prepare({"area": "chat", "view": "chat", "paper_ids": [picked["id"]],
-                                            "collection_id": "samples", "picked_collection": True, "focus": focus}, "question")
+    focus = [{"kind": "article", "title": "Picked article", "ref": f"kavot://articles/{picked['id']}"}]
+    snapshot, _, _ = agent_context.prepare({"area": "chat", "view": "chat", "paper_ids": [picked["id"]], "focus": focus}, "question")
     assert [p["title"] for p in snapshot["records"]["papers"]] == ["Picked article"]
-    assert [r["values"]["title"] for r in snapshot["records"]["collection"]] == ["Core A"]
     assert snapshot["focus"] == focus
 
 
 def test_the_prompt_names_the_picked_context():
-    from app.core.agents.sessions import focus_lines
+    from app.core.agents.prompt import focus_lines
     lines = focus_lines([{"kind": "article folder", "title": "Methods", "count": 3},
                          {"kind": "project", "title": "Reefs", "ref": "kavot://projects/2"}, "ignored"])
     assert lines == ["- article folder: Methods (3 items)", "- project: Reefs — kavot://projects/2"]

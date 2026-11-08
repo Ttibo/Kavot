@@ -43,9 +43,6 @@ export function subscribeSheet(listener: (spec: SheetSpec | null) => void) {
 }
 
 function emit(spec: SheetSpec | null) { listeners.forEach(listener => listener(spec)); }
-
-export function currentSheet() { return current?.spec || null; }
-
 /** Show a record in the side panel; the open one may ask to save first. */
 export async function openSheet(spec: SheetSpec) {
   if (current?.spec.key === spec.key) return true;

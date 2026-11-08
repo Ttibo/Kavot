@@ -2,7 +2,7 @@
 import sys
 import time
 
-from app.core.agents import install, sessions
+from app.core.agents import engines, install
 
 
 def _wait(job_id: str) -> dict:
@@ -22,7 +22,7 @@ def _use(monkeypatch, code: str) -> None:
 
 def test_install_reports_output_and_detected_program(monkeypatch):
     _use(monkeypatch, "print('\\x1b[32mdownloading\\x1b[0m'); print('installed')")
-    monkeypatch.setattr(sessions, "_resolve_executable", lambda engine, configured="": "/bin/codex")
+    monkeypatch.setattr(engines, "resolve_executable", lambda engine, configured="", shims=True: "/bin/codex")
     assert install.plan("codex")["available"]
     job = _wait(install.start("codex")["id"])
     assert job["status"] == "done" and job["path"] == "/bin/codex"

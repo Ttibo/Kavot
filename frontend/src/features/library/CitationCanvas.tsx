@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import ForceGraph2D, { type ForceGraphMethods, type NodeObject } from 'react-force-graph-2d';
 
 export type CitationNode = { id: string; title: string; authors: string[]; year?: number; doi?: string; openalex_id?: string; abstract?: string; publication?: string; url?: string; pdf_url?: string; paper_id?: number; relation: string; cited_by_count?: number; sources?: string[]; lookup_errors?: string[] };
@@ -17,6 +17,31 @@ function readPins(key: string): Pins {
   } catch { return {}; }
 }
 
+type Palette = { focus: string; reference: string; citation: string; link: string; surface: string; active: string; ink: string; subtle: string };
+const fallback: Palette = { focus: '#1f8a5b', reference: '#3f7cac', citation: '#b9731c', link: '#9aa3ad', surface: '#ffffff', active: '#e6f4ec', ink: '#222222', subtle: '#8a8a8a' };
+
+/** The graph is drawn on a canvas: read the theme tokens, and read them again when the theme changes. */
+function useGraphPalette(host: RefObject<HTMLElement | null>): Palette {
+  const [palette, setPalette] = useState(fallback);
+  useEffect(() => {
+    const read = () => {
+      if (!host.current) return;
+      const style = getComputedStyle(host.current);
+      const token = (name: string, otherwise: string) => style.getPropertyValue(name).trim() || otherwise;
+      setPalette({ focus: token('--graph-focus', fallback.focus), reference: token('--graph-reference', fallback.reference), citation: token('--graph-citation', fallback.citation),
+        link: token('--graph-link', fallback.link), surface: token('--surface', fallback.surface), active: token('--accent-soft', fallback.active),
+        ink: token('--ink', fallback.ink), subtle: token('--subtle', fallback.subtle) });
+    };
+    read();
+    const observer = new MutationObserver(read);
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme', 'class', 'style'] });
+    // Custom accent colours are written into a <style> element.
+    observer.observe(document.head, { childList: true, subtree: true, characterData: true });
+    return () => observer.disconnect();
+  }, [host]);
+  return palette;
+}
+
 export function CitationCanvas({ focus, nodes, edges, selectedId, onSelect }: {
   focus: CitationNode; nodes: CitationNode[]; edges?: CitationEdge[]; selectedId?: string; onSelect: (node: CitationNode) => void;
 }) {
@@ -30,6 +55,7 @@ export function CitationCanvas({ focus, nodes, edges, selectedId, onSelect }: {
   const fitPending = useRef(true);
   const userArranged = useRef(false);
   const [size, setSize] = useState({ width: 600, height: 600 });
+  const palette = useGraphPalette(host);
   const graphData = useMemo(() => {
     const radius = Math.max(500, Math.sqrt(nodes.length) * 240);
     const visibleIds = new Set([focus.id, ...nodes.map(node => node.id)]);
@@ -124,21 +150,25 @@ export function CitationCanvas({ focus, nodes, edges, selectedId, onSelect }: {
       context.fillStyle = hitColor;
       context.fillRect(x - labelWidth / 2, y - 14 / scale, labelWidth, 62 / scale);
     } else {
-      const color = isFocus ? '#61c5d9' : node.relation === 'citation' ? '#c98a37' : '#578b9b';
+      const color = isFocus ? palette.focus : node.relation === 'citation' ? palette.citation : palette.reference;
       context.beginPath(); context.arc(x, y, radius + 5 / scale, 0, Math.PI * 2);
-      context.fillStyle = active ? '#d6f4fa' : '#ffffff'; context.fill();
+      context.fillStyle = active ? color : palette.surface; context.fill();
+      if (active) { context.beginPath(); context.arc(x, y, radius + 3 / scale, 0, Math.PI * 2); context.fillStyle = palette.surface; context.fill(); }
       context.beginPath(); context.arc(x, y, radius, 0, Math.PI * 2);
       context.fillStyle = color; context.fill();
       if (node.fx != null) {
         context.beginPath(); context.arc(x, y, 2.5 / scale, 0, Math.PI * 2);
-        context.fillStyle = '#ffffff'; context.fill();
+        context.fillStyle = palette.surface; context.fill();
       }
-      context.fillStyle = active ? '#e9f8fb' : 'rgba(255, 255, 255, .94)';
+      context.fillStyle = active ? palette.active : palette.surface;
+      context.globalAlpha = active ? 1 : .94;
       context.beginPath(); context.roundRect(x - labelWidth / 2, y + 15 / scale, labelWidth, 34 / scale, 5 / scale); context.fill();
+      context.globalAlpha = 1;
+      if (active) { context.strokeStyle = color; context.lineWidth = 1 / scale; context.stroke(); }
       context.textAlign = 'center'; context.textBaseline = 'middle';
-      context.fillStyle = '#283345'; context.fillText(title, x, y + 26 / scale);
+      context.fillStyle = palette.ink; context.fillText(title, x, y + 26 / scale);
       context.font = `500 ${11 / scale}px system-ui, sans-serif`;
-      context.fillStyle = '#68778a'; context.fillText(String(node.year || 'Year unknown'), x, y + 40 / scale);
+      context.fillStyle = palette.subtle; context.fillText(String(node.year || 'Year unknown'), x, y + 40 / scale);
     }
     context.restore();
   }
@@ -146,14 +176,14 @@ export function CitationCanvas({ focus, nodes, edges, selectedId, onSelect }: {
   return <div className="citation-map">
     <div className="citation-map-toolbar" role="toolbar" aria-label="Graph controls">
       <div className="citation-zoom-controls"><button aria-label="Zoom out" title="Zoom out" onClick={() => zoom(1 / 1.25)}>−</button><button aria-label="Zoom in" title="Zoom in" onClick={() => zoom(1.25)}>+</button></div>
-      <button onClick={fit}>Fit view</button><button onClick={reset} title="Release pinned articles and arrange the graph again">Reset layout</button>
+      <button onClick={() => { userArranged.current = false; fit(); }} title="Show the whole graph">Fit view</button><button onClick={reset} title="Release pinned articles and arrange the graph again">Reset layout</button>
       <span className="citation-pin-status" role="status">{pinCount ? `${pinCount} pinned` : 'Drag to arrange'}</span>
       {selectedId && pins.current[selectedId] && <button onClick={unpin}>Unpin article</button>}
     </div>
     <div className="citation-canvas" ref={host} onPointerDown={keepView} onWheel={keepView} data-visible-article-ids={nodes.map(node => node.id).join(',')}>
       <ForceGraph2D ref={graph} width={size.width} height={size.height} graphData={graphData}
         enableNodeDrag nodeRelSize={7}
-        linkColor={() => '#8795a6'} linkWidth={1.2} backgroundColor="rgba(0,0,0,0)"
+        linkColor={() => palette.link} linkWidth={1.2} backgroundColor="rgba(0,0,0,0)"
         linkCanvasObjectMode={() => 'after'} linkCanvasObject={(edge, context, scale) => {
           const source = edge.source as GraphNode, target = edge.target as GraphNode;
           if (source.x == null || source.y == null || target.x == null || target.y == null) return;
@@ -163,7 +193,7 @@ export function CitationCanvas({ focus, nodes, edges, selectedId, onSelect }: {
           context.save();
           context.translate(source.x + dx * 0.7, source.y + dy * 0.7);
           context.rotate(Math.atan2(dy, dx));
-          context.fillStyle = '#8795a6';
+          context.fillStyle = palette.link;
           context.beginPath(); context.moveTo(5 / scale, 0);
           context.lineTo(-5 / scale, -4 / scale); context.lineTo(-5 / scale, 4 / scale);
           context.closePath(); context.fill(); context.restore();

@@ -6,6 +6,7 @@ export const iconPaths: Record<string, string> = {
   workflow: 'M3 4h6v5H3zM15 4h6v5h-6zM9 15h6v5H9zM9 6.5h6M6 9v3.5h6V15M18 9v3.5h-6',
   projects: 'M3 5h7l2 3h9v12H3zM8 12h8M12 10v7',
   notes: 'M6 3h8l4 4v14H6zM14 3v5h4M9 12h6M9 16h6',
+  noteplus: 'M6 3h8l4 4v14H6zM14 3v5h4M12 10v7M8.5 13.5h7',
   papers: 'M5 4h14v17H5zM8 4V2h8v2M8 9h8M8 13h8M8 17h5',
   tasks: 'M8 4h12v16H4V8M2 4l3 3 5-5M8 11h8M8 16h8',
   calendar: 'M4 5h16v16H4zM8 2v6M16 2v6M4 10h16M8 14h2M14 14h2',

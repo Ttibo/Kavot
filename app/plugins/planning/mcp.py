@@ -8,7 +8,7 @@ from pydantic import Field
 
 
 def install(ctx) -> None:
-    from app.core.agents import collections
+    from app.mcp import collections
     from app.core.records.repository import store
     from app.plugins.planning import calendar
 

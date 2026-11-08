@@ -1,20 +1,13 @@
-import { flushCollectionSaves, openCollectionInNotes } from './noteEditor';
-import { escapeHtml, state, truncate } from '../../app/state';
-import { formatLibraryDate } from '../library/filters';
-import { openModal } from '../../components/dialogs/controller';
+import { openCollectionInNotes } from './noteEditor';
+import { state } from '../../app/state';
 import { navigate, toast } from '../../app/navigation';
 import { paperPdfUploadModal, previewPaperPdfModal } from '../library/documents';
 import { newTaskModal } from '../tasks/dialogs';
-import { publish, showView } from '../../app/viewBridge';
 
-/** Readable text of a note that may be stored as HTML, for previews. */
-function plainText(value: unknown) {
-  const text = String(value ?? "");
-  if (!/<[a-z][\s\S]*>/i.test(text)) return text;
-  return new DOMParser().parseFromString(text, "text/html").body.textContent?.replace(/\s+/g, " ").trim() || "";
-}
+/** The items of the workspace a note, a canvas or a script can point to: notes, articles and tasks.
+ * (The name "collection" stays in the drag payloads and links already stored in notes and canvases.) */
 
-export function collectionDatabaseDefinitions() {
+function collectionDatabaseDefinitions() {
   return (state.databases || []).filter((database) => database.id !== "notes");
 }
 
@@ -44,38 +37,7 @@ export function collectionItems(databaseId) {
       meta: task.status || "todo",
       source: task,
     }));
-  if (databaseId === "conferences")
-    return state.conferences.map((conference) => ({
-      id: conference.id,
-      type: "conference",
-      databaseId,
-      title: conference.acronym || conference.name,
-      detail: conference.name,
-      meta: conference.starts_at || conference.status || "watching",
-      source: conference,
-    }));
-  if (databaseId === "datasets")
-    return state.datasets.map((dataset) => ({
-      id: dataset.id,
-      type: "dataset",
-      databaseId,
-      title: dataset.name,
-      detail: dataset.description || dataset.url || "Dataset",
-      meta: dataset.access_status || "available",
-      source: dataset,
-    }));
-  return (state.databaseRecords?.[databaseId] || []).map((record) => {
-    const values = record.values || {};
-    return {
-      id: record.id,
-      type: "record",
-      databaseId,
-      title: values.title || values.name || values.subject || `Record ${String(record.id).slice(0, 8)}`,
-      detail: plainText(values.content || values.description || values.body || values.from) || "Local record",
-      meta: record.updated_at ? formatLibraryDate(record.updated_at) : "local",
-      source: record,
-    };
-  });
+  return [];
 }
 
 export function collectionDragPayload(type, id, databaseId = "") {
@@ -93,7 +55,7 @@ export function parseCollectionDragPayload(value) {
   }
 }
 
-export function collectionItemCanvasPayload(item, representation = "note") {
+export function collectionItemCanvasPayload(item, _representation = "note") {
   if (!item) return null;
   if (item.type === "note") return {
     type: "note", noteId: item.id, templateId: item.source.template_id,
@@ -119,9 +81,9 @@ export function collectionItemCanvasPayload(item, representation = "note") {
     recordId: item.id,
     title: item.title,
     detail: item.detail,
-    status: source.status || source.access_status || "",
+    status: source.status || "",
     projectIds: source.project_ids || (source.project_id ? [source.project_id] : []),
-    url: source.url || source.values?.url || "",
+    url: source.url || "",
   };
 }
 
@@ -131,66 +93,34 @@ export function findCollectionItem(reference) {
     note: "notes",
     paper: "articles",
     task: "tasks",
-    conference: "conferences",
-    dataset: "datasets",
   }[reference.type];
   return collectionItems(databaseId).find(
     (item) => item.type === reference.type && String(item.id) === String(reference.id),
   ) || null;
 }
 
-function showGenericCollectionRecord(item) {
-  const values = item?.source?.values || {};
-  const fields = Object.entries(values)
-    .map(([key, value]) => `<div class="collection-record-field"><small>${escapeHtml(key)}</small><p>${escapeHtml(Array.isArray(value) ? value.join(", ") : typeof value === "object" ? JSON.stringify(value, null, 2) : String(value ?? ""))}</p></div>`)
-    .join("");
-  openModal(`<header class="modal-header"><h2>${escapeHtml(item?.title || "Record")}</h2><p>${escapeHtml(item?.databaseId || "Collection")}</p></header><div class="modal-body collection-record-detail">${fields || "<p>This record is empty.</p>"}<div class="form-actions"><button class="button" data-close-modal>Close</button></div></div>`, true);
-}
-
-const PAGE_VIEWS: Record<string, string> = { conference: "conferences", dataset: "datasets", record: "database" };
-
-/** Opens an item in the side panel of its collection page, beside the list. */
-export async function openCollectionPanel(reference) {
-  const databaseId = reference.databaseId || { conference: "conferences", dataset: "datasets" }[reference.type];
-  const next = { type: reference.type, id: reference.id, databaseId };
-  if (!findCollectionItem(next)) return toast("Item not found", "error");
-  await flushCollectionSaves();
-  state.collectionPanel = next;
-  publish();
-}
-
+/** Opens an item: as a tab of the editor from the notes, otherwise in its own dialog (a task) or its PDF (an article). */
 export function openCollectionItem(reference) {
-  // On the page of its collection, an item opens in the side panel; elsewhere it opens as a note.
-  const page = PAGE_VIEWS[reference.type];
-  if (page && state.view === page && (page !== "database" || state.collectionId === reference.databaseId)) return openCollectionPanel(reference);
-  const custom = state.databases.some(database => database.id === reference.databaseId && database.storage?.driver === 'json-files');
-  if (custom || state.view === "notes" || ["conference", "dataset"].includes(reference.type)) return openCollectionInNotes(reference);
+  if (state.view === "notes") return openCollectionInNotes(reference);
   const item = findCollectionItem(reference);
-  if (!item) return toast("Collection item not found", "error");
+  if (!item) return toast("Item not found", "error");
   if (item.type === "paper")
     return item.source.file_path
       ? previewPaperPdfModal(Number(item.id))
       : paperPdfUploadModal(Number(item.id));
   if (item.type === "task") return newTaskModal(null, null, Number(item.id));
-  return showGenericCollectionRecord(item);
+  return openCollectionInNotes(reference);
 }
 
-export function collectionItemRow(item, compact = false) {
-  const payload = collectionDragPayload(item.type, item.id, item.databaseId);
-  return `<div class="collection-item-row ${compact ? "compact" : ""}" draggable="true" data-collection-drag="${escapeHtml(payload)}"><span class="collection-item-grip" title="Drag to a project canvas">⠿</span><button data-collection-open="${escapeHtml(payload)}"><strong>${escapeHtml(item.title)}</strong><small>${escapeHtml(truncate(item.detail || "", compact ? 52 : 130))}</small></button><i>${escapeHtml(item.meta || "")}</i>${compact ? "" : `<button data-workspace-row-menu aria-label="Actions de ${escapeHtml(item.title)}">•••</button>`}</div>`;
-}
-
+/** Opens the page of a kind of item (older "#collection/<id>" links). */
 export async function openCollectionDatabase(databaseId, options: { newTab?: boolean; beside?: boolean } = {}) {
   if (databaseId === "notes") return navigate("notes");
   const database = collectionDatabaseDefinitions().find(
     (item) => item.id === databaseId,
   );
-  if (!database) return toast("Database not found", "error");
-  state.collectionId = databaseId;
-  const view = { articles: "papers", tasks: "tasks", conferences: "conferences", datasets: "datasets" }[databaseId] || "database";
+  if (!database) return toast("Not found", "error");
+  const view = { articles: "papers", tasks: "tasks" }[databaseId] || "notes";
   return navigate(view, options);
 }
 
-export function renderSidebarCollections() { publish(); }
 
-export function renderDatabaseCollection() { showView("database"); }

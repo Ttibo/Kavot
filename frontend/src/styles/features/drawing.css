@@ -89,8 +89,6 @@
 .drawing-note-pane header > div > span { display: grid; place-items: center; width: 38px; height: 38px; border-radius: 10px; color: #b76c12; background: #fff1d8; }
 .drawing-note-pane h2 { margin: 2px 0 0; font-size: 18px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .drawing-note-pane small { color: var(--muted); font-size: 11px; }
-.drawing-note-preview { display: grid; place-items: center; flex: 1; min-height: 200px; overflow: auto; border: 1px solid var(--line); border-radius: 12px; background-color: #f8fafc; background-image: linear-gradient(45deg, #e8edf5 25%, transparent 25%), linear-gradient(-45deg, #e8edf5 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e8edf5 75%), linear-gradient(-45deg, transparent 75%, #e8edf5 75%); background-size: 18px 18px; background-position: 0 0, 0 9px, 9px -9px, -9px 0; cursor: pointer; }
-.drawing-note-preview img { display: block; width: min(100%, 1200px); max-height: 100%; object-fit: contain; }
 .workspace-drawing-label { color: #b76c12; font-weight: 700; }
 @media (max-width: 1100px) { .drawing-menu-hint { display: none; } .drawing-help { max-width: 220px; } }
 @media (max-width: 760px) {

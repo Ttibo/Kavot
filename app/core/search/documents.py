@@ -11,7 +11,9 @@ to the version stored in the index.
 from __future__ import annotations
 
 import hashlib
+import os
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Iterator
 
 PASSAGE_CHARS = 900
@@ -155,9 +157,8 @@ def note_documents(state: dict[str, Any], known: dict[str, str]) -> Iterator[Doc
 
 
 def record_documents(state: dict[str, Any], known: dict[str, str]) -> Iterator[Document]:
-    """Projects, items of plugin collections declared with search_fields, and custom collection items."""
+    """Projects and items of plugin collections declared with search_fields."""
     from app.core.kernel.plugins import load
-    from app.core.records import databases
     for project in state.get("projects", []):
         yield Document(ref("projects", project["id"]), "projects", str(project["id"]), project.get("name", ""),
                        project.get("description", ""), project_ids=[project["id"]], updated_at=project.get("updated_at", ""))
@@ -173,19 +174,6 @@ def record_documents(state: dict[str, Any], known: dict[str, str]) -> Iterator[D
             yield Document(ref(definition["id"], item["id"]), definition["id"], str(item["id"]),
                            str(item.get(title_field) or item.get("name") or item["id"]), text,
                            project_ids=projects_of(item), updated_at=item.get("updated_at", ""))
-    for definition in databases.list_databases():
-        if definition.get("storage", {}).get("driver") != "json-files":
-            continue
-        labels = {f["id"]: f.get("name", f["id"]) for f in definition.get("fields", [])}
-        for record in databases.records(definition["id"]):
-            values = record.get("values", {})
-            title = str(values.get("title") or record.get("title") or record["id"])
-            text = " · ".join(f"{labels.get(k, k)}: {flatten(v)}" for k, v in values.items()
-                              if k not in {"title", "content"} and flatten(v))
-            content = flatten(values.get("content"))
-            yield Document(ref(definition["id"], record["id"]), definition["id"], str(record["id"]), title,
-                           (text + " " + content).strip(), project_ids=projects_of(values),
-                           updated_at=record.get("updated_at", ""))
 
 
 TEXT_FILES = {".md", ".txt"}
@@ -228,13 +216,19 @@ def workspace_files(state: dict[str, Any]) -> Iterator[tuple[str, Any]]:
             continue
     allowed = TEXT_FILES | DATA_FILES | IMAGE_FILES | {".pdf"}
     for folder in FILE_ROOTS:
-        for path in sorted((root / folder).rglob("*")):
-            relative = path.relative_to(root)
-            if (path.suffix.lower() not in allowed or not path.is_file() or path.resolve() in notes
-                    or any(part.startswith(".") for part in relative.parts) or path.name.endswith((".kavot.json", ".generated.html"))
-                    or (relative.parts[0] == "databases" and "items" in relative.parts)):
-                continue
-            yield relative.as_posix(), path
+        found = []
+        # Hidden folders (.trash, .preview…) and database item records are pruned, not walked.
+        for directory, folders, names in os.walk(root / folder):
+            folders[:] = [name for name in folders if not name.startswith(".")
+                          and not (folder == "databases" and name == "items")]
+            for name in names:
+                if (name.startswith(".") or os.path.splitext(name)[1].lower() not in allowed
+                        or name.endswith((".kavot.json", ".generated.html"))):
+                    continue
+                path = Path(directory, name)
+                if path.is_file() and path not in notes:
+                    found.append((path.relative_to(root).as_posix(), path))
+        yield from sorted(found)
 
 
 def file_text(path: Any) -> list[tuple[str, str]]:

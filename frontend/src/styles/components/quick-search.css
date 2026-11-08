@@ -1,0 +1,36 @@
+/* The finder of notes and files: results on the left, a preview of the selected one on the right. */
+.qs-backdrop { position: fixed; z-index: 200; inset: 0; display: flex; align-items: flex-start; justify-content: center; padding-top: 9vh; background: rgba(0, 0, 0, .38); }
+.qs { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); width: min(1100px, calc(100vw - 48px)); height: min(560px, calc(100vh - 14vh)); overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); box-shadow: 0 24px 60px rgba(0, 0, 0, .35); }
+
+.qs-results { display: flex; min-width: 0; min-height: 0; flex-direction: column; border-right: 1px solid var(--line); }
+.qs-input { display: flex; align-items: center; gap: 10px; flex: 0 0 auto; height: 48px; padding: 0 14px; border-bottom: 1px solid var(--line); color: var(--subtle); }
+.qs-input input { flex: 1; min-width: 0; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: var(--ink); font: inherit; font-size: 15px; }
+.qs-input small { flex-shrink: 0; color: var(--subtle); font-size: 11px; font-variant-numeric: tabular-nums; }
+
+.qs-results ul { flex: 1; min-height: 0; margin: 0; padding: 6px; overflow-y: auto; list-style: none; scrollbar-width: thin; }
+.qs-results li { display: grid; grid-template-columns: 16px minmax(0, auto) minmax(0, 1fr) auto; align-items: center; gap: 9px; height: 30px; padding: 0 9px; border-radius: 6px; color: var(--muted); font-size: 13px; cursor: pointer; }
+.qs-results li[aria-selected="true"] { background: var(--accent-soft); color: var(--ink); }
+.qs-results li[aria-selected="true"] > svg { color: var(--accent); }
+.qs-name { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.qs-folder, .qs-line { overflow: hidden; color: var(--subtle); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
+.qs-ext { color: var(--subtle); font-family: ui-monospace, "Cascadia Code", Consolas, monospace; font-size: 10.5px; text-transform: lowercase; }
+.qs mark { padding: 0; border-radius: 2px; background: none; color: var(--accent); font-weight: 700; }
+.qs-results li.qs-none { display: block; height: auto; padding: 18px 10px; color: var(--subtle); cursor: default; }
+
+.qs-results footer { display: flex; flex-wrap: wrap; gap: 4px 14px; flex: 0 0 auto; padding: 8px 14px; border-top: 1px solid var(--line); color: var(--subtle); font-size: 11px; }
+.qs kbd { display: inline-block; min-width: 18px; margin: 0 2px; padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; background: var(--surface-raised, var(--surface)); color: var(--muted); font: 10.5px ui-monospace, Consolas, monospace; text-align: center; }
+
+.qs-preview { display: flex; min-width: 0; min-height: 0; flex-direction: column; background: var(--canvas); }
+.qs-preview header { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; height: 48px; padding: 0 16px; border-bottom: 1px solid var(--line); color: var(--subtle); }
+.qs-preview header strong { overflow: hidden; color: var(--ink); font-size: 13.5px; text-overflow: ellipsis; white-space: nowrap; }
+.qs-preview header small { flex-shrink: 0; margin-left: auto; font-size: 11.5px; }
+.qs-preview pre { flex: 1; min-height: 0; margin: 0; padding: 14px 18px; overflow: auto; color: var(--muted); font: 12.5px/1.6 ui-monospace, "Cascadia Code", Consolas, monospace; white-space: pre-wrap; word-break: break-word; }
+.qs-preview mark { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--ink); font-weight: 600; }
+.qs-preview img { max-width: calc(100% - 32px); max-height: calc(100% - 80px); margin: 16px auto; object-fit: contain; }
+.qs-preview-empty { display: grid; flex: 1; margin: 0; place-items: center; color: var(--subtle); font-size: 13px; }
+
+@media (max-width: 760px) {
+  .qs { grid-template-columns: minmax(0, 1fr); }
+  .qs-preview { display: none; }
+}
+.qs .qs-input input, .qs .qs-input input:focus, .qs .qs-input input:focus-visible { border: 0; outline: 0; box-shadow: none; background: transparent; }

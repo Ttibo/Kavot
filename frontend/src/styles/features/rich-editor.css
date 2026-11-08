@@ -344,12 +344,6 @@
 .rich-reference > header button { border: 0; background: transparent; color: inherit; width: 28px; height: 28px; cursor: pointer; font-size: 20px; }
 .rich-reference-filters { display: grid; grid-template-columns: minmax(0, 1fr) 170px; gap: 8px; margin: 16px 0 10px; }
 .rich-reference.is-collections .rich-reference-filters { grid-template-columns: minmax(0, 1fr); margin-top: 10px; }
-.rich-reference-collections { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
-.rich-reference-collections button { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 10px; border: 1px solid var(--line); border-radius: 99px; background: var(--surface); color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
-.rich-reference-collections button:hover { border-color: var(--line-strong); }
-.rich-reference-collections button[aria-selected="true"] { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); font-weight: 600; }
-.rich-reference-collections small { color: var(--subtle); font-size: 10.5px; font-variant-numeric: tabular-nums; }
-.rich-reference-collections p { margin: 0; color: var(--subtle); font-size: 12px; }
 .rich-reference-filters input, .rich-reference-filters select { width: 100%; max-width: none; min-width: 0; height: 34px; padding: 6px 8px; box-sizing: border-box; font-size: 12px; border: 1px solid var(--line); border-radius: 5px; background: var(--surface); color: inherit; }
 .rich-reference-results { display: grid; gap: 5px; margin-top: 10px; max-height: 340px; overflow: auto; }
 .rich-reference-results > button { display: flex; align-items: center; gap: 10px; width: 100%; border: 1px solid transparent; border-radius: 6px; padding: 9px; background: var(--surface-soft); color: inherit; cursor: pointer; text-align: left; }

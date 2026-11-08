@@ -1,12 +1,13 @@
-import { tokens, totalTokens, type Usage } from '../atelier/types';
+import { billedTokens as totalTokens, tokens, type Usage } from './format';
 import type { Run, Session } from './api';
 
-/** Tokens past which a request, or a whole conversation, is worth flagging (cached tokens included). */
+/** Billed tokens (a cached token counts a tenth) past which a request, or a whole conversation, is worth flagging. */
 export const MESSAGE_WARN = 250_000, MESSAGE_LIMIT = 500_000;
-export const CONVERSATION_WARN = 1_000_000, CONVERSATION_LIMIT = 3_000_000;
+const CONVERSATION_WARN = 1_000_000;
+export const CONVERSATION_LIMIT = 3_000_000;
 
-export type Level = 'ok' | 'warn' | 'over';
-export type Budget = {
+type Level = 'ok' | 'warn' | 'over';
+type Budget = {
   total: number; last: number; level: Level; hue: number; runId?: string;
   /** Which limit is passed: the last request, the conversation, or none. */
   reason?: 'message' | 'conversation';

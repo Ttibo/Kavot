@@ -5,7 +5,7 @@ export type PickedKind = 'project' | 'code' | 'resource' | 'task' | 'note' | 'pa
 export type PickedItem = { key: string; kind: PickedKind; id: string | number; title: string; subtitle?: string; count?: number; project_id?: number };
 /** A folder linked to a project in the Atelier. */
 export type ProjectFolder = { id: string; name: string; path: string; kind?: 'code' | 'resources'; file?: boolean; available: boolean; is_git?: boolean; branch?: string | null };
-export type PickerResource = { id: string; title: string; path: string; kind: string };
+type PickerResource = { id: string; title: string; path: string; kind: string };
 type PickerState = {
   projects?: Project[]; notes?: Note[]; papers?: Paper[]; paperFolders?: PaperFolder[]; noteFolders?: NoteFolder[]; tasks?: any[];
   databases?: Array<{ id: string; name: string; removed?: boolean }>;
@@ -20,7 +20,7 @@ export const KIND_ICONS: Record<PickedKind, string> = {
   note_folder: 'folder', collection: 'database', file: 'local',
 };
 /** Most notes a note folder adds as sources; the agent can still explore the rest. */
-export const FOLDER_NOTE_LIMIT = 40;
+const FOLDER_NOTE_LIMIT = 40;
 
 /** Files the user made or added; Kavot's own metadata and article folders are reached otherwise. */
 const isUserFile = (item: PickerResource) => item.kind !== 'note' && item.kind !== 'paper' && !item.path.startsWith('library/')
@@ -38,12 +38,12 @@ function descendants<T extends { id: number; parent_id: number | null }>(folders
   return found;
 }
 
-export function folderPapers(state: PickerState, folderId: number): Paper[] {
+function folderPapers(state: PickerState, folderId: number): Paper[] {
   const ids = descendants(state.paperFolders || [], folderId);
   return (state.papers || []).filter(paper => [paper.folder_id, ...(paper.folder_ids || [])].some(id => id !== null && id !== undefined && ids.has(id)));
 }
 
-export function folderNotes(state: PickerState, folderId: number): Note[] {
+function folderNotes(state: PickerState, folderId: number): Note[] {
   const ids = descendants(state.noteFolders || [], folderId);
   return (state.notes || []).filter(note => !note.trashed_at && note.folder_id !== null && ids.has(note.folder_id));
 }
@@ -136,7 +136,7 @@ export function filterOptions(options: PickedItem[], query: string, kind: Picked
   return ordered.filter(option => { const seen = perKind.get(option.kind) || 0; perKind.set(option.kind, seen + 1); return seen < 6; }).slice(0, limit);
 }
 
-export type PickedContext = {
+type PickedContext = {
   project_id?: number; project_name?: string; collection_id?: string; picked_collection?: boolean;
   resource_ids: string[]; paper_ids: number[]; focus: Record<string, unknown>[]; note_id: number | null;
   code_folder_ids: string[]; resource_folder_ids: string[];

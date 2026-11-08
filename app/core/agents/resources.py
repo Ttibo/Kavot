@@ -8,20 +8,10 @@ from app.core.kernel.config import settings
 from app.core.kernel.files import prefixed_entry, safe_name
 from app.core.workspace import documents
 from app.core.records.repository import store
+from app.mcp.paths import workspace_file
 
 ALLOWED_EXTENSIONS = {".md", ".html", ".pdf", ".txt", ".canvas", ".json", ".csv"}
 MAX_ATTACHMENT_BYTES = 20 * 1024 * 1024
-
-
-def workspace_file(value: str) -> Path:
-    root = settings.storage_path.resolve()
-    relative = Path(value)
-    if relative.is_absolute() or not relative.parts or relative.parts[0] not in {"notes", "projects", "library", "databases"}:
-        raise HTTPException(422, "Chemin hors du workspace.")
-    target = (root / relative).resolve()
-    if not target.is_relative_to(root):
-        raise HTTPException(422, "Chemin hors du workspace.")
-    return target
 
 
 def inventory() -> list[dict]:
@@ -52,20 +42,26 @@ def inventory() -> list[dict]:
     known = {item["path"] for item in resources.values()}
     for folder in ("notes", "projects", "library", "databases"):
         for path in (root / folder).rglob("*"):
-            if not path.is_file() or path.suffix.lower() not in ALLOWED_EXTENSIONS:
+            # The suffix first: most entries are folders and assets, and every check below touches the disk.
+            if path.suffix.lower() not in ALLOWED_EXTENSIONS or not path.is_file():
                 continue
             resolved = path.resolve()
             if not resolved.is_relative_to(root):
                 continue
             relative = resolved.relative_to(root).as_posix()
             if relative not in known and not any(part.startswith(".") for part in Path(relative).parts):
-                add("file:" + relative, path.name, path.suffix.lower().lstrip("."), path)
+                resources["file:" + relative] = {"id": "file:" + relative, "title": path.name,
+                                                 "kind": path.suffix.lower().lstrip("."), "path": relative}
     return list(resources.values())
 
 
-def resolve_context(context: dict | None) -> tuple[list[dict], dict | None]:
+def resolve_context(context: dict | None, catalog: list[dict] | None = None) -> tuple[list[dict], dict | None]:
+    """The sources a request names (picked files, open note, canvas, open tabs) and its target note.
+
+    ``catalog`` is :func:`inventory`, when the caller already has it.
+    """
     context = context or {}
-    catalog = {item["id"]: item for item in inventory()}
+    catalog = {item["id"]: item for item in (inventory() if catalog is None else catalog)}
     by_path = {item["path"]: item for item in catalog.values()}
     selected: list[dict] = []
     excluded = set(context.get("excluded_resource_ids") or [])

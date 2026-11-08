@@ -41,9 +41,9 @@ async function start() {
     menus.initializeAppContextMenus();
     await runtime.refreshData();
     publish();
-    // The start page opens as the first tab of the editor (Home when the saved view is not a page).
+    // The start page opens as the first tab of the editor (the notes when the saved view is not a page).
     const start = canonicalView(runtime.state.view);
-    await runtime.navigate(isPage(start) || start === 'notes' ? start : 'dashboard');
+    await runtime.navigate(isPage(start) ? start : 'notes');
     cloud.startCloudRefresh(runtime);
   } catch (error) {
     console.error('Unable to initialize Kavot', error);

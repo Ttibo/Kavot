@@ -1,10 +1,11 @@
 import { modal } from '../../app/state';
+import { onDisconnect } from './domLifecycle';
 import { editorSession } from '../../app/editorSession';
 import { closeModal, openModal } from '../../components/dialogs/controller';
-import { drawingEditorMarkup } from './drawingUI';
-import { shapeById } from './drawingShapes';
-import { drawingBounds, bounds, clone, emptyDrawing, isLine, localPoint, normalizePoints, parseDrawing, resizeElement, worldPoint, type Bounds, type DrawingDocument, type DrawingElement, type Point } from './drawingModel';
-import { drawingImage, drawingPreviewPng, hitElement, paintDrawing, prepareDrawingImages } from './drawingRender';
+import { drawingEditorMarkup } from './drawing/ui';
+import { shapeById } from './drawing/shapes';
+import { drawingBounds, bounds, clone, emptyDrawing, isLine, localPoint, normalizePoints, parseDrawing, resizeElement, worldPoint, type Bounds, type DrawingDocument, type DrawingElement, type Point } from './drawing/model';
+import { drawingImage, drawingPreviewPng, hitElement, paintDrawing, prepareDrawingImages } from './drawing/render';
 import '../../styles/features/drawing.css';
 export { emptyDrawing, drawingPreviewPng };
 export type { DrawingDocument };
@@ -513,12 +514,10 @@ export function openDrawingEditor(title: string, initial: DrawingDocument, onCha
   if (host) {
     inlineDrawingFlushes.add(flush);
     // The tab pane may be replaced by a render: save the last edits, then release the editor.
-    const detach = new MutationObserver(() => {
-      if (root.isConnected) return;
-      detach.disconnect(); observer.disconnect(); inlineDrawingFlushes.delete(flush);
+    onDisconnect(root, () => {
+      observer.disconnect(); inlineDrawingFlushes.delete(flush);
       if (revision) void persist();
     });
-    detach.observe(document.body, { childList: true, subtree: true });
   } else {
     editorSession.modalBeforeClose = flush;
     editorSession.modalCleanup = () => { clearTimeout(timer); observer.disconnect(); modal.classList.remove('modal-drawing'); };

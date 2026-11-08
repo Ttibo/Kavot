@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import os
 import re
-import shlex
 import shutil
 import subprocess
 import sys
@@ -137,7 +136,7 @@ def start(engine: str) -> dict:
 
 
 def _run(job: dict, chosen: dict) -> None:
-    from app.core.agents import sessions
+    from app.core.agents.engines import resolve_executable
     environment = {**os.environ, "PATH": search_path(), **chosen.get("env", {})}
     try:
         process = subprocess.Popen(chosen["command"], stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
@@ -156,7 +155,7 @@ def _run(job: dict, chosen: dict) -> None:
             timer.cancel()
         if code:
             raise RuntimeError(f"The installer stopped with code {code}.")
-        path = sessions._resolve_executable(job["engine"])
+        path = resolve_executable(job["engine"])
         if not path:
             raise RuntimeError("The installer finished but the program was not found. Restart Kavot or give its path.")
         job.update(status="done", path=path)
@@ -176,29 +175,15 @@ def get(job_id: str) -> dict:
 
 def login(engine: str) -> dict:
     """Open a terminal window running the CLI's sign-in command."""
-    from app.core.agents import sessions
-    binary = sessions._resolve_executable(engine)
+    from app.core.agents import terminal
+    from app.core.agents.engines import resolve_executable
+    binary = resolve_executable(engine)
     if not binary:
         raise HTTPException(422, "Install the program before signing in.")
     arguments = LOGIN[engine]
     shown = " ".join([Path(binary).stem, *arguments])
     try:
-        if WINDOWS:
-            quoted = "'" + binary.replace("'", "''") + "'"
-            subprocess.Popen(["powershell", "-NoProfile", "-NoExit", "-Command", f"& {quoted} {' '.join(arguments)}"],
-                             creationflags=subprocess.CREATE_NEW_CONSOLE, env={**os.environ, "PATH": search_path()})
-        elif sys.platform == "darwin":
-            script = shlex.join([binary, *arguments]).replace("\\", "\\\\").replace('"', '\\"')
-            subprocess.Popen(["osascript", "-e", f'tell application "Terminal" to do script "{script}"',
-                              "-e", 'tell application "Terminal" to activate'])
-        else:
-            terminal = next((which(name) for name in ("x-terminal-emulator", "gnome-terminal", "konsole", "xterm")
-                             if which(name)), None)
-            if not terminal:
-                raise OSError("No terminal found.")
-            command = f"{shlex.join([binary, *arguments])}; exec \"${{SHELL:-sh}}\""
-            separator = ["--"] if Path(terminal).name == "gnome-terminal" else ["-e"]
-            subprocess.Popen([terminal, *separator, "sh", "-c", command])
+        terminal.open_terminal([binary, *arguments])
     except OSError:
         raise HTTPException(422, f"Unable to open a terminal. Run “{shown}” yourself.") from None
     return {"engine": engine, "command": shown}

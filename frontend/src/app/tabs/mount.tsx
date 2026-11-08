@@ -6,8 +6,7 @@ import '../../styles/components/tabs.css';
 /** The component each React tab kind renders (see kinds.ts), loaded with its first tab. */
 const components: Record<ReactTabKind, () => Promise<ComponentType<any>>> = {
   view: () => import('../../components/PaneView').then(module => module.PaneView),
-  atelier: () => import('../../features/atelier/AtelierPane').then(module => module.AtelierPane),
-  document: () => import('../../features/atelier/WorkspaceDocument').then(module => module.WorkspaceDocument),
+  document: () => import('../../features/documents/WorkspaceDocument').then(module => module.WorkspaceDocument),
 };
 
 /** The editor engine redraws its panes; each React tab placeholder gets its own root. A placeholder kept across

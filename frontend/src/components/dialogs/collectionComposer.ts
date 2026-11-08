@@ -1,4 +1,4 @@
-import { escapeHtml, modal } from '../../app/state';
+import { modal } from '../../app/state';
 import { openModal } from './controller';
 
 /** Shared composition surface for collection records; field names stay API-native. */
@@ -6,11 +6,6 @@ export function collectionField(prefix: string, name: string, label: string, con
   const id = `${prefix}-${name}`;
   return `<div class="form-field collection-field"><label for="${id}">${label}</label>${control.replace(/<(input|select|textarea)\b/, `<$1 id="${id}" name="${name}"${help ? ` aria-describedby="${id}-help"` : ''}`)}${help ? `<small id="${id}-help">${help}</small>` : ''}</div>`;
 }
-
-export function collectionInput(value = '', attributes = '') {
-  return `<input value="${escapeHtml(value)}" ${attributes}>`;
-}
-
 export function openCollectionComposer({ id, title, eyebrow, description, main, details, actions }: {
   id: string; title: string; eyebrow: string; description: string; main: string; details: string; actions: string;
 }) {

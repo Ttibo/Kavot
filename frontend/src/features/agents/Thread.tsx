@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { getRuntime } from '../../app/runtime';
 import { AgentMessageContent } from '../../components/AgentMessageContent';
 import { Icon } from '../../components/Icon';
-import { relative, tokens, totalTokens } from '../atelier/types';
+import { billedTokens as totalTokens, relative, tokens } from './format';
 import { MESSAGE_LIMIT, MESSAGE_WARN, usageOfRun } from './budget';
 import type { AgentEvent, Message, Mode, Proposal, Run, Session } from './api';
 

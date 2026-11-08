@@ -1,4 +1,4 @@
-import { escapeHtml, noteAssetBase, renderMarkdown, state } from '../../app/state';
+import { escapeHtml, state } from '../../app/state';
 import { currentMarkdownBlockInput } from './markdown';
 import { noteContextLabel } from './workspace';
 
@@ -49,20 +49,5 @@ export function bindNoteReferences(root: HTMLElement, editor: HTMLElement, exclu
     if (!input || !picker.classList.contains('hidden')) return;
     const match = input.value.slice(0, input.selectionStart).match(/\[\[([^\]\n]*)$/);
     if (match) open(input.selectionStart - match[0].length, input.selectionStart, match[1]);
-  });
-}
-
-/** Preview references without discarding the task's unsaved form. */
-export function bindTaskReferencePreview(root: HTMLElement) {
-  root.addEventListener('click', event => {
-    const link = (event.target as HTMLElement).closest<HTMLAnchorElement>('a[href^="#note-"]');
-    if (!link) return;
-    event.preventDefault(); event.stopPropagation();
-    const note = state.notes.find(item => item.id === Number(link.getAttribute('href').slice(6)));
-    const preview = root.querySelector<HTMLElement>('[data-task-reference-preview]');
-    preview.hidden = false;
-    preview.innerHTML = `<button type="button" class="button button-small" data-preview-close>Close preview</button><h3>${escapeHtml(note?.title || 'Note unavailable')}</h3><div class="markdown-preview">${note ? renderMarkdown(note.content, noteAssetBase(note)) : 'This note no longer exists.'}</div>`;
-    preview.querySelector('[data-preview-close]').addEventListener('click', () => { preview.hidden = true; });
-    preview.scrollIntoView({ block: 'nearest' });
   });
 }

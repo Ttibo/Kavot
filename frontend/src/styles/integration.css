@@ -1,7 +1,7 @@
+/* Citation graph colours: one per relation, readable in both themes. */
+:root { --graph-focus: var(--accent); --graph-reference: #3f7cac; --graph-citation: #b9731c; --graph-link: #9aa3ad; }
+html[data-theme="dark"] { --graph-reference: #7fb2dc; --graph-citation: #e3a95c; --graph-link: #5d6670; }
 #root { min-height: 100vh; }
-.settings-page .settings-panels { max-width: 1100px; margin-inline: auto; }
-.settings-page .settings-tabs { display: flex; flex-wrap: wrap; margin-bottom: 24px; }
-.settings-page .settings-tabs button { flex: 1; }
 .scholarly-sources > header { margin: 24px 0 16px; }
 .scholarly-sources > header p { color: var(--muted); line-height: 1.6; font-size: 12px; }
 .scholarly-source fieldset { min-width: 0; margin: 0; padding: 0; border: 0; }
@@ -24,47 +24,8 @@
 .scholarly-source-footer > span { color: var(--muted); font-size: 11px; }
 .scholarly-source-error { color: var(--danger, #b91c1c) !important; margin: 12px 0 0 !important; }
 @media (max-width: 600px) { .scholarly-source-fields { grid-template-columns: minmax(0, 1fr); } .scholarly-source-heading { gap: 10px; } .scholarly-source-footer { flex-wrap: wrap; } }
-.settings-page .settings-panels > .settings-section { display: block; }
 .settings-dialog { overflow: hidden; }
 .settings-dialog > .modal-close { z-index: 2; }
-.settings-dialog .settings-page { display: grid; grid-template-columns: 220px minmax(0, 1fr); grid-template-rows: auto minmax(0, 1fr); width: 100%; height: 100%; min-height: 0; }
-.settings-dialog .page-header { grid-column: 1 / -1; margin: 0; padding: 20px 58px 16px 24px; border-bottom: 1px solid var(--line); }
-.settings-dialog .settings-tabs { display: flex; flex-direction: column; flex-wrap: nowrap; gap: 4px; min-height: 0; margin: 0; overflow-y: auto; }
-.settings-dialog .settings-tabs button { display: block; flex: 0 0 auto; }
-.settings-dialog .settings-tabs button > div { display: block; }
-.settings-dialog .settings-panels { min-height: 0; max-width: none; margin: 0; overflow: hidden; }
-.settings-dialog .settings-panels > .settings-section { height: 100%; overflow-y: auto; }
-.settings-nav-group { display: flex; flex-direction: column; gap: 2px; }
-.settings-nav-group + .settings-nav-group { margin-top: 10px; }
-.settings-nav-label { padding: 6px 9px 4px; color: var(--subtle); font-size: 10px; font-weight: 650; letter-spacing: .07em; text-transform: uppercase; }
-.settings-page .settings-tabs button { min-height: 0; }
-.plugin-settings { display: grid; gap: 0; }
-.plugin-summary-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
-.plugin-summary-head h3 { margin: 2px 0 4px; }
-.plugin-summary-head p { margin: 0; }
-.plugin-eyebrow { color: var(--accent); font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
-.plugin-status { flex: none; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; color: var(--muted); font-size: 11px; font-weight: 600; }
-.plugin-status.active { border-color: color-mix(in srgb, var(--teal, #0f766e) 45%, transparent); color: var(--teal, #0f766e); }
-.plugin-status.pending { border-color: color-mix(in srgb, var(--amber, #b45309) 45%, transparent); color: var(--amber, #b45309); }
-.plugin-toggle { display: flex; align-items: flex-start; gap: 10px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); cursor: pointer; }
-.plugin-toggle input { flex: none; width: 18px; height: 18px; margin: 1px 0 0; accent-color: var(--accent); }
-.plugin-toggle input:disabled { cursor: not-allowed; }
-.plugin-toggle span { display: grid; gap: 2px; }
-.plugin-toggle small { color: var(--muted); font-size: 12px; line-height: 1.5; }
-.plugin-restart { margin: 10px 0 0; color: var(--amber, #b45309); font-size: 12px; font-weight: 600; }
-.plugin-collections, .plugin-connectors { display: grid; margin: 8px 0 0; padding: 0; list-style: none; }
-.plugin-collections li, .plugin-connectors li { display: flex; align-items: baseline; gap: 10px; padding: 8px 0; border-top: 1px solid var(--line); }
-.plugin-collections li:first-child, .plugin-connectors li:first-child { border-top: 0; }
-.plugin-collections span { color: var(--muted); font-size: 12px; }
-.plugin-collections small { margin-left: auto; color: var(--subtle); font-size: 11px; }
-.plugin-connectors code { margin-left: auto; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; text-align: right; }
-.plugin-section { margin: 10px 0 4px; }
-.plugin-section-title { margin: 18px 0 10px; color: var(--muted); font-size: 11px; font-weight: 650; letter-spacing: .06em; text-transform: uppercase; }
-.plugin-section .scholarly-sources > header { margin-top: 18px; }
-@media (max-width: 720px) {
-  .settings-dialog .settings-page { grid-template-columns: 105px minmax(0, 1fr); }
-  .settings-dialog .settings-tabs small { display: none; }
-}
 .registry-edit-target { cursor: pointer; }
 
 .integration-modal-backdrop { position: fixed; inset: 0; z-index: 320; display: grid; place-items: center; padding: 24px; background: rgba(22,25,26, .5); backdrop-filter: blur(5px); }
@@ -99,10 +60,10 @@
 .pdf-discovery.available { color: #26705d; }
 .integration-error { margin: 0; color: var(--red); font-size: 10px; }
 #paper-pdf-form [hidden] { display: none; }
-.graph-warning { margin-top: 16px !important; border: 1px solid #ead9b9; border-radius: 9px; background: #fff8e9; padding: 9px; color: #87652e !important; }
+.graph-warning { margin-top: 16px !important; border: 1px solid color-mix(in srgb, var(--amber) 40%, var(--line)); border-radius: 8px; background: color-mix(in srgb, var(--amber) 9%, var(--surface)); padding: 9px 11px; color: var(--ink) !important; font-size: 12px; line-height: 1.5; }
 .citation-exploration { display: grid; min-width: 0; overflow: hidden; }
 .citation-layout { display: grid; min-height: 0; grid-template-columns: 240px minmax(0, 1fr) 10px var(--citation-inspector-width, 340px); overflow: hidden; border-top: 1px solid var(--line); }
-.citation-canvas { position: relative; min-width: 0; min-height: 0; background-color: #f8fafc; background-image: radial-gradient(#dfe5ee .75px, transparent .75px); background-size: 20px 20px; overflow: hidden; cursor: grab; }
+.citation-canvas { position: relative; min-width: 0; min-height: 0; background-color: var(--canvas-deep, var(--surface-soft)); background-image: radial-gradient(var(--line-strong, var(--line)) .75px, transparent .75px); background-size: 20px 20px; overflow: hidden; cursor: grab; }
 .citation-canvas:active { cursor: grabbing; }
 .citation-browser { display: grid; grid-template-rows: auto minmax(0, 1fr); min-height: 0; background: var(--surface); }
 .citation-list-panel { border-right: 1px solid var(--line); }
@@ -117,8 +78,8 @@
 .citation-result > span:last-child { display: grid; gap: 3px; min-width: 0; }
 .citation-result strong { overflow: hidden; font-size: 9px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 .citation-result small, .citation-result em { overflow: hidden; color: var(--subtle); font-size: 7px; font-style: normal; text-overflow: ellipsis; white-space: nowrap; }
-.relation-dot { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: #578b9b; }
-.relation-dot.citation { background: #c98a37; }
+.relation-dot { width: 7px; height: 7px; margin-top: 5px; border-radius: 50%; background: var(--graph-reference); }
+.relation-dot.citation { background: var(--graph-citation); }
 .citation-selection-actions { display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
 .citation-selection-actions .button-primary { flex: 1 1 160px; }
 .citation-inspector { min-width: 0; overflow-y: auto; overscroll-behavior: contain; background: var(--surface); padding: 20px 24px 28px; scrollbar-gutter: stable; }
@@ -131,9 +92,9 @@
 .citation-abstract h4 { margin: 0 0 7px; font-size: 10px; }
 .citation-abstract p { margin: 0; color: var(--muted); font-size: 9px; line-height: 1.65; }
 .citation-open-link { display: inline-flex; margin-top: 12px; color: var(--accent); font-size: 9px; font-weight: 700; text-decoration: none; }
-.relation-chip { display: inline-flex; border-radius: 99px; background: #eef1f5; padding: 5px 8px; color: #64758d; font-size: 8px; font-weight: 750; }
+.relation-chip { display: inline-flex; border-radius: 99px; background: color-mix(in srgb, var(--graph-reference) 14%, var(--surface)); padding: 5px 8px; color: var(--graph-reference); font-size: 8px; font-weight: 750; }
 .relation-chip.focus { background: var(--accent-soft); color: var(--accent); }
-.relation-chip.citation { background: #fff0dc; color: #9a641f; }
+.relation-chip.citation { background: color-mix(in srgb, var(--graph-citation) 14%, var(--surface)); color: var(--graph-citation); }
 .integration-brand { display: grid; grid-template-columns: 42px minmax(0, 1fr) auto; align-items: center; gap: 12px; }
 .integration-brand > span { display: grid; width: 42px; height: 42px; place-items: center; border-radius: 10px; background: #b51d2a; color: white; font: 700 20px Georgia, serif; }
 .integration-brand h3, .integration-brand p { margin: 0; }
@@ -161,16 +122,16 @@
 .citation-workspace { width: 100%; height: 100%; min-width: 0; min-height: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--surface); }
 .citation-page-header { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 6px 56px 6px 12px; border-bottom: 1px solid var(--line); flex: 0 0 auto; }
 .citation-page-header h1 { margin: 0; font-size: 14px; white-space: nowrap; letter-spacing: -.025em; }
-.citation-page-header .citation-back { display: grid; place-items: center; flex: 0 0 30px; width: 30px; height: 30px; margin: 0; padding: 0; font-size: 18px; }
+.citation-page-header .citation-back { display: inline-flex; align-items: center; gap: 5px; flex: 0 0 auto; margin: 0; }
 .citation-exploration > header p { margin: 0; color: var(--muted); font-size: 12px; }
 .citation-exploration h2 { overflow-wrap: anywhere; }
 .citation-tabs { display: flex; flex: 1; min-width: 120px; align-items: center; padding: 0; }
 .citation-tabs > div { display: flex; flex: 1; min-width: 0; overflow-x: auto; gap: 6px; }
 .citation-tab { display: flex; flex-shrink: 0; }
-.citation-tab button, .citation-directions button, .citation-pagination button, .citation-pagination select { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 9px 12px; border-radius: 7px; cursor: pointer; }
+.citation-tab button, .citation-pagination button, .citation-pagination select { border: 1px solid var(--line); background: var(--surface); color: var(--ink); padding: 9px 12px; border-radius: 7px; cursor: pointer; }
 .citation-tab [role=tab] { max-width: 240px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .citation-tab button { min-height: 30px; padding: 5px 9px; font-size: 12px; }
-.citation-tab [aria-selected=true], .citation-directions [aria-pressed=true] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
+.citation-tab [aria-selected=true] { background: var(--accent-soft); color: var(--accent); border-color: var(--accent); }
 .citation-tab-panel { flex: 1; min-width: 0; min-height: 0; }
 .citation-tab-panel[hidden] { display: none; }
 .citation-tab-panel .citation-exploration { width: 100%; height: 100%; max-height: none; grid-template-rows: auto minmax(0, 1fr); }
@@ -192,7 +153,8 @@
 .citation-page-heading > svg { color: var(--accent); }
 .citation-page-heading > span { margin-left: 12px; color: var(--subtle); font-size: 12px; }
 .citation-exploration h2 { margin: 0 0 6px; font-size: 19px; letter-spacing: -.025em; }
-.citation-directions button { min-height: 28px; font-size: 11px; padding: 4px 9px; border-radius: 6px; }
+.citation-directions { gap: 0; padding: 2px; }
+.citation-directions button[aria-pressed=true] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 1px 2px rgba(0, 0, 0, .08); }
 .citation-inspector-head h3 { font-size: 19px; letter-spacing: -.025em; overflow-wrap: anywhere; }
 .citation-inspector .relation-chip { font-size: 10px; padding: 5px 9px; }
 .citation-inspector dl { margin-block: 20px; border-radius: 8px; border: 1px solid var(--line); padding: 9px 12px; background: var(--surface-soft); }
@@ -214,7 +176,7 @@
 .citation-legend { display: flex; flex-wrap: wrap; gap: 12px; color: var(--muted); font-size: 10px; }
 .citation-legend span { display: inline-flex; align-items: center; gap: 5px; }
 .citation-legend i { width: 7px; height: 7px; border-radius: 50%; }
-.citation-legend .focus { background: #61c5d9; }.citation-legend .reference { background: #578b9b; }.citation-legend .citation { background: #c98a37; }
+.citation-legend .focus { background: var(--graph-focus); }.citation-legend .reference { background: var(--graph-reference); }.citation-legend .citation { background: var(--graph-citation); }
 .citation-inspector-resize { position: relative; display: flex; align-items: center; justify-content: center; min-height: 0; border-inline: 1px solid var(--line); background: var(--surface-soft); cursor: col-resize; touch-action: none; user-select: none; }
 .citation-inspector-resize span { width: 3px; height: 38px; border-radius: 3px; background: var(--subtle); opacity: .4; }
 .citation-inspector-resize:hover, .citation-inspector-resize:focus-visible { background: var(--accent-soft); outline: 0; }
@@ -232,8 +194,6 @@
   .citation-list-panel { border-right: 0; border-top: 1px solid var(--line); }
   .citation-page-header { padding-left: 56px; }
   .citation-page-header .citation-tabs { flex-basis: 100%; }
-  .citation-directions { gap: 4px; }
-  .citation-directions button { padding: 7px; font-size: 11px; }
 }
 
 .zotero-sync-spinner { width: 19px; height: 19px; flex: 0 0 19px; color: var(--accent); }
@@ -267,7 +227,29 @@
 .citation-agent-menu > summary::-webkit-details-marker { display: none; }
 .citation-agent-menu > summary:hover { background: var(--accent-soft); color: var(--accent); }
 .citation-agent-menu[open] > summary { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); }
-.citation-agent-menu-body { position: absolute; top: calc(100% + 6px); right: 0; display: grid; gap: 6px; width: max-content; max-width: min(340px, calc(100vw - 24px)); border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 10px; box-shadow: 0 10px 30px rgba(42, 43, 37, .12); }
+.citation-agent-menu-body { position: absolute; top: calc(100% + 6px); right: 0; display: grid; gap: 6px; width: max-content; max-width: min(340px, calc(100vw - 24px)); border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 10px; box-shadow: var(--shadow); z-index: 30; }
 .citation-agent-menu-body .button { width: 100%; justify-content: flex-start; white-space: normal; font-size: 12px; }
 
 .citation-agent-scope { align-self: center; font-size: 9px; color: var(--subtle); padding-bottom: 6px; border-bottom: 1px solid var(--line); }
+
+/* Add to the library: one paste bar by default, one tab per other way. */
+.quick-add-modal { width: min(640px, 94vw); }
+.quick-add-tabs { padding: 0 18px; }
+.quick-add-tabs button { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; }
+.quick-add-tabs button svg { opacity: .8; }
+.quick-add-bar { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 12px; border: 1px solid var(--line-strong, var(--line)); border-radius: 8px; background: var(--surface); color: var(--subtle); }
+.quick-add-bar:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px var(--focus-ring); }
+.quick-add-lookup .quick-add-bar input { flex: 1; min-width: 0; border: 0; padding: 8px 0; background: transparent; box-shadow: none; font-size: 14px; }
+.quick-add-lookup .quick-add-bar input:focus { box-shadow: none; }
+.quick-add-hint { margin: -4px 0 0; color: var(--subtle); font-size: 12px; line-height: 1.5; }
+.quick-add-lookup > p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.55; }
+.quick-add-lookup > p strong { color: var(--ink); }
+.quick-add-drop { display: grid; justify-items: center; gap: 6px; padding: 28px 16px; border: 1.5px dashed var(--line-strong, var(--line)); border-radius: 10px; background: var(--surface-soft); color: var(--muted); font: inherit; cursor: pointer; }
+.quick-add-drop:hover, .quick-add-drop.is-dragging { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+.quick-add-drop strong { color: var(--ink); font-size: 13px; }
+.quick-add-drop small { font-size: 12px; }
+.quick-add-files { display: grid; gap: 2px; max-height: 180px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.quick-add-files li { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 12.5px; }
+.quick-add-files li:hover { background: var(--hover); }
+.quick-add-files li span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.quick-add-confirm label > span, .quick-add-lookup label > span, .quick-add-projects legend { font-size: 11px; }

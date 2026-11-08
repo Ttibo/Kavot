@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import logging
 import os
 import shutil
 
@@ -42,7 +43,8 @@ def ensure_workspace_directories() -> None:
 
 def reconcile_workspace() -> None:
     store.ensure()
-    from app.core.workspace.documents import backfill_article_pdf_links, migrate_html_notes
+    from app.core.workspace.documents import backfill_article_pdf_links
+    from app.core.workspace.note_migration import migrate_html_notes
     migrate_html_notes()
     backfill_article_pdf_links()
     from app.core.records.migrations import migrate_legacy_files, archive_retired_collections
@@ -61,25 +63,33 @@ async def lifespan(_: FastAPI):
     reconcile_workspace()
     from app.core.storage.cloud_sync.routes import start_background_sync, stop_background_sync
     automatic_sync = os.getenv("KAVOT_DESKTOP", "").lower() in {"1", "true", "yes"}
-    from app.core.automation import watchers, workflows
-    workflows.recover()
-    watchers.migrate()
+    from app.core.kernel.plugins import load as load_plugins
+    services = load_plugins().background_services
     if automatic_sync:
         start_background_sync()
         from app.core.storage import backups as workspace_backups
         workspace_backups.start_scheduler()
-        watchers.start()
-        workflows.start()
+        for service in services:
+            service.start()
+        # Agent CLIs opened from Kavot connect to it; a failure must not stop the app (it is retried on launch).
+        from app.mcp import server as mcp_server
+        try:
+            mcp_server.start()
+        except RuntimeError as error:
+            logging.getLogger(__name__).warning("Kavot MCP server not started: %s", error)
     try:
         yield
     finally:
         if automatic_sync:
             stop_background_sync()
             workspace_backups.stop_scheduler()
-            watchers.stop()
-            workflows.stop()
-        from app.core.agents.sessions import shutdown
-        shutdown()
+            for service in services:
+                service.stop()
+        from app.core.agents import consoles, sessions
+        consoles.shutdown()
+        sessions.shutdown()
+        from app.mcp import server as mcp_server
+        mcp_server.stop()
 
 
 __all__ = ["ensure_workspace_directories", "lifespan", "reconcile_workspace"]

@@ -8,20 +8,18 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
-from app.core.storage.cloud_sync.client import CloudError
-from app.core.records import databases
+from app.core.storage.cloud_sync.errors import CloudError
 from app.core.workspace import documents
 from app.core.projects import projects
 from app.core.records.repository import store
 
-DOMAINS = {"articles": "papers", "notes": "notes", "tasks": "tasks", "conferences": "conferences", "datasets": "datasets"}
+# What can be shared: notes, projects, and the items of the Library and of Tasks.
+DOMAINS = {"articles": "papers", "notes": "notes", "tasks": "tasks"}
 FIELDS = {
     "projects": ["name", "description", "status"],
     "notes": ["title", "content"],
     "papers": ["title", "authors", "abstract", "publication", "published_at", "doi", "url", "tags", "status"],
     "tasks": ["title", "description", "status", "priority", "labels", "start_date", "due_date"],
-    "conferences": ["name", "title", "description", "notes", "acronym", "edition", "location", "url", "starts_at", "ends_at", "status"],
-    "datasets": ["name", "title", "description", "notes", "url", "doi", "tags", "version", "license", "access_status"],
 }
 LABELS = {"title": "Title", "name": "Name", "content": "Content", "description": "Description", "abstract": "Summary",
           "authors": "Authors", "status": "Status", "priority": "Priority", "tags": "Keywords", "labels": "Labels",
@@ -49,18 +47,14 @@ def snapshot(source):
             if candidate.is_file() and candidate.resolve().is_relative_to(settings.storage_path.resolve()):
                 attachments.add(candidate.resolve())
 
-    def add(domain, item, database=None):
+    def add(domain, item):
         if domain == 'notes':
             item = documents.enrich_note(item, state)
-        key = f"{database or domain}:{item['id']}"
+        key = f"{domain}:{item['id']}"
         if key in targets or item.get("trashed_at") or item.get("archived_at"):
             return
-        values = item.get("values", {}) if database else item
+        values = item
         names = FIELDS.get(domain, ["title", "content", "description"])
-        definitions = {}
-        if database:
-            definitions = {field["id"]: field for field in databases.load(database).get("fields", [])}
-            names = [*names, *definitions]
         fields = {}
         for name in dict.fromkeys(names):
             value = values.get(name)
@@ -68,16 +62,11 @@ def snapshot(source):
                 continue
             if isinstance(value, (dict, list)) and not (isinstance(value, list) and all(isinstance(v, str) for v in value)):
                 continue
-            definition = definitions.get(name, {})
-            if definition.get("type") in {"file", "relation", "json"}:
-                continue
             kind = "boolean" if type(value) is bool else "number" if type(value) in {int, float} else "tags" if isinstance(value, list) else "markdown" if name in {"content", "description", "abstract", "notes"} else "text"
-            if definition.get("type") in {"number", "boolean", "tags", "markdown"}:
-                kind = definition["type"]
-            fields[name] = {"label": definition.get("name", LABELS.get(name, name)), "type": kind, "value": value if value is not None or kind in {"number", "boolean", "tags"} else ""}
+            fields[name] = {"label": LABELS.get(name, name), "type": kind, "value": value if value is not None or kind in {"number", "boolean", "tags"} else ""}
         title = str(values.get("title") or values.get("name") or "Untitled")[:240]
         entries.append({"key": key, "title": title, "fields": fields})
-        targets[key] = (domain, item["id"], database)
+        targets[key] = (domain, item["id"])
         dates.append(timestamp(item.get("updated_at")))
         if domain == "papers":
             file(item.get("file_path"))
@@ -91,16 +80,6 @@ def snapshot(source):
                     file(documents.asset_path(item["id"], unquote(name)))
                 except (HTTPException, ValueError):
                     pass
-        if database:
-            url = values.get("url", "")
-            prefix = "/api/databases/resources/files/"
-            if isinstance(url, str) and url.startswith(prefix):
-                from urllib.parse import unquote
-                file(databases.path("resources").parent / "files" / unquote(url[len(prefix):]))
-            if values.get("note_id"):
-                linked = next((n for n in state["notes"] if n["id"] == values["note_id"]), None)
-                if linked:
-                    add("notes", linked)
 
     kind, identifier = source["kind"], source["id"]
     if kind in {"note", "project"}:
@@ -108,27 +87,17 @@ def snapshot(source):
         item = store.find(domain, int(identifier))
         add(domain, item)
         if kind == "project":
-            for domain in ("notes", "papers", "tasks", "conferences", "datasets"):
+            for domain in ("notes", "papers", "tasks"):
                 for child in state[domain]:
                     if child.get("project_id") == item["id"] or item["id"] in child.get("project_ids", []):
                         add(domain, child)
-            for database in databases.list_databases():
-                if database.get("storage", {}).get("driver") == "json-files":
-                    for child in databases.records(database["id"]):
-                        if item["id"] in child.get("values", {}).get("project_ids", []):
-                            add("record", child, database["id"])
     else:
-        database = source["collection"]
-        if database in DOMAINS:
-            domain = DOMAINS[database]
-            if not str(identifier).isdigit():
-                raise HTTPException(422, "Invalid item ID.")
-            add(domain, store.find(domain, int(identifier)))
-        else:
-            item = next((row for row in databases.records(database) if str(row["id"]) == identifier), None)
-            if item is None:
-                raise HTTPException(404, "Item not found.")
-            add("record", item, database)
+        domain = DOMAINS.get(source.get("collection"))
+        if not domain:
+            raise HTTPException(404, "This kind of item can no longer be shared.")
+        if not str(identifier).isdigit():
+            raise HTTPException(422, "Invalid item ID.")
+        add(domain, store.find(domain, int(identifier)))
     if not entries:
         raise HTTPException(404, "This item is no longer available.")
     return {"entries": entries, "attachments": []}, targets, max(dates, default=0), attachments
@@ -138,16 +107,11 @@ def catalog():
     state = store.read()
     items = [{"kind": "project", "id": str(row["id"]), "title": row["name"], "group": "Projects"} for row in state["projects"]]
     items += [{"kind": "note", "id": str(row["id"]), "title": row["title"], "group": "Notes"} for row in state["notes"] if not row.get("trashed_at")]
-    for database in databases.list_databases():
-        if database["id"] == "notes":
-            continue
-        domain = DOMAINS.get(database["id"])
-        rows = state[domain] if domain else databases.records(database["id"])
-        for row in rows:
-            values = row if domain else row.get("values", {})
+    for collection, group in (("articles", "Articles"), ("tasks", "Tasks")):
+        for row in state[DOMAINS[collection]]:
             if not row.get("archived_at"):
-                items.append({"kind": "item", "collection": database["id"], "id": str(row["id"]),
-                              "title": values.get("title") or values.get("name") or "Untitled", "group": database["name"]})
+                items.append({"kind": "item", "collection": collection, "id": str(row["id"]),
+                              "title": row.get("title") or row.get("name") or "Untitled", "group": group})
     return items
 
 
@@ -157,7 +121,6 @@ def scope(client, account):
 
 def bindings(client, account):
     with client.db() as db:
-        db.execute("CREATE TABLE IF NOT EXISTS shared_bindings (scope TEXT, item_id TEXT, source TEXT, content TEXT, version INTEGER, PRIMARY KEY(scope,item_id))")
         return db.execute("SELECT item_id,source,content,version FROM shared_bindings WHERE scope=?", (scope(client, account),)).fetchall()
 
 
@@ -206,13 +169,11 @@ def apply(source, content, expected):
         for entry in content["entries"]:
             if entry["key"] not in targets:
                 continue
-            domain, identifier, database = targets[entry["key"]]
+            domain, identifier = targets[entry["key"]]
             fields = {name: field["value"] for name, field in entry["fields"].items() if name in allowed[entry["key"]] and field["value"] != allowed[entry["key"]][name]["value"]}
             if not fields:
                 continue
-            if database:
-                databases.save_record(database, {"values": fields}, str(identifier))
-            elif domain == "notes":
+            if domain == "notes":
                 from app.models.documents import NoteUpdate
                 documents.update_note(identifier, NoteUpdate(**fields))
             else:

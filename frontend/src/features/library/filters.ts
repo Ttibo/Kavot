@@ -16,18 +16,6 @@ export function paperPublicationYear(paper) {
   const match = String(paper?.published_at || "").match(/(?:18|19|20)\d{2}/);
   return match ? match[0] : "";
 }
-
-export function formatLibraryDate(value) {
-  if (!value) return "—";
-  const parsed = new Date(`${String(value).replace(" ", "T")}Z`);
-  if (Number.isNaN(parsed.getTime())) return String(value).slice(0, 10);
-  return new Intl.DateTimeFormat("en-US", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  }).format(parsed);
-}
-
 export function paperFolderDescendantIds(folderId) {
   const ids = new Set([Number(folderId)]);
   let changed = true;
@@ -47,10 +35,23 @@ export function paperFolderDescendantIds(folderId) {
   return ids;
 }
 
+/** Articles in each folder and its subfolders, computed once per loaded library (the folder tree asks for
+ * every folder on each redraw). */
+let folderCounts: { papers: Paper[]; folders: PaperFolder[]; counts: Map<number, number> } | null = null;
 export function paperFolderCount(folderId) {
-  const ids = paperFolderDescendantIds(folderId);
-  return state.papers.filter((paper) => paperFolderIds(paper).some(id => ids.has(id)))
-    .length;
+  if (folderCounts?.papers !== state.papers || folderCounts.folders !== state.paperFolders) {
+    const parents = new Map(state.paperFolders.map((folder) => [folder.id, folder.parent_id || null]));
+    const counts = new Map<number, number>();
+    for (const paper of state.papers) {
+      const reached = new Set<number>();
+      for (let id of paperFolderIds(paper)) {
+        while (id != null && !reached.has(id)) { reached.add(id); id = parents.get(id) ?? null; }
+      }
+      reached.forEach((id) => counts.set(id, (counts.get(id) || 0) + 1));
+    }
+    folderCounts = { papers: state.papers, folders: state.paperFolders, counts };
+  }
+  return folderCounts.counts.get(Number(folderId)) || 0;
 }
 
 export function paperFolderOptions(

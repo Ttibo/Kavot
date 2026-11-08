@@ -3,9 +3,6 @@
 .storage-page-heading h2 { margin: 6px 0 8px; font-size: 24px; letter-spacing: -.035em; }
 .storage-page-heading > p { margin: 0; color: var(--muted); line-height: 1.6; }
 .storage-settings .storage-eyebrow { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
-.storage-overview { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-bottom: 16px; }
-.settings-panels .storage-settings .settings-card { min-width: 0; margin-bottom: 16px; padding: 22px; background: var(--surface); box-shadow: none; }
-.settings-panels .storage-overview > .settings-card { display: flex; flex-direction: column; margin-bottom: 0; }
 .storage-settings .settings-card h3 { margin: 0 0 6px; font-size: 16px; }
 .storage-settings .settings-card p { font-size: 12px; line-height: 1.65; }
 .storage-card-heading { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
@@ -18,47 +15,22 @@
 .storage-path { padding: 12px; border: 1px solid var(--line); border-radius: 9px; background: var(--canvas); font-family: ui-monospace, monospace; font-size: 12px; overflow-wrap: anywhere; line-height: 1.7; }
 .storage-settings .form-actions { flex-wrap: wrap; margin-top: 16px; }
 .storage-settings .settings-card .settings-hint { margin: 12px 0 0; font-size: 11px; color: var(--muted) !important; }
-.storage-account-card > .form-actions { margin-top: auto; padding-top: 16px; }
-.storage-quota-label { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; font-size: 11px; }
-.storage-quota progress { display: block; width: 100%; height: 8px; margin: 12px 0 8px; accent-color: var(--accent); border: 0; border-radius: 8px; overflow: hidden; background: var(--surface-soft); }
-.storage-quota progress::-webkit-progress-bar { background: var(--surface-soft); }
-.storage-quota progress::-webkit-progress-value { background: var(--accent); border-radius: 8px; }
-.storage-settings .storage-quota > p { margin-bottom: 10px; font-size: 11px; }
 .storage-settings details { color: var(--muted); font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
 .storage-settings summary { cursor: pointer; padding-block: 5px; }
 .storage-settings details p { margin: 8px 0 0; }
-.storage-section-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 16px; margin-bottom: 18px; }
-.storage-settings .storage-section-heading p { margin: 0; }
-.storage-sync-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; border-block: 1px solid var(--line); padding: 16px 0; margin-bottom: 12px; }
-.storage-sync-facts span, .storage-sync-facts strong, .storage-sync-facts small { display: block; }
-.storage-sync-facts span { color: var(--muted); font-size: 11px; margin-bottom: 8px; }
-.storage-sync-facts strong { font-size: 12px; font-weight: 600; }
-.storage-sync-facts small { margin-top: 5px; color: var(--muted); font-size: 11px; }
 .storage-settings .storage-notice { border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 8px; padding: 12px 14px; background: var(--surface-soft); font-size: 12px; overflow-wrap: anywhere; }
 .storage-settings .storage-notice p { margin-bottom: 8px; }
 .storage-settings .storage-conflicts { border-left: 3px solid var(--amber); }
 .storage-conflict-row { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; padding: 12px 0; border-top: 1px solid var(--line); }
 .storage-conflict-row strong { font-size: 12px; overflow-wrap: anywhere; min-width: 0; }
 .storage-pairing-code { display: inline-block; margin-left: 8px; padding: 6px 12px; border-radius: 8px; background: var(--surface-soft); font-family: ui-monospace, monospace; letter-spacing: .12em; }
-.storage-search { display: grid; gap: 8px; color: var(--muted); font-size: 11px; margin-bottom: 16px; }
-.storage-search input { width: 100%; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; color: var(--ink); background: var(--canvas); font-size: 12px; }
-.storage-search input:focus-visible, .storage-settings summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+.storage-settings summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
 .storage-settings .cloud-files-table { max-height: 360px; }
 .storage-settings .cloud-files-table table { font-size: 11px; }
 .storage-settings .cloud-files-table th { color: var(--muted); font-weight: 500; }
 .storage-settings .cloud-files-table td:first-child { font-family: ui-monospace, monospace; }
 .storage-settings .storage-empty { padding: 20px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); text-align: center; }
 .storage-settings .storage-empty p { margin: 0; }
-@container (max-width: 650px) {
-  .storage-overview { grid-template-columns: 1fr; }
-  .storage-sync-facts { grid-template-columns: 1fr; gap: 16px; }
-  .settings-panels .storage-settings .settings-card { padding: 18px; }
-  .storage-section-heading { align-items: flex-start; }
-}
-
-.storage-sync-progress { padding: 16px; border-radius: 12px; background: var(--background-secondary, #f3f6fa); }
-.storage-sync-progress progress { display: block; width: 100%; margin-top: 12px; accent-color: #386bba; }
-.storage-sync-progress p { overflow-wrap: anywhere; }
 .cloud-files-table { max-height: 360px; overflow: auto; }
 .cloud-files-table .cloud-file-history td { background: var(--surface-2, transparent); }
 .cloud-files-table .cloud-file-history ol { display: grid; gap: 6px; margin: 4px 0; padding: 0; list-style: none; }

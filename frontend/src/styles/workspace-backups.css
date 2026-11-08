@@ -20,7 +20,6 @@
 .workspace-backups .backup-day .backup-row:first-of-type { border-top: 1px solid var(--line); }
 .workspace-backups .backup-row { justify-content: flex-start; }
 .workspace-backups .backup-info { flex: 1; }
-.workspace-backups .backup-version { flex: none; min-width: 40px; color: var(--muted); font: 600 11px/1 var(--font-mono, ui-monospace, monospace); }
 .workspace-backups .backup-kind { padding: 1px 6px; border-radius: 999px; background: var(--line); color: var(--text, inherit); font-size: 10px; }
 .workspace-backups .backup-kind.is-auto { background: color-mix(in srgb, var(--accent, #3b6) 18%, transparent); }
 .workspace-backups .backup-kind.is-uploaded { background: color-mix(in srgb, var(--muted) 18%, transparent); }

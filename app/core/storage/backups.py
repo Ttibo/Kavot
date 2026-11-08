@@ -17,7 +17,7 @@ from pathlib import Path
 
 from fastapi import HTTPException
 
-from app.core.storage.cloud_sync.client import tree_fingerprint
+from app.core.storage.cloud_sync.files import tree_fingerprint, walk
 from app.core.kernel.config import settings
 from app.core.kernel.user_settings import save_storage_path
 from app.core.records.repository import store
@@ -96,12 +96,11 @@ def create_backup(kind: str = "manual", label: str | None = None) -> dict:
     try:
         with zipfile.ZipFile(temporary, "w", compression=zipfile.ZIP_DEFLATED,
                              allowZip64=True) as bundle:
-            for path in settings.storage_path.rglob("*"):
-                relative = path.relative_to(settings.storage_path)
-                if (".kavot-backups" in relative.parts or ".kavot-conflicts" in relative.parts or ".kavot-local" in relative.parts
-                        or path.is_symlink() or not path.is_file()):
+            # Kavot's own folders (backups, conflict copies, local index) are never entered.
+            for relative, entry in walk(settings.storage_path):
+                if entry.is_symlink():
                     continue
-                bundle.write(path, relative.as_posix())
+                bundle.write(entry.path, relative)
                 files += 1
         with zipfile.ZipFile(temporary) as bundle:
             if bundle.testzip() is not None:
@@ -278,8 +277,9 @@ def restore_archive(archive: Path, identifier: str) -> dict:
                     destination.parent.mkdir(parents=True, exist_ok=True)
                     with bundle.open(member) as source, destination.open("xb") as output:
                         shutil.copyfileobj(source, output)
-        from app.core.agents.sessions import workspace_change
-        with workspace_change():
+        from app.mcp.session import SESSION
+        from app.core.agents.sessions import workspace_change as conversations_change
+        with conversations_change(), SESSION.workspace_change():
             save_storage_path(target)
             object.__setattr__(settings, "storage_root", target)
             store.ensure()

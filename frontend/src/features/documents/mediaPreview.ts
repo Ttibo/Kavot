@@ -1,6 +1,6 @@
 const escape = (value: string) => value.replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]!);
 
-export function safeMediaUrl(value: string): string {
+function safeMediaUrl(value: string): string {
   if (!value || /[\u0000-\u0020\\]/.test(value)) return '';
   if (/^https?:\/\//i.test(value) || /^\/api\/(databases\/resources\/files\/|notes\/\d+\/assets\/|workspace\/file\?|papers\/\d+\/file)/.test(value)) return value;
   return '';

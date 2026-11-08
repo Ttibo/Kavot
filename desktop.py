@@ -220,11 +220,14 @@ def main() -> None:
 
     close_window = install_close_support(window)
 
-    def pick_storage_folder():
+    def pick_folder():
         selection = window.create_file_dialog(
             webview.FileDialog.FOLDER, directory=str(Path.home())
         )
         return selection[0] if selection else None
+
+    def pick_storage_folder():
+        return pick_folder()
 
     def open_external_url(url: str):
         if not isinstance(url, str) or not url.lower().startswith(("https://", "http://", "mailto:")):
@@ -232,16 +235,7 @@ def main() -> None:
         return webbrowser.open(url)
 
     def pick_project_resource_folder():
-        selection = window.create_file_dialog(
-            webview.FileDialog.FOLDER, directory=str(Path.home())
-        )
-        return selection[0] if selection else None
-
-    def pick_project_resource_file():
-        selection = window.create_file_dialog(
-            webview.FileDialog.OPEN, directory=str(Path.home())
-        )
-        return selection[0] if selection else None
+        return pick_folder()
 
     def open_project_resource(target: str):
         """Open a validated web address or an existing local folder for a project."""
@@ -271,7 +265,6 @@ def main() -> None:
         pick_storage_folder,
         open_external_url,
         pick_project_resource_folder,
-        pick_project_resource_file,
         open_project_resource,
     )
     install_resize_support(window)

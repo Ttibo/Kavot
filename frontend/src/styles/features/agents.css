@@ -7,7 +7,6 @@
 .agent-surface.panel > .atelier-thread-layout { flex: 1; min-height: 0; }
 .agent-surface.panel .atelier-messages { padding: 12px 14px 16px; }
 .agent-surface.panel .atelier-thread-head { padding: 6px 12px; }
-.agent-surface.panel .atelier-context { padding-inline: 12px; }
 .agent-surface.panel .agent-compose { margin: 0 10px 8px; }
 /* In the narrow panel, the changes and the usage cover the thread. */
 .agent-surface.panel .atelier-changes { position: absolute; inset: 38px 0 0; z-index: 5; border-left: 0; background: var(--surface); }
@@ -51,7 +50,6 @@
 .agent-compose .assistant-model-options button, .agent-compose .assistant-ideas button { display: flex; width: 100%; padding: 6px 8px; border: 1px solid transparent; border-radius: 6px; background: transparent; color: var(--ink); font: inherit; font-size: 12px; cursor: pointer; }
 .agent-compose .assistant-model-options button:hover, .agent-compose .assistant-ideas button:hover { background: var(--surface-soft); }
 .agent-compose .agent-error { margin: 0; font-size: 12px; }
-
 
 /* A page measures its width to choose between the list beside the thread and the compact layout. */
 .agent-surface-host { display: flex; flex: 1; min-width: 0; min-height: 0; height: 100%; }

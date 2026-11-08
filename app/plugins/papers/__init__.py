@@ -5,6 +5,7 @@ from __future__ import annotations
 def register(registry, manifest) -> None:
     from app.core.records.repository import json_values
     from app.plugins.papers import library, mcp, search
+    from app.plugins.papers import article_watch as article_watch_state
     from app.plugins.papers.models import PaperImportConfirm, PaperUpdate
     from app.plugins.papers.routes import article_watch, discovery, integrations, library as library_routes
 
@@ -13,6 +14,8 @@ def register(registry, manifest) -> None:
     registry.search_sources.append(search.documents)
     registry.link_sources.append(citation_links)
     registry.agent_guides["papers"] = GUIDE
+    registry.state_migrations.append(article_watch_state.restore_from_watchers)
+    registry.background_services.append(article_watch_state)
     registry.card_builders["articles"] = search.article_card
 
     def import_paper(payload, identifier, values):

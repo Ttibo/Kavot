@@ -34,6 +34,4 @@
 .context-picker footer { padding: 6px 12px; border-top: 1px solid var(--line); color: var(--muted); font-size: 10.5px; }
 .context-picker.mention { max-height: min(340px, 50vh); }
 /* The composer lays its direct children out as rows; the picker and the chips have their own layout. */
-.assistant-composer.agent-composer > .context-picker { display: flex; flex-direction: column; align-items: stretch; justify-content: flex-start; margin-top: 0; }
-.assistant-composer.agent-composer > .assistant-picked { justify-content: flex-start; margin-top: 0; }
 .context-picker-search input, .context-picker-search input:focus { width: auto; max-width: none; height: auto; padding: 0; border: 0; box-shadow: none; }

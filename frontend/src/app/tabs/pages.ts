@@ -8,14 +8,9 @@ import { flushCanvasSaves } from '../../features/documents/canvas';
 
 type Pane = 'primary' | 'secondary';
 
-/** The resource of a page tab. A custom collection is a page of its own (`view/database/<id>`). */
-export function pageResource(view: PageId, collectionId?: string) {
-  const collection = view === 'database' ? collectionId : undefined;
-  return {
-    type: 'view', view, collectionId: collection,
-    path: collection ? `view/database/${collection}` : `view/${view}`,
-    title: viewTitle(view, state.databases.find((item: any) => item.id === collection)?.name),
-  };
+/** The resource of a page tab. */
+function pageResource(view: PageId) {
+  return { type: 'view', view, path: `view/${view}`, title: viewTitle(view) };
 }
 
 /** The main area shows the editor (it always does once the application has started). */
@@ -29,7 +24,7 @@ export function ensureEditor() {
 const otherPane = (pane: Pane): Pane => pane === 'secondary' ? 'primary' : 'secondary';
 
 /** Opens a page in the focused pane (in its active tab, or a new one), or in the other pane. */
-export async function openPage(view: string, options: { collectionId?: string; beside?: boolean; newTab?: boolean } = {}) {
+export async function openPage(view: string, options: { beside?: boolean; newTab?: boolean } = {}) {
   if (!isPage(view)) return;
   await flushCurrentNoteAutosave();
   await flushSecondaryNoteAutosave();
@@ -38,7 +33,7 @@ export async function openPage(view: string, options: { collectionId?: string; b
   await flushCanvasSaves();
   ensureEditor();
   const focused: Pane = state.activeNotePane === 'secondary' ? 'secondary' : 'primary';
-  const tab = workspaceResourceTab(pageResource(view, options.collectionId));
+  const tab = workspaceResourceTab(pageResource(view));
   if (options.beside) {
     const target = otherPane(focused);
     ensureWorkspaceTab(target, tab);

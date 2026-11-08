@@ -31,6 +31,7 @@ _status_lock = threading.Lock()
 # Local edits are noticed by a stat-only watcher; the cloud pushes its own
 # changes over SSE. The periodic pass is only a safety net.
 WATCH_SECONDS = 2
+WATCH_MAX_SECONDS = 30
 SAFETY_SECONDS = 900
 OFFLINE_SECONDS = 60
 _workspace_status = {
@@ -157,29 +158,35 @@ def _run_workspace_sync():
 
 
 def _background_loop():
-    fingerprint, last_pass, failures = None, 0.0, 0
+    fingerprint, last_pass, failures, interval = None, 0.0, 0, WATCH_SECONDS
     while not _stop.is_set():
-        woken = _wake.wait(WATCH_SECONDS)
+        woken = _wake.wait(interval)
         _wake.clear()
         if _stop.is_set():
             break
         try:
-            sync_client = client()
-            # Edits from agents, editors or the file explorer never pass through
-            # the API, so compare a cheap stat signature of the workspace.
-            current = sync_client.fingerprint()
-            periodic = (SAFETY_SECONDS if _events_connected.is_set() else OFFLINE_SECONDS) * 2 ** min(failures, 4)
             with _status_lock:
                 blocked = _workspace_status["auth_required"]
-            if blocked or not (woken or current != fingerprint or time.monotonic() - last_pass >= periodic):
+            sync_client = client()
+            # An unlinked device has nothing to sync: never walk its workspace.
+            if blocked or not sync_client.token():
+                fingerprint = None
+                continue
+            # Edits from agents, editors or the file explorer never pass through
+            # the API, so compare a cheap stat signature of the workspace. A large
+            # workspace is watched less often so the walk stays a small share of the time.
+            started = time.monotonic()
+            current = sync_client.fingerprint()
+            interval = min(WATCH_MAX_SECONDS, max(WATCH_SECONDS, (time.monotonic() - started) * 20))
+            periodic = (SAFETY_SECONDS if _events_connected.is_set() else OFFLINE_SECONDS) * 2 ** min(failures, 4)
+            if not (woken or current != fingerprint or time.monotonic() - last_pass >= periodic):
                 continue
             # Coalesce bursts of editor saves without delaying local responses.
             if _stop.wait(0.5):
                 break
             _wake.clear()
             fingerprint, last_pass = current, time.monotonic()
-            if sync_client.token():
-                run_workspace_sync()
+            run_workspace_sync()
             failures = 0
         except Exception:
             # The status endpoint exposes the last useful error. A missing token,
@@ -413,6 +420,13 @@ def workspace_activity():
 @router.post("/workspace/sync", dependencies=[Depends(local_only)])
 def synchronize_workspace():
     return invoke(lambda _: run_workspace_sync())
+
+
+@router.post("/workspace/deletions/confirm", dependencies=[Depends(local_only)])
+def confirm_deletions():
+    """Apply the deletions a pass held back (many files gone from this device at once)."""
+    invoke(lambda c: c.confirm_deletions(), serialize=False)
+    return run_workspace_sync()
 
 
 

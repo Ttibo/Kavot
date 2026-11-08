@@ -4,8 +4,7 @@
  * navigation) a row in the sidebar. Titles, icons, the tab bar, the new-tab launcher, the agent context
  * and navigation all read this registry. See frontend/TABS.md. */
 
-export type PageId = 'dashboard' | 'chat' | 'tasks' | 'calendar' | 'watchers' | 'workflows'
-  | 'papers' | 'conferences' | 'datasets' | 'database' | 'trash';
+export type PageId = 'papers' | 'chat' | 'terminal' | 'tasks' | 'calendar' | 'trash';
 
 export type Page = {
   title: string;
@@ -17,24 +16,22 @@ export type Page = {
 };
 
 export const pages: Record<PageId, Page> = {
-  dashboard: { title: 'Home', icon: 'home', layout: 'overview-mode', launcher: 1 },
+  papers: { title: 'Library', icon: 'papers', launcher: 1 },
   chat: { title: 'Agents', icon: 'agents', launcher: 2 },
+  // The agent CLIs in a terminal, with all their own options (advanced; opened from the Agents page).
+  terminal: { title: 'Terminal', icon: 'code', launcher: 5 },
   tasks: { title: 'Tasks', icon: 'tasks', layout: 'tasks-mode', launcher: 3 },
   calendar: { title: 'Calendar', icon: 'calendar', layout: 'calendar-mode', launcher: 4 },
-  watchers: { title: 'Watchers', icon: 'sparkle' },
-  workflows: { title: 'Workflows', icon: 'workflow' },
-  papers: { title: 'Library', icon: 'papers', launcher: 5 },
-  conferences: { title: 'Conferences', icon: 'conferences' },
-  datasets: { title: 'Datasets', icon: 'database' },
-  // A custom collection: one page per collection, named after it.
-  database: { title: 'Collection', icon: 'database' },
   trash: { title: 'Trash', icon: 'trash' },
 };
 
 export const isPage = (id: unknown): id is PageId => typeof id === 'string' && Object.hasOwn(pages, id);
 
 /** Older names a link or a saved session may still use. */
-const aliases: Record<string, string> = { discovery: 'papers', 'article-watch': 'watchers', projects: 'notes' };
+const aliases: Record<string, string> = {
+  agents: 'chat', discovery: 'papers', 'article-watch': 'papers', watchers: 'papers',
+  projects: 'notes', dashboard: 'notes', workflows: 'notes', conferences: 'notes', datasets: 'notes', database: 'notes',
+};
 export const canonicalView = (view: string) => aliases[view] || view;
 
 export const launcherPages = (Object.keys(pages) as PageId[])

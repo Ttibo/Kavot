@@ -4,8 +4,8 @@ import { agents, type Run } from './api';
 /** Every agent run is followed here, not by the view that started it: a conversation open in a tab
  * that is hidden or closed still gets its results, and the documents it changed are reloaded.
  *
- * One poller per run (the view's own poll is a listener, not a second timer): the run's state is
- * broadcast with kavot:agent-run-tick while it runs, and kavot:agent-run-finished when it ends.
+ * One poller per run (the view's own poll is a listener, not a second timer): each state of the run
+ * is sent to the listeners of onRunUpdate.
  */
 const watched = new Set<string>();
 const listeners = new Set<(run: Run) => void>();
@@ -30,11 +30,7 @@ export function watchRun(run: Pick<Run, 'id' | 'status' | 'mode'> | null | undef
     if (next.status === 'running') { later(); return; }
     watched.delete(run.id);
     if (run.mode === 'auto' && ![...watched.keys()].length) lockAgentEditors(false);
-    try {
-      if (next.modified_files?.length || next.proposals?.some(item => item.status === 'applied')) await refreshAgentArtifacts();
-    } finally {
-      window.dispatchEvent(new CustomEvent('kavot:agent-run-finished', { detail: { run: next } }));
-    }
+    if (next.modified_files?.length || next.proposals?.some(item => item.status === 'applied')) await refreshAgentArtifacts();
   };
   later();
 }

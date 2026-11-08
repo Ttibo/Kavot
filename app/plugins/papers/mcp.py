@@ -1,12 +1,14 @@
-"""MCP tools of the Papers plugin: the active graph's pack, watches and scholarly search."""
+"""MCP tools of the Papers plugin: the citation graph in view, watches, scholarly search."""
 from __future__ import annotations
 
 import copy
+import time
 from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
 LOOKUP_LIMIT = 30
+LOOKUP_WINDOW = 10 * 60
 # Search results stay in the conversation and are resent on every later call:
 # lists carry a short abstract, get_article_details gives the full one.
 ABSTRACT_PREVIEW = 300
@@ -66,11 +68,13 @@ def install(ctx) -> None:
                                for p in papers[:12]]}
 
     def reserve_lookup(count=1):
-        ctx.active()
-        used = ctx.run.get("literature_lookups", 0)
-        if used + count > LOOKUP_LIMIT:
-            raise ValueError(f"At most {LOOKUP_LIMIT} searches or enrichments per request. Continue in a new message.")
-        ctx.run["literature_lookups"] = used + count
+        """At most LOOKUP_LIMIT online lookups per LOOKUP_WINDOW seconds: an agent loop cannot flood the providers."""
+        now = time.monotonic()
+        recent = [at for at in ctx.run.get("literature_lookups", []) if now - at < LOOKUP_WINDOW]
+        if len(recent) + count > LOOKUP_LIMIT:
+            raise ValueError(f"At most {LOOKUP_LIMIT} searches or enrichments per {LOOKUP_WINDOW // 60} minutes. "
+                             "Work with these results, or continue later.")
+        ctx.run["literature_lookups"] = recent + [now] * count
 
     @ctx.tool(annotations=ctx.network_read)
     def search_articles(query: Annotated[str, Field(min_length=1, max_length=1000)],

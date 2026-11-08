@@ -4,7 +4,8 @@ from typing import Literal
 from fastapi import APIRouter, File, UploadFile
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.core.agents import install, sessions as external_agents
+from app.core.agents import engines, install, sessions as external_agents
+from app.core.agents.context import prepare
 from app.core.agents.resources import inventory, save_attachment
 
 router = APIRouter(prefix="/external-agents", tags=["external-agents"])
@@ -57,17 +58,17 @@ class CheckRequest(BaseModel):
 
 @router.get("/settings")
 def get_settings():
-    return external_agents.public_settings()
+    return engines.public_settings()
 
 
 @router.patch("/settings")
 def save_settings(payload: SettingsUpdate):
-    return external_agents.configure({engine: value.model_dump() for engine, value in payload.engines.items()})
+    return engines.configure({engine: value.model_dump() for engine, value in payload.engines.items()})
 
 
 @router.post("/settings/{engine}/check")
 def check_settings(engine: Engine, payload: CheckRequest):
-    return external_agents.check(engine, payload.executable)
+    return engines.check(engine, payload.executable)
 
 
 @router.get("/settings/{engine}/install")
@@ -92,14 +93,7 @@ def login(engine: Engine):
 
 @router.get("/models/{engine}")
 def models(engine: Engine, refresh: bool = False, executable: str = ""):
-    from app.core.agents.engines import discover
-    from app.core.kernel.config import settings
-    from fastapi import HTTPException
-    binary = external_agents._resolve_executable(engine, executable or external_agents.configuration()[engine]["executable"])
-    if not binary:
-        raise HTTPException(422, "Program not found. Check its path in the settings.")
-    settings.storage_path.mkdir(parents=True, exist_ok=True)
-    return discover(engine, binary, str(settings.storage_path.resolve()), refresh)
+    return engines.models(engine, executable, refresh)
 
 
 @router.get("/sessions")
@@ -140,7 +134,6 @@ def resources():
 
 @router.post("/context")
 def preview_context(payload: MessageCreate):
-    from app.core.agents.context import prepare
     context, resources, target = prepare(payload.context, payload.text, include_sources=False)
     return {"resources": resources, "target": target, "note_intent": context.get("note_intent"), "view_label": context.get("view_label"),
             "project": context.get("project"), "code_repository": context.get("code_repository"), "filters": context.get("filters"),

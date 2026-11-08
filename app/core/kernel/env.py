@@ -106,11 +106,6 @@ def stored(name: str) -> str:
     return _read(user_file()).get(name, "")
 
 
-def overridden(name: str) -> bool:
-    """True when the environment or the repository file pins this value."""
-    return name in os.environ or name in _repository()
-
-
 def update(values: dict[str, str | None]) -> None:
     """Write values to the user file; an empty value removes the line."""
     path = user_file()

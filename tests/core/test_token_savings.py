@@ -2,8 +2,8 @@
 background summaries and a get_context that names each thing once."""
 import json
 
-from app.core.agents import digests, sessions
-from app.core.agents.mcp_server import compact_context
+from app.core.agents import digests, engines, prompt
+from app.mcp.context_view import compact_context
 from app.core.agents.usage import Meter
 
 DEFAULT = {"enabled": True, "executable": "", "model": "opus", "effort": "high", "access": "read",
@@ -18,18 +18,18 @@ def test_a_resumed_claude_session_costs_the_difference():
     resumed.feed({"type": "result", "total_cost_usd": 0.46, "usage": {"input_tokens": 6}})
     assert round(resumed.value()["cost_usd"], 2) == 0.12 and resumed.cumulative == {"cost_usd": 0.46}
     legacy = {"engine": "claude", "usage_history": [{"cost_usd": 0.34}, {"cost_usd": 0.46}]}
-    assert sessions._thread_usage(legacy) == {"cost_usd": 0.46}, "Older conversations stored the running cost"
+    assert prompt.thread_usage(legacy) == {"cost_usd": 0.46}, "Older conversations stored the running cost"
 
 
 def test_questions_run_on_the_lighter_model():
     config = {**DEFAULT, "answer_model": "haiku", "answer_effort": "low"}
-    assert sessions.run_model(config, {"model": "opus", "effort": "high"}, "answer") == {"model": "haiku", "effort": "low"}
-    assert sessions.run_model(config, {"model": "opus", "effort": "high"}, "propose") == {"model": "opus", "effort": "high"}
+    assert prompt.run_model(config, {"model": "opus", "effort": "high"}, "answer") == {"model": "haiku", "effort": "low"}
+    assert prompt.run_model(config, {"model": "opus", "effort": "high"}, "propose") == {"model": "opus", "effort": "high"}
     picked = {"model": "sonnet", "effort": "medium"}
-    assert sessions.run_model(config, picked, "answer") == picked, "A model picked for the conversation is kept"
+    assert prompt.run_model(config, picked, "answer") == picked, "A model picked for the conversation is kept"
     effort_only = {**DEFAULT, "answer_effort": "low"}
-    assert sessions.run_model(effort_only, {"model": "opus", "effort": "high"}, "answer") == {"model": "opus", "effort": "low"}
-    assert sessions.run_model(DEFAULT, {}, "answer") == {"model": "opus", "effort": "high"}
+    assert prompt.run_model(effort_only, {"model": "opus", "effort": "high"}, "answer") == {"model": "opus", "effort": "low"}
+    assert prompt.run_model(DEFAULT, {}, "answer") == {"model": "opus", "effort": "high"}
 
 
 def test_get_context_names_each_source_once():
@@ -56,7 +56,7 @@ def test_a_light_model_writes_the_summary_in_the_background(client, monkeypatch)
     ref = levels.ref(note["id"])
     anchor = note_text(note["id"])[1][0]["anchor"]
     assert digests.queue(ref) is False, "Without a summary model the chat agent is still asked"
-    monkeypatch.setattr(sessions, "configuration", lambda: {"claude": {**DEFAULT, "digest_model": "haiku"}})
+    monkeypatch.setattr(engines, "configuration", lambda: {"claude": {**DEFAULT, "digest_model": "haiku"}})
     prompts = []
     def run(name, config, prompt):
         prompts.append(prompt)

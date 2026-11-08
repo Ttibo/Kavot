@@ -420,3 +420,41 @@ def stop():
     _wake.set()
     if _worker:
         _worker.join(timeout=2)
+
+
+def restore_from_watchers(state: dict, timestamp: str) -> bool:
+    """Bring back, once, the article watches kept by the retired generic watchers.
+
+    Those watchers searched scientific literature for the Library; their record
+    (suggestions, reports, last run) replaces the original article watch. Other
+    watchers are left in the state file untouched."""
+    if state.get("article_watches_restored"):
+        return False
+    watches = state.setdefault("article_watches", [])
+    for watcher in state.get("watchers") or []:
+        target = watcher.get("target") or {}
+        sources = [source.get("type") for source in watcher.get("sources") or []]
+        if target.get("collection_id") != "articles" or sources != ["scholarly"]:
+            continue
+        values = {
+            "name": watcher.get("name") or "Article watch",
+            "description": watcher.get("description") or "",
+            "topics": watcher.get("topics") or [], "keywords": watcher.get("keywords") or [],
+            "folder_ids": watcher.get("folder_ids") or [],
+            "semantic_enabled": watcher.get("semantic_enabled", True),
+            "enabled": bool(watcher.get("enabled", True)),
+            "max_suggestions": max(1, min(30, int(watcher.get("max_items") or 10))),
+            "suggestions": watcher.get("suggestions") or [], "reports": watcher.get("reports") or [],
+            "last_run_at": watcher.get("last_run_at"), "last_error": watcher.get("last_error"),
+            "updated_at": timestamp,
+        }
+        legacy = watcher.get("legacy") or {}
+        original = next((item for item in watches if legacy.get("kind") == "article_watch"
+                         and item.get("id") == legacy.get("id")), None)
+        if original:
+            original.update(values)
+        else:
+            next_id = max((int(item.get("id", 0)) for item in watches), default=0) + 1
+            watches.append({"id": next_id, **values, "created_at": watcher.get("created_at") or timestamp})
+    state["article_watches_restored"] = timestamp
+    return True

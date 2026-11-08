@@ -4,8 +4,6 @@ export const editorSession = {
   activeDragPayload: "",
   noteAutosaveTimer: null,
   noteAutosaveVersion: 0,
-  noteLinkRange: null,
-  secondaryNoteLinkRange: null,
   readerAutosaveTimer: null,
   pendingReaderSave: null,
   secondaryNoteAutosaveTimer: null,

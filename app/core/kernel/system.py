@@ -9,13 +9,14 @@ from app.plugins.planning import service as work
 from app.core.records.repository import store
 
 
-def dashboard() -> dict:
-    state = store.read()
-    notes = [item for item in state["notes"] if not item.get("trashed_at")]
-    papers = [item for item in state["papers"] if item.get("file_path")]
-    note = documents.enrich_note(max(notes, key=lambda item: item["updated_at"]), state) if notes else None
-    paper = library.enrich(max(papers, key=lambda item: item["updated_at"]), state) if papers else None
-    return {"current_note": note, "recent_paper": paper}
+class _Payload:
+    """The values of a request body, for services that take a validated payload."""
+
+    def __init__(self, **values) -> None:
+        self.values = values
+
+    def model_dump(self, **_: object) -> dict:
+        return dict(self.values)
 
 
 def load_demo() -> dict:
@@ -36,12 +37,9 @@ def load_demo() -> dict:
         ("Prepare the comparison matrix", "Variables, methods, datasets, and limitations.", "todo", "medium"),
         ("Organize the local library", "", "done", "low"),
     ):
-        class TaskPayload:
-            def model_dump(self, **_: object) -> dict:
-                return {"project_id": project["id"], "column_id": None, "title": title, "description": description, "status": status, "priority": priority, "labels": [], "checklist": [], "start_date": None, "due_date": None}
-        work.create_task(TaskPayload())
-    class NotePayload:
-        def model_dump(self, **_: object) -> dict:
-            return {"project_id": project["id"], "paper_id": None, "folder_id": None, "template_id": None, "template_context_project_id": None, "title": "Research questions", "content": "# Research questions\n\n- Which methods are most transparent?\n- Where are the methodological gaps?\n"}
-    documents.create_note(NotePayload())
+        work.create_task(_Payload(project_id=project["id"], column_id=None, title=title, description=description, status=status,
+                                  priority=priority, labels=[], checklist=[], start_date=None, due_date=None))
+    documents.create_note(_Payload(project_id=project["id"], paper_id=None, folder_id=None, template_id=None,
+                                   template_context_project_id=None, title="Research questions",
+                                   content="# Research questions\n\n- Which methods are most transparent?\n- Where are the methodological gaps?\n"))
     return {"project_id": project["id"], "paper_ids": [item["id"] for item in papers]}

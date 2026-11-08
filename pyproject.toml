@@ -11,6 +11,8 @@ license = { file = "LICENSE" }
 requires-python = ">=3.10"
 dependencies = [
     "mcp>=1.30,<3",
+    # The agents' integrated terminal: a pseudo-console on Windows (the standard pty module elsewhere).
+    "pywinpty>=2.0,<4; sys_platform == 'win32'",
     "httpx>=0.27,<1",
     "keyring>=25,<27",
     "fastapi>=0.115.0,<1.0.0",

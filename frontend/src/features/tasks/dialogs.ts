@@ -4,8 +4,7 @@ import { closeModal, openModal, projectOptions } from '../../components/dialogs/
 import { openSheet, type SheetHandle } from '../sheet/sheet';
 import { api } from '../../services/api';
 import { refreshData, toast } from '../../app/navigation';
-import { renderDashboard } from '../../app/viewActions';
-import { renderTaskContext } from './actions';
+import { renderTasks } from './actions';
 import { relativeTime } from './text';
 import '../../styles/features/task-sheet.css';
 
@@ -239,8 +238,7 @@ function mountTaskEditor(body: HTMLElement, sheet: { close: (force?: boolean) =>
         // Saving before opening a linked document: do not pull the user back to the tasks.
         if (state.view !== view) return;
         if (onSaved) await onSaved(record);
-        else if (viewShown("dashboard")) renderDashboard();
-        else await renderTaskContext();
+        else renderTasks();
       })();
       toast(task ? "Task saved" : "Task created");
       return true;
@@ -259,7 +257,7 @@ function mountTaskEditor(body: HTMLElement, sheet: { close: (force?: boolean) =>
       await api(`/tasks/${task.id}/archive`, { method: "POST" });
       await sheet.close(true);
       await refreshData();
-      if (viewShown("tasks")) await renderTaskContext();
+      if (viewShown("tasks")) renderTasks();
       toast("Task archived");
     } catch (error) { toast(error.message, "error"); }
   });
@@ -294,7 +292,7 @@ export function taskColumnModal(columnId = null) {
         });
         closeModal();
         await refreshData();
-        await renderTaskContext();
+        renderTasks();
         toast(column ? "Column updated" : "Column added");
       } catch (error) {
         toast(error.message, "error");
@@ -322,7 +320,7 @@ export function deleteTaskColumnModal(columnId) {
         });
         closeModal();
         await refreshData();
-        await renderTaskContext();
+        renderTasks();
         toast("Column deleted; cards moved");
       } catch (error) {
         toast(error.message, "error");

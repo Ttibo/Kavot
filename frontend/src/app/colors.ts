@@ -1,7 +1,7 @@
 /** Interface colors chosen in the settings: overrides of the theme tokens, and the palette offered by color pickers. */
 export type ThemeName = 'light' | 'dark';
-export type ColorRole = 'canvas' | 'surface' | 'sidebar' | 'ink' | 'muted' | 'line' | 'accent';
-export type ThemeColors = Partial<Record<ColorRole, string>>;
+type ColorRole = 'canvas' | 'surface' | 'sidebar' | 'ink' | 'muted' | 'line' | 'accent';
+type ThemeColors = Partial<Record<ColorRole, string>>;
 export type ColorPreferences = { colors: Record<ThemeName, ThemeColors>; palette: string[] };
 
 export const colorRoles: [ColorRole, string, string][] = [

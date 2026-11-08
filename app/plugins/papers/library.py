@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+from collections import Counter
 from pathlib import Path
 from typing import Any, BinaryIO
 
@@ -34,17 +35,26 @@ def paper_folder_ids(paper: dict[str, Any]) -> list[int]:
     return list(dict.fromkeys(value for value in [paper.get("folder_id"), *(paper.get("folder_ids") or [])] if value is not None))
 
 
-def enrich(paper: dict[str, Any], state: dict[str, Any]) -> dict[str, Any]:
+def _counts(state: dict[str, Any]) -> tuple[Counter, Counter]:
+    """Live notes and references per article, counted once for a whole listing."""
+    notes = Counter(item.get("paper_id") for item in state["notes"] if not item.get("trashed_at"))
+    references = Counter(item.get("paper_id") for item in state["paper_references"])
+    return notes, references
+
+
+def enrich(paper: dict[str, Any], state: dict[str, Any], counts: tuple[Counter, Counter] | None = None) -> dict[str, Any]:
     path = local_pdf_path(paper)
     paper = {**paper, "file_path": str(path) if path else paper.get("file_path"),
              "extraction": asset_metadata.summary(path) if path else None}
     projects = [{"id": item["id"], "name": item["name"], "color": item["color"]} for item in state["projects"] if item["id"] in paper.get("project_ids", [])]
     topics = [item for item in state["topics"] if item["id"] in paper.get("topic_ids", [])]
-    return {**paper, "projects": projects, "topics": topics, "note_count": sum(item.get("paper_id") == paper["id"] and not item.get("trashed_at") for item in state["notes"]), "reference_count": sum(item.get("paper_id") == paper["id"] for item in state["paper_references"])}
+    notes, references = counts or _counts(state)
+    return {**paper, "projects": projects, "topics": topics, "note_count": notes[paper["id"]], "reference_count": references[paper["id"]]}
 
 
 def list_papers(project_id: int | None = None, topic_id: int | None = None, paper_status: str | None = None, query: str | None = None) -> list[dict[str, Any]]:
     state = store.read()
+    counts = _counts(state)
     items = state["papers"]
     if project_id is not None:
         items = [item for item in items if project_id in item.get("project_ids", [])]
@@ -55,7 +65,7 @@ def list_papers(project_id: int | None = None, topic_id: int | None = None, pape
     if query:
         needle = query.casefold()
         items = [item for item in items if needle in " ".join([item.get("title", ""), item.get("abstract", ""), *item.get("authors", []), *item.get("tags", [])]).casefold()]
-    return [enrich(item, state) for item in sorted(items, key=lambda value: (value["created_at"], value["id"]), reverse=True)]
+    return [enrich(item, state, counts) for item in sorted(items, key=lambda value: (value["created_at"], value["id"]), reverse=True)]
 
 
 def create_paper(values: dict[str, Any], source: BinaryIO | None = None) -> dict[str, Any]:

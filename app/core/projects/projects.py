@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import copy
 import uuid
 from pathlib import Path
 from typing import Any
@@ -78,15 +79,25 @@ def ensure_files(project: dict[str, Any]) -> dict[str, Any]:
         "repository_path": project.get("repository_path", ""),
         "repository_context_enabled": project.get("repository_context_enabled", False),
     }
-    atomic_write_json(project_paths["manifest"], manifest)
-    canvas = read_json_object(project_paths["canvas"]) or _canvas(project, uid)
+    if manifest != previous:
+        atomic_write_json(project_paths["manifest"], manifest)
+    stored = read_json_object(project_paths["canvas"])
+    canvas = copy.deepcopy(stored) if stored else _canvas(project, uid)
     canvas.update({"projectId": project["id"], "projectUid": uid, "title": project["name"]})
     root = next((item for item in canvas.get("nodes", []) if item.get("type") == "project"), None)
     if root:
         root.update({"title": project["name"], "description": project.get("description", ""), "status": project.get("status", "active"), "color": project.get("color", "#087e86")})
-    atomic_write_json(project_paths["canvas"], canvas)
+    if canvas != stored:
+        atomic_write_json(project_paths["canvas"], canvas)
     index_canvas(project_paths["canvas"], canvas)
     return manifest
+
+
+def _write_if_changed(path: Path, payload: dict[str, Any]) -> None:
+    """Listing projects ensures their files: unchanged files are not rewritten
+    (each write would wake the cloud sync and file watchers for nothing)."""
+    if read_json_object(path) != payload:
+        atomic_write_json(path, payload)
 
 
 def index_canvas(canvas_path: Path, canvas: dict[str, Any]) -> None:
@@ -105,13 +116,13 @@ def index_canvas(canvas_path: Path, canvas: dict[str, Any]) -> None:
         "annotation": node.get("annotation", ""), "card_notes": node.get("cardNotes", ""), "progress": node.get("progress", ""),
     } for node in canvas.get("nodes", []) if isinstance(node, dict) and node.get("type") not in {"project", "zone", "shape", "text"}]
     common = {"schema_version": 1, "project_id": canvas.get("projectId"), "project_uid": canvas.get("projectUid")}
-    atomic_write_json(canvas_path.parent / RELATIONS, {**common, "relations": relations})
+    _write_if_changed(canvas_path.parent / RELATIONS, {**common, "relations": relations})
     # Include free ideas and areas for future assistant context, not just linked files.
     elements = [{key: node[key] for key in (
         "id", "type", "title", "text", "description", "noteId", "url", "databaseId", "scope", "recordId", "collectionType",
         "labels", "annotation", "cardNotes", "progress", "taskId", "taskColumnId", "projectId", "templateId", "collapsed", "x", "y", "width", "height",
     ) if key in node} for node in canvas.get("nodes", []) if isinstance(node, dict)]
-    atomic_write_json(canvas_path.parent / REFERENCES, {**common, "references": references, "elements": elements})
+    _write_if_changed(canvas_path.parent / REFERENCES, {**common, "references": references, "elements": elements})
 
 
 def remove_note_reference(project: dict[str, Any], note_id: int) -> bool:

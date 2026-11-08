@@ -114,11 +114,6 @@ export function SharingPanel({initialSource, onDirtyChange}: {initialSource?: Sh
     </section>}
   </div>;
 }
-
-export function ShareButton({source}: {source: ShareSource}) {
-  const [open, setOpen] = useState(false);
-  return <><button className="button button-small" onClick={() => setOpen(true)}>Share</button>{open && <ShareDialog source={source} close={() => setOpen(false)}/>}</>;
-}
 function ShareDialog({source, close}: {source: ShareSource; close: () => void}) {
   const dialog = useRef<HTMLDialogElement>(null);
   const dirty = useRef(false);

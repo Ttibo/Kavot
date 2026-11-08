@@ -1,6 +1,6 @@
 /** Reading a task description, written in Markdown (older tasks) or HTML (rich editor). */
 
-export type TaskDigest = { summary: string; done: number; total: number; links: number };
+type TaskDigest = { summary: string; done: number; total: number; links: number };
 
 const isHtml = (value: string) => /^\s*<[a-z][\s\S]*>/i.test(value);
 

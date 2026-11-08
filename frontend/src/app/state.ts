@@ -69,18 +69,13 @@ export const state = {
   settingsTab: "general",
   theme: initialTheme,
   // Graph search was merged into the library; keep old ?view=discovery links working.
-  view: ((view) => view === "discovery" ? "papers" : view === "article-watch" ? "watchers" : view)(["discovery", "dashboard", "projects", "papers", "article-watch", "watchers", "workflows", "chat", "tasks", "notes", "calendar", "database", "conferences", "datasets", "settings", "trash"].includes(
-    new URLSearchParams(window.location.search).get("view"),
-  )
-    ? new URLSearchParams(window.location.search).get("view")
-    : "dashboard"),
+  view: ((view) => ["papers", "chat", "terminal", "tasks", "notes", "calendar", "settings", "trash"].includes(view) ? view
+    : ["discovery", "article-watch", "watchers"].includes(view) ? "papers" : "notes")(new URLSearchParams(window.location.search).get("view")),
   projects: [] as Project[],
   papers: [] as Paper[],
   paperFolders: [] as PaperFolder[],
   tasks: [] as any[],
   taskColumns: [] as any[],
-  conferences: [] as any[],
-  datasets: [] as any[],
   calendarEvents: [] as any[],
   notes: [] as any[],
   noteFolders: [] as NoteFolder[],
@@ -88,19 +83,7 @@ export const state = {
   noteTemplates: [] as any[],
   noteScripts: [] as any[],
   databases: [] as any[],
-  workflows: [] as any[],
-  workflowId: null as number | null,
-  /** Project the whole interface is filtered on (sidebar trees, tasks, library…), or null for the whole workspace. */
-  scopeProjectId: (Number(localStorage.getItem("kavot-scope-project")) || null) as number | null,
-  /** Last project opened in the Atelier (code folders, map and agents). */
-  atelierProjectId: null as number | null,
-  databaseRecords: {} as Record<string, Array<{ id: string; values: Record<string, any>; updated_at?: string; note?: Note }>>,
-  collectionId: "articles",
-  /** Item open in the side panel of a collection page. */
-  collectionPanel: null as { type: string; id: string | number; databaseId: string; session?: number; projectIds?: number[] } | null,
-  collectionsSidebarOpen: localStorage.getItem("kavot-collections-open") !== "false",
   workspaceTree: [],
-  dashboard: null as { recent_paper?: Paper; current_note?: any } | null,
   recentDocument: initialWorkspaceSession.recentDocument || null,
   recentFile:
     initialWorkspaceSession.recentFile ||
@@ -119,16 +102,11 @@ export const state = {
   currentNoteId: null,
   noteScope: "general",
   noteFolderId: "all" as string | number,
-  collapsedFolders: new Set(),
-  collapsedSpaces: new Set(["readings"]),
-  initializedReadingSpaces: new Set(),
   taskProjectFilter: "all",
   taskView: localStorage.getItem("kavot-task-view") === "list" ? "list" : "kanban",
   calendarProjectFilter: "all",
   calendarSourceFilter: "all",
   calendarCursor: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
-  conferenceProjectFilter: "all",
-  datasetProjectFilter: "all",
   paperProjectFilter: "all",
   paperFolderFilter: "all",
   paperSearch: "",
@@ -153,7 +131,6 @@ export const state = {
   expandedPaperFolders: new Set(),
   editingNoteFolderId: null,
   editingWorkspacePath: null,
-  focusNoteTitleId: null,
 };
 
 // This module is also imported by React views while the module graph is

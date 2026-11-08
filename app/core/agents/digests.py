@@ -35,8 +35,8 @@ _worker: threading.Thread | None = None
 
 def engine() -> tuple[str, dict] | None:
     """The first enabled engine with a summary model."""
-    from app.core.agents.sessions import configuration
-    return next(((name, config) for name, config in configuration().items()
+    from app.core.agents import engines
+    return next(((name, config) for name, config in engines.configuration().items()
                  if config.get("enabled") and config.get("digest_model") and name in COMMANDS), None)
 
 
@@ -104,9 +104,9 @@ def summarize(ref: str) -> dict[str, Any] | None:
 
 
 def _run(name: str, config: dict, prompt: str) -> tuple[str, dict]:
-    from app.core.agents.sessions import _parse_result, _resolve_executable
+    from app.core.agents import cli, engines
     from app.core.agents.usage import Meter
-    binary = _resolve_executable(name, config["executable"])
+    binary = engines.resolve_executable(name, config["executable"], shims=False)
     if not binary:
         raise ValueError("Program not found.")
     # An empty folder of its own: nothing to read there, and no project instructions.
@@ -123,7 +123,7 @@ def _run(name: str, config: dict, prompt: str) -> tuple[str, dict]:
             meter.feed(json.loads(line))
         except ValueError:
             continue
-    return _parse_result(name, result.stdout)[1], meter.value()
+    return cli.parse_result(name, result.stdout)[1], meter.value()
 
 
 def _object(answer: str) -> dict:

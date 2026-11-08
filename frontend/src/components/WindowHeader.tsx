@@ -37,6 +37,9 @@ function readTitlebar(state: any, zone: HTMLElement | null): Titlebar {
   return { groups, title, icon: viewIcon };
 }
 
+/** Content edited in place: its mutations never change the layout of the panes. */
+const EDITING_SURFACES = '.ProseMirror, [contenteditable="true"], .canvas-viewport, .drawing-paper';
+
 type DraggedTab = { pane: string; id: string };
 let draggedTab: DraggedTab | null = null;
 const moveTab = (tab: DraggedTab, pane: string, index = -1) =>
@@ -56,8 +59,8 @@ function editorDropTarget(event: DragEvent, state: any) {
   return target === draggedTab.pane ? null : { pane: target, element: pane, split: false };
 }
 
-export function WindowHeader({ sidebarCollapsed, onToggleSidebar }: {
-  sidebarCollapsed: boolean; onToggleSidebar: () => void;
+export function WindowHeader({ sidebarCollapsed }: {
+  sidebarCollapsed: boolean;
 }) {
   const runtime = useOptionalRuntime();
   const [native, setNative] = useState(false);
@@ -110,7 +113,11 @@ export function WindowHeader({ sidebarCollapsed, onToggleSidebar }: {
     refresh();
     const unsubscribe = subscribe(refresh);
     const main = document.getElementById('main-content');
-    const mutations = new MutationObserver(refresh);
+    // Typing in an editor or moving canvas cards mutates the main area constantly; only changes around the panes
+    // (a pane swapped, split or resized) can move the tab groups.
+    const mutations = new MutationObserver(records => {
+      if (records.some(record => !(record.target instanceof Element ? record.target : record.target.parentElement)?.closest(EDITING_SURFACES))) refresh();
+    });
     if (main) mutations.observe(main, { childList: true, subtree: true, attributes: true, attributeFilter: ['style', 'class'] });
     const sizes = new ResizeObserver(refresh);
     if (main) sizes.observe(main);
@@ -198,8 +205,7 @@ export function WindowHeader({ sidebarCollapsed, onToggleSidebar }: {
     onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag} onPointerCancel={endDrag}
     onDoubleClick={event => { if (native && isDragSurface(event.target)) void command('toggle_maximize_window'); }}>
     <div className={`titlebar-lead${sidebarCollapsed ? ' is-collapsed' : ''}`}>
-      <button type="button" className="titlebar-brand" data-nav="dashboard" aria-label="Kavot home" title="Research Home"><span className="brand-mark">{/* Drawn inline so it follows the accent color. */}<svg viewBox="0 0 32 36" width="14" height="16" aria-hidden="true"><path className="brand-mark-letter" d="M3 3h7v12L20 3h9L16 18l13 15h-9L10 21v12H3V3Z"/><path className="brand-mark-dot" d="m27 17 3 3-3 3-3-3 3-3Z"/></svg></span><span className="titlebar-brand-name">Kavot</span></button>
-      <button type="button" className="titlebar-button" aria-label={sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'} title="Sidebar (Ctrl+\)" aria-pressed={!sidebarCollapsed} onClick={onToggleSidebar}><Icon name="sidebar" size={15}/></button>
+      <button type="button" className="titlebar-brand" data-nav="notes" aria-label="Kavot, back to the notes" title="Notes"><span className="brand-mark">{/* Drawn inline so it follows the accent color. */}<svg viewBox="0 0 32 36" width="14" height="16" aria-hidden="true"><path className="brand-mark-letter" d="M3 3h7v12L20 3h9L16 18l13 15h-9L10 21v12H3V3Z"/><path className="brand-mark-dot" d="m27 17 3 3-3 3-3-3 3-3Z"/></svg></span><span className="titlebar-brand-name">Kavot</span></button>
       {/* Back and Forward in the active tab only. */}
       <button type="button" className="titlebar-button" aria-label="Back" title="Back in this tab (Alt+←)" disabled={!runtime?.canNavigateTabHistory(-1)} onClick={() => void runtime?.navigateTabHistory(-1)}><Icon name="back" size={15}/></button>
       <button type="button" className="titlebar-button" aria-label="Forward" title="Forward in this tab (Alt+→)" disabled={!runtime?.canNavigateTabHistory(1)} onClick={() => void runtime?.navigateTabHistory(1)}><Icon name="chevron" size={15}/></button>
@@ -229,10 +235,6 @@ export function WindowHeader({ sidebarCollapsed, onToggleSidebar }: {
     </div>
     {error && <span className="window-header-error" role="alert">{error}</span>}
     <div className="titlebar-trail">
-      {/* The explorer is always in the sidebar: the file search is available from every view. */}
-      <label className="titlebar-search"><Icon name="search" size={13}/><input id="note-filter" type="search" placeholder="Search files…" aria-label="Search notes"/></label>
-      {/* The agents open beside what is on screen, as a tab of the editor. */}
-      <button type="button" className="titlebar-button" aria-label="Open the agents to the side" title="Agents, to the side" onClick={() => void import('../app/tabs/pages').then(module => module.openPage('chat', { beside: true }))}><Icon name="agents" size={15}/></button>
     </div>
     {controls}
   </header>;

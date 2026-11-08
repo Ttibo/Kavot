@@ -17,6 +17,7 @@ export function startCloudRefresh(runtime: {refreshData: () => Promise<void>; re
   let controller: AbortController | undefined;
   let reconnect: number | undefined;
   let watchdog: number | undefined;
+  let retry: number | undefined;
   const edited = () => { editVersion++; };
   const editing = () => (document.activeElement?.matches('input, textarea, select, [contenteditable="true"]')
       && !document.activeElement?.closest('.note-pane, .reader-note-pane, [data-canvas-path]'))
@@ -26,9 +27,13 @@ export function startCloudRefresh(runtime: {refreshData: () => Promise<void>; re
     || noteTitleTimers.size || workspaceMarkdownTimers.size
     || editorSession.noteAutosaveTimer || editorSession.secondaryNoteAutosaveTimer
     || editorSession.readerAutosaveTimer || editorSession.pendingReaderSave;
+  // A received revision that cannot be applied yet (a sync running, the user editing) is retried later; nothing
+  // runs on a timer while the workspace is up to date. A hidden window applies it when shown (visibilitychange).
+  const retryLater = () => { window.clearTimeout(retry); retry = window.setTimeout(() => void poll(), 1000); };
   const poll = async () => {
     if (polling || stopped || document.hidden) return;
     polling = true;
+    let deferred = false;
     try {
       const status = latest;
       if (!status) return;
@@ -36,7 +41,9 @@ export function startCloudRefresh(runtime: {refreshData: () => Promise<void>; re
       if (revision === undefined) return;
       // A nonzero revision on the first poll may have arrived during startup.
       applied ??= 0;
-      if (status.running || revision === applied || editing()) return;
+      if (revision === applied) return;
+      deferred = true;
+      if (status.running || editing()) return;
       const before = editVersion;
       await runtime.refreshData();
       if (stopped || before !== editVersion || editing()) return;
@@ -46,9 +53,13 @@ export function startCloudRefresh(runtime: {refreshData: () => Promise<void>; re
       runtime.render();
       restorePositions();
       applied = revision;
+      deferred = false;
     } catch {
-      // Keep the current view on network failure and retry on the next poll.
-    } finally { polling = false; }
+      // Keep the current view on network failure and retry.
+    } finally {
+      polling = false;
+      if (deferred && !stopped) retryLater();
+    }
   };
   const receive = (status: {running: boolean; local_revision?: number}) => { latest = status; void poll(); };
   const fallback = async () => {
@@ -107,8 +118,6 @@ export function startCloudRefresh(runtime: {refreshData: () => Promise<void>; re
   document.addEventListener('input', edited, true);
   document.addEventListener('change', edited, true);
   document.addEventListener('visibilitychange', poll);
-  // Retry deferred renders without network polling while SSE is connected.
-  const timer = window.setInterval(() => void poll(), 250);
   const fallbackTimer = window.setInterval(() => void fallback(), 10000);
   void connect();
   void fallback();
@@ -118,7 +127,7 @@ export function startCloudRefresh(runtime: {refreshData: () => Promise<void>; re
     window.clearTimeout(reconnect);
     window.clearTimeout(watchdog);
     window.clearInterval(fallbackTimer);
-    window.clearInterval(timer);
+    window.clearTimeout(retry);
     document.removeEventListener('input', edited, true);
     document.removeEventListener('change', edited, true);
     document.removeEventListener('visibilitychange', poll);

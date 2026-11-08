@@ -1,161 +1,40 @@
+"""Two-way sync of the local workspace folder with Kavot Cloud, file by file, like a drive.
+
+The pieces live next to this module: ``files`` (what syncs, hashing, walking),
+``errors`` (CloudError and address checks), ``ledger`` (the SQLite state of this
+device) and ``conflicts`` (files changed on both sides).
+"""
 from __future__ import annotations
 
-import difflib
 import hashlib
-import json
 import os
-import io
 import shutil
-import sqlite3
 import tempfile
-import uuid
-import re
 import threading
 import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
-import xml.etree.ElementTree as ET
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from urllib.parse import urlsplit
 
 import httpx
 
+from app.core.storage.cloud_sync.conflicts import STATE_FILE, ConflictHandling
+from app.core.storage.cloud_sync.errors import CloudError, https_url, s3_error
+from app.core.storage.cloud_sync.files import (
+    FileData, create_without_overwrite, device_name, reader, sha, tree_fingerprint, walk,
+)
+from app.core.storage.cloud_sync.ledger import SyncLedger
+
 MANIFEST_PAGE = 500
-# .kavot-local holds derived, per-device data (search index, change journal).
-EXCLUDED_PARTS = {".kavot-conflicts", ".kavot-backups", ".kavot-local"}
+# More deletions than this in one pass wait for a confirmation (an emptied or unmounted folder).
+MASS_DELETE_MIN = 10
+MASS_DELETE_SHARE = 0.3
+# Local copies kept when the cloud deletes or replaces a file, kept this long.
+KEEP_REMOVED_SECONDS = 30 * 24 * 3600
 # Parallel transfers hide network latency; each path is still handled by one worker.
 TRANSFER_WORKERS = 4
-# Sync activity kept per device for Settings: passes that did something, file events.
-ACTIVITY_PASSES = 50
-ACTIVITY_EVENTS = 200
-ACTIVITY_COUNTS = ("uploaded", "downloaded", "deleted_local", "deleted_remote")
-
-
-class CloudError(Exception):
-    def __init__(self, status, detail, current=None):
-        self.status, self.detail = status, detail
-        self.current = current
-        super().__init__(str(detail))
-
-
-class FileData:
-    """A bounded-memory file payload, optionally owning a temporary download."""
-    def __init__(self, path, temporary=False):
-        self.path, self.temporary = Path(path), temporary
-
-    def __len__(self):
-        return self.path.stat().st_size
-
-    def __bool__(self):
-        return True
-
-    def decode(self, encoding):
-        return self.path.read_bytes().decode(encoding)
-
-    def __del__(self):
-        if self.temporary:
-            self.path.unlink(missing_ok=True)
-
-
-def reader(data):
-    return data.path.open("rb") if isinstance(data, FileData) else io.BytesIO(data)
-
-
-def sha(data):
-    digest = hashlib.sha256()
-    with reader(data) as handle:
-        while chunk := handle.read(1024 * 1024):
-            digest.update(chunk)
-    return digest.hexdigest()
-
-
-def https_url(value):
-    parsed = urlsplit(value)
-    if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password or parsed.fragment:
-        raise CloudError(422, "An HTTPS URL without credentials is required.")
-    return value
-
-
-def s3_error(response, operation="Upload"):
-    """Expose actionable S3 diagnostics without leaking signed URLs or keys."""
-    fields = {}
-    try:
-        root = ET.fromstring(response.content[:65536])
-        fields = {node.tag.rsplit("}", 1)[-1]: node.text or "" for node in root.iter()}
-    except ET.ParseError:
-        pass
-    code = fields.get("Code", "")
-    if not re.fullmatch(r"[A-Za-z][A-Za-z0-9]{0,79}", code):
-        code = ""
-    detail = f"{operation} rejected by S3 (HTTP {response.status_code}{', ' + code if code else ''})."
-    if code in {"AuthorizationQueryParametersError", "AuthorizationHeaderMalformed"}:
-        expected = re.search(r"expecting ['\"]([a-z0-9-]{1,63})['\"]", fields.get("Message", ""))
-        region = expected.group(1) if expected else fields.get("Region", "")
-        if re.fullmatch(r"[a-z0-9-]{1,63}", region):
-            detail += f" Wrong S3 region: set KAVOT_S3_REGION={region} on the cloud server, then reload the API configuration."
-        else:
-            detail += " Check the S3 region configured on the cloud server."
-    else:
-        hint = {
-            "SignatureDoesNotMatch": "Check the region, S3 address and credentials configured on the cloud server.",
-            "AccessDenied": "Check the bucket access rights and that the S3 authorization is valid.",
-            "InvalidAccessKeyId": "The S3 access key configured on the cloud server is invalid.",
-            "RequestExpired": "The S3 authorization has expired. Run the sync again to renew it.",
-            "ExpiredToken": "The cloud server’s S3 credentials have expired.",
-            "RequestTimeTooSkewed": "Check the cloud server’s clock.",
-            "BadDigest": "The storage rejected the uploaded file’s checksum.",
-            "NotImplemented": "The storage does not support an option of the S3 transfer.",
-            "PermanentRedirect": "The configured S3 address does not match the bucket’s region.",
-        }.get(code, "Check the cloud storage configuration, or try again if the service is temporarily unavailable.")
-        detail += " " + hint
-    detail += " The pending local copy is kept."
-    return CloudError(503 if response.status_code >= 500 else 502, detail)
-
-
-def create_without_overwrite(source: Path, target: Path, *, move=False):
-    """Publish a file only if target is absent, including restricted Windows hosts."""
-    try:
-        os.link(source, target)
-        return
-    except PermissionError:
-        if os.name != "nt":
-            raise
-    if move:
-        # On Windows rename is atomic and refuses to replace an existing file.
-        os.rename(source, target)
-        return
-    with source.open("rb") as reader, target.open("xb") as writer:
-        while chunk := reader.read(1024 * 1024):
-            writer.write(chunk)
-        writer.flush()
-        os.fsync(writer.fileno())
-
-
-def tree_fingerprint(root):
-    """Cheap stat-only signature of a folder, ignoring Kavot copies."""
-    digest = hashlib.sha256()
-    stack = [Path(root)]
-    while stack:
-        folder = stack.pop()
-        try:
-            entries = sorted(os.scandir(folder), key=lambda entry: entry.name)
-        except OSError:
-            continue
-        for entry in entries:
-            if entry.name in EXCLUDED_PARTS or entry.name.startswith(".kavot-download-"):
-                continue
-            try:
-                if entry.is_symlink():
-                    continue
-                if entry.is_dir():
-                    stack.append(Path(entry.path))
-                elif entry.is_file():
-                    info = entry.stat()
-                    digest.update(f"{entry.path}|{info.st_size}|{info.st_mtime_ns}|".encode("utf-8", "surrogatepass"))
-            except OSError:
-                continue
-    return digest.hexdigest()
-
 
 class Vault:
     def __init__(self, origin):
@@ -176,7 +55,8 @@ class Vault:
                 pass
 
 
-class LocalSync:
+
+class LocalSync(SyncLedger, ConflictHandling):
     def __init__(self, origin, root: Path, state_path: Path, *, vault=None, api_transport=None, s3_transport=None):
         self.origin = https_url(origin).rstrip("/")
         if urlsplit(self.origin).path or urlsplit(self.origin).query:
@@ -189,6 +69,9 @@ class LocalSync:
         self._session = threading.local()
         self._manifest_cache = None
         self._hash_cache = {}
+        self._hashes_loaded = False
+        # Set by confirm_deletions: the next pass applies the deletions it would otherwise hold.
+        self.allow_deletions = False
         # The account behind the stored token, reused across passes: a pass
         # does not need GET /me while the device token stays the same.
         self._account_cache = None
@@ -239,7 +122,7 @@ class LocalSync:
         return data
 
     def connect(self):
-        self.pairing = self.api("POST", "/devices/start", {"name": "Kavot bureau"}, anonymous=True)
+        self.pairing = self.api("POST", "/devices/start", {"name": f"Kavot · {device_name()}"}, anonymous=True)
         return {key: self.pairing[key] for key in ("verification_url", "user_code", "expires_in")}
 
     def poll(self):
@@ -270,122 +153,6 @@ class LocalSync:
         except OSError:
             raise CloudError(404, "Local file unavailable.")
 
-    @contextmanager
-    def db(self):
-        self.state_path.parent.mkdir(parents=True, exist_ok=True)
-        connection = sqlite3.connect(self.state_path, timeout=30)
-        try:
-            os.chmod(self.state_path, 0o600)
-            connection.execute("PRAGMA journal_mode=WAL")
-            with connection:
-                connection.execute("CREATE TABLE IF NOT EXISTS tracked (key TEXT PRIMARY KEY, state TEXT NOT NULL, snapshot BLOB)")
-                yield connection
-        finally:
-            connection.close()
-
-    def key(self, account, relative):
-        return json.dumps([self.origin, account, str(self.root), self.path(relative).relative_to(self.root).as_posix()])
-
-    def load(self, key):
-        with self.db() as db:
-            row = db.execute("SELECT state,snapshot FROM tracked WHERE key=?", (key,)).fetchone()
-        if not row:
-            return {"resource_id": str(uuid.uuid4()), "version": 0}, None
-        state = json.loads(row[0])
-        snapshot = FileData(self.state_path.parent / state["snapshot_file"]) if state.get("snapshot_file") else row[1]
-        return state, snapshot
-
-    def save(self, key, state, snapshot=None):
-        if isinstance(snapshot, FileData):
-            if not state.get("snapshot_file"):
-                folder = self.state_path.parent / "cloud-sync-pending"
-                folder.mkdir(parents=True, exist_ok=True)
-                destination = folder / uuid.uuid4().hex
-                with reader(snapshot) as source, destination.open("xb") as output:
-                    shutil.copyfileobj(source, output, 1024 * 1024)
-                    output.flush()
-                    os.fsync(output.fileno())
-                state["snapshot_file"] = str(destination.relative_to(self.state_path.parent))
-            snapshot = None
-        with self.db() as db:
-            previous = db.execute("SELECT state FROM tracked WHERE key=?", (key,)).fetchone()
-            db.execute("INSERT INTO tracked VALUES (?,?,?) ON CONFLICT(key) DO UPDATE SET state=excluded.state,snapshot=excluded.snapshot",
-                       (key, json.dumps(state), snapshot))
-        old = json.loads(previous[0]).get("snapshot_file") if previous else None
-        if old and old != state.get("snapshot_file"):
-            (self.state_path.parent / old).unlink(missing_ok=True)
-
-    def forget(self, key):
-        with self.db() as db:
-            db.execute("DELETE FROM tracked WHERE key=?", (key,))
-
-    @contextmanager
-    def activity_db(self):
-        with self.db() as db:
-            db.execute("CREATE TABLE IF NOT EXISTS sync_passes (id INTEGER PRIMARY KEY, scope TEXT NOT NULL, "
-                       "started_at REAL NOT NULL, finished_at REAL NOT NULL, duration_ms INTEGER, "
-                       "signature TEXT, repeats INTEGER NOT NULL DEFAULT 0, data TEXT NOT NULL)")
-            db.execute("CREATE TABLE IF NOT EXISTS sync_events (id INTEGER PRIMARY KEY, scope TEXT NOT NULL, "
-                       "at REAL NOT NULL, kind TEXT NOT NULL, path TEXT NOT NULL, size INTEGER, detail TEXT)")
-            yield db
-
-    def activity_scope(self):
-        return json.dumps([self.origin, str(self.root)])
-
-    def record_activity(self, started_at, duration_ms, summary=None, error=None):
-        """Keep a pass that did something; repeated idle or failing passes share one row.
-
-        Returns True when the stored activity changed.
-        """
-        events, self.pass_events = self.pass_events, []
-        summary = summary or {}
-        counts = {name: int(summary.get(name) or 0) for name in ACTIVITY_COUNTS}
-        conflicts = sorted(summary.get("conflicts") or [])
-        errors = summary.get("errors") or []
-        if not any(counts.values()) and not conflicts and not errors and not error and not events:
-            return False
-        data = {**counts, "conflicts": conflicts[:20], "conflict_count": len(conflicts),
-                "errors": errors[:20], "error_count": len(errors), "error": error}
-        signature = None if any(counts.values()) else hashlib.sha256(json.dumps(
-            [conflicts, sorted(item["path"] + "|" + item["detail"] for item in errors), error]).encode()).hexdigest()
-        scope, now = self.activity_scope(), time.time()
-        with self.activity_db() as db:
-            last = db.execute("SELECT id,signature FROM sync_passes WHERE scope=? ORDER BY id DESC LIMIT 1", (scope,)).fetchone()
-            if signature and last and last[1] == signature:
-                # The same conflicts or failure again: do not push real activity out.
-                db.execute("UPDATE sync_passes SET finished_at=?,duration_ms=?,repeats=repeats+1 WHERE id=?",
-                           (now, duration_ms, last[0]))
-            else:
-                db.execute("INSERT INTO sync_passes (scope,started_at,finished_at,duration_ms,signature,data) VALUES (?,?,?,?,?,?)",
-                           (scope, started_at, now, duration_ms, signature, json.dumps(data)))
-            for event in events:
-                if event["kind"] == "conflict":
-                    # An unresolved conflict is reported by every pass: list it once.
-                    previous = db.execute("SELECT kind FROM sync_events WHERE scope=? AND path=? ORDER BY id DESC LIMIT 1",
-                                          (scope, event["path"])).fetchone()
-                    if previous and previous[0] == "conflict":
-                        continue
-                db.execute("INSERT INTO sync_events (scope,at,kind,path,size,detail) VALUES (?,?,?,?,?,?)",
-                           (scope, event["at"], event["kind"], event["path"], event.get("size"), event.get("detail")))
-            for table, keep in (("sync_passes", ACTIVITY_PASSES), ("sync_events", ACTIVITY_EVENTS)):
-                db.execute(f"DELETE FROM {table} WHERE scope=? AND id NOT IN "
-                           f"(SELECT id FROM {table} WHERE scope=? ORDER BY id DESC LIMIT ?)", (scope, scope, keep))
-        return True
-
-    def activity(self):
-        scope = self.activity_scope()
-        with self.activity_db() as db:
-            passes = db.execute("SELECT id,started_at,finished_at,duration_ms,repeats,data FROM sync_passes "
-                                "WHERE scope=? ORDER BY id DESC LIMIT ?", (scope, ACTIVITY_PASSES)).fetchall()
-            events = db.execute("SELECT id,at,kind,path,size,detail FROM sync_events "
-                                "WHERE scope=? ORDER BY id DESC LIMIT ?", (scope, ACTIVITY_EVENTS)).fetchall()
-        return {
-            "passes": [{"id": row[0], "started_at": row[1], "finished_at": row[2], "duration_ms": row[3],
-                        "repeats": row[4], **json.loads(row[5])} for row in passes],
-            "events": [{"id": row[0], "at": row[1], "kind": row[2], "path": row[3], "size": row[4],
-                        "detail": row[5]} for row in events],
-        }
-
     def erased(self, resource_id):
         """True when the cloud no longer knows this resource at all."""
         try:
@@ -396,36 +163,20 @@ class LocalSync:
             return error.status == 404
         return False
 
-    def tracked(self, account):
-        """Return synchronization states belonging to this account/workspace."""
-        result = {}
-        with self.db() as db:
-            rows = db.execute("SELECT key,state FROM tracked").fetchall()
-        for key, raw_state in rows:
-            try:
-                origin, owner, root, relative = json.loads(key)
-            except (TypeError, ValueError):
-                continue
-            if origin == self.origin and owner == account and root == str(self.root):
-                result[relative] = (key, json.loads(raw_state), None)
-        return result
-
     def scan(self):
         """Hash regular workspace files without following links outside it."""
         files, skipped = {}, []
         if not self.root.exists():
             raise CloudError(409, "The local folder is unavailable. Sync paused to protect the cloud files.")
-        for candidate in self.root.rglob("*"):
-            path = None
+        if not self._hashes_loaded:
+            self._hash_cache = self.load_hashes()
+            self._hashes_loaded = True
+        previous = dict(self._hash_cache)
+        for path, entry in walk(self.root):
+            candidate = Path(entry.path)
             try:
-                relative = candidate.relative_to(self.root)
-                if any(part in EXCLUDED_PARTS for part in relative.parts):
-                    continue
-                path = relative.as_posix()
-                if candidate.is_symlink():
+                if entry.is_symlink():
                     skipped.append(path)
-                    continue
-                if candidate.name.startswith(".kavot-download-") or not candidate.is_file():
                     continue
                 stat = candidate.stat()
                 signature = (stat.st_size, stat.st_mtime_ns, stat.st_ctime_ns)
@@ -442,10 +193,10 @@ class LocalSync:
                         continue
                     self._hash_cache[path] = (signature, files[path])
             except (OSError, CloudError):
-                if path:
-                    skipped.append(path)
+                skipped.append(path)
                 continue
         self._hash_cache = {path: value for path, value in self._hash_cache.items() if path in files}
+        self.store_hashes(previous)
         return files, skipped
 
     def fingerprint(self):
@@ -581,7 +332,25 @@ class LocalSync:
             self.save(key, state)
         elif result["status"] == "resolved":
             return self.resolve(relative, result["resolution"], result["current"]["version"])
+        elif result["status"] == "conflict":
+            return self.settle_conflict(relative, result)
         return result
+
+    def settle_conflict(self, relative, result):
+        """Settle an upload that raced another device's, like a drive does.
+
+        The cloud refuses to pick a winner; without this the file stayed blocked
+        until someone resolved it by hand, and every pass reported it again.
+        An edit beats a remote deletion; otherwise both versions are kept and
+        this device's one becomes the cloud's conflict copy. If the file changed
+        again meanwhile, the conflict is left for the person to resolve."""
+        current = result.get("current") or {}
+        choice = "keep_local" if current.get("deleted_at") else "keep_both"
+        try:
+            settled = self.resolve(relative, choice, current["version"])
+        except (CloudError, OSError, KeyError):
+            return result
+        return settled if settled.get("status") != "conflict" else result
 
     def download(self, revision_id):
         info = self.api("GET", f"/sync/revisions/{revision_id}/download")
@@ -681,32 +450,25 @@ class LocalSync:
             raise CloudError(409, "The local file changed during the remote deletion.")
         folder = self.root / ".kavot-conflicts"
         folder.mkdir(exist_ok=True)
-        backup = folder / (uuid.uuid4().hex + "-supprime-" + target.name)
+        backup = folder / (uuid.uuid4().hex + "-deleted-" + target.name)
         target.replace(backup)
         return backup.relative_to(self.root).as_posix()
 
+    def prune_removed(self):
+        """Forget the local copies of files the cloud deleted or replaced, after a month."""
+        folder = self.root / ".kavot-conflicts"
+        if not folder.is_dir():
+            return
+        limit = time.time() - KEEP_REMOVED_SECONDS
+        for entry in folder.iterdir():
+            try:
+                if entry.is_file() and entry.stat().st_mtime < limit:
+                    entry.unlink()
+            except OSError:
+                continue
 
-    def initial_conflict(self, account, relative, remote):
-        """Merge two unrelated first-sync files without losing either copy."""
-        target = self.path(relative)
-        suffix = target.suffix
-        stem = target.name[:-len(suffix)] if suffix else target.name
-        copy = target.with_name(f"{stem[:120]} (conflit local {uuid.uuid4().hex[:8]}){suffix}")
-        target.replace(copy)
-        try:
-            data = self.download(remote["revision_id"])
-            self.write_remote(target, data, None)
-        except Exception:
-            if not target.exists() and copy.exists():
-                copy.replace(target)
-            raise
-        self.save(self.key(account, relative), {
-            "resource_id": remote["id"], "version": remote["version"],
-            "sha256": remote["sha256"], "deleted": False,
-        })
-        copy_relative = copy.relative_to(self.root).as_posix()
-        self.push(copy_relative)
-        return copy_relative
+    def confirm_deletions(self):
+        self.allow_deletions = True
 
     def replace_cloud_from_local(self):
         # Validate that the local source is readable before any remote deletion.
@@ -765,13 +527,38 @@ class LocalSync:
         remote = {item["path"]: item for item in remote_rows}
         def new_summary():
             return {"uploaded": 0, "downloaded": 0, "deleted_local": 0,
-                    "deleted_remote": 0, "conflicts": [], "preserved": [],
+                    "deleted_remote": 0, "conflicts": [], "preserved": [], "merged": [],
                     "skipped": [], "errors": []}
         totals = new_summary()
         totals["skipped"] = skipped
         skipped_paths = set(skipped)
 
         paths = sorted(set(local) | set(remote) | set(tracked))
+
+        # Many files gone from this device at once usually mean a folder emptied or unmounted
+        # by mistake: deleting them from the cloud waits for a confirmation instead of spreading
+        # to every device. (Deletions coming from the cloud were confirmed where they were made.)
+        live = {path: row[1] for path, row in tracked.items() if not row[1].get("deleted") and "pending" not in row[1]}
+        deletions = [path for path, state in live.items()
+                     if path not in local and path not in skipped_paths and remote.get(path)
+                     and not remote[path].get("deleted_at") and remote[path]["version"] == state.get("version")]
+        hold = not self.allow_deletions and len(deletions) > max(MASS_DELETE_MIN, int(len(live) * MASS_DELETE_SHARE))
+        self.allow_deletions = False
+        totals["held_deletions"] = len(deletions) if hold else 0
+        if hold:
+            held = set(deletions)
+            paths = [path for path in paths if path not in held]
+
+        def count(result, summary, relative):
+            """Add one upload's outcome to the pass summary."""
+            status = result.get("status")
+            if status == "conflict":
+                summary["conflicts"].append(relative)
+            elif status in {"committed", "resolved"}:
+                summary["uploaded"] += 1
+                path = (result.get("result") or {}).get("path")
+                if status == "resolved" and result.get("resolution") == "keep_both" and path:
+                    summary["preserved"].append(path)
 
         def handle(relative):
             summary = new_summary()
@@ -783,32 +570,18 @@ class LocalSync:
             local_sha = local.get(relative)
             try:
                 if (current and not current.get("deleted_at") and local_sha is not None
-                        and local_sha != current.get("sha256") and current.get("modified_at") is not None
+                        and local_sha != current.get("sha256")
                         and (not state or ("pending" not in state
                              and current["version"] != state.get("version")
                              and local_sha != state.get("sha256")))):
-                    local_time = self.path(relative).stat().st_mtime
-                    baseline = {"resource_id": current["id"], "version": current["version"] if local_time > current["modified_at"] else 0,
-                                "sha256": current["sha256"] if local_time > current["modified_at"] else local_sha}
-                    self.save(self.key(account, relative), baseline)
-                    if local_time > current["modified_at"]:
-                        result = self.push(relative, current)
-                        summary["uploaded"] += result["status"] == "committed"
-                        if result["status"] == "conflict":
-                            summary["conflicts"].append(relative)
-                    else:
-                        self.pull(current["id"], relative, current)
-                        summary["downloaded"] += 1
+                    # Changed here and in the cloud: never pick one by date; keep both (or merge the metadata).
+                    self.resolve_both_changed(account, relative, current, summary)
                     return summary
                 # Version zero and pending uploads are deliberately absent from
                 # the published manifest. Resume their durable operation first.
                 if state and ("pending" in state or (state.get("version", 0) == 0 and current is None)):
                     if "pending" in state or local_sha is not None:
-                        result = self.push(relative, current)
-                        if result["status"] == "conflict":
-                            summary["conflicts"].append(relative)
-                        elif result["status"] == "committed":
-                            summary["uploaded"] += 1
+                        count(self.push(relative, current), summary, relative)
                     return summary
                 if state and current is None and self.erased(state.get("resource_id")):
                     # The cloud copy was erased from the portal: this path is new again.
@@ -821,14 +594,11 @@ class LocalSync:
                             "sha256": None, "deleted": True,
                         })
                         if local_sha is not None:
-                            target = self.path(relative)
-                            suffix = target.suffix
-                            stem = target.name[:-len(suffix)] if suffix else target.name
-                            copy = target.with_name(f"{stem[:120]} (restaure local {uuid.uuid4().hex[:8]}){suffix}")
-                            target.replace(copy)
-                            self.push(copy.relative_to(self.root).as_posix())
-                            summary["preserved"].append(copy.relative_to(self.root).as_posix())
-                            summary["uploaded"] += 1
+                            # A file this device never synced, at a path deleted in the cloud:
+                            # publish it as the path's new version rather than renaming it
+                            # (renaming every file after the cloud folder was emptied
+                            # filled the workspace with "(restored …)" copies).
+                            count(self.push(relative, current), summary, relative)
                         return summary
                     if current and local_sha is not None:
                         if current["sha256"] == local_sha:
@@ -837,28 +607,43 @@ class LocalSync:
                                 "sha256": local_sha, "deleted": False,
                             })
                         else:
-                            copy = self.initial_conflict(account, relative, current)
-                            summary["preserved"].append(copy)
-                            summary["downloaded"] += 1
-                            summary["uploaded"] += 1
+                            self.resolve_both_changed(account, relative, current, summary)
                         return summary
                     if current:
                         self.pull(current["id"], relative, current)
                         summary["downloaded"] += 1
                     elif local_sha is not None:
-                        result = self.push(relative, current)
-                        summary["uploaded"] += result["status"] == "committed"
-                        if result["status"] == "conflict":
-                            summary["conflicts"].append(relative)
+                        count(self.push(relative, current), summary, relative)
                     return summary
 
                 if current is None:
                     # A tracked server resource should always appear in the manifest.
                     # Keep the local file untouched until the server is consistent again.
-                    summary["errors"].append({"path": relative, "detail": "Ressource distante absente du manifeste."})
+                    summary["errors"].append({"path": relative, "detail": "The cloud file is missing from the cloud list. Retrying later."})
                     return summary
                 if current["id"] != state["resource_id"]:
-                    summary["conflicts"].append(relative)
+                    # The path now belongs to another cloud file (erased from the portal,
+                    # then created again elsewhere). This used to stay a conflict forever,
+                    # with nothing to compare or resolve: bind the path to the new file.
+                    key = self.key(account, relative)
+                    if current.get("deleted_at"):
+                        self.save(key, {"resource_id": current["id"], "version": current["version"],
+                                        "sha256": None, "deleted": True})
+                        if local_sha is not None:
+                            count(self.push(relative, current), summary, relative)
+                    elif local_sha is None or local_sha == state.get("sha256"):
+                        # Unchanged here since the last agreement: take the cloud file.
+                        self.save(key, {"resource_id": current["id"], "version": 0,
+                                        "sha256": local_sha, "deleted": False})
+                        if local_sha == current.get("sha256"):
+                            self.save(key, {"resource_id": current["id"], "version": current["version"],
+                                            "sha256": local_sha, "deleted": False})
+                        else:
+                            self.pull(current["id"], relative, current)
+                            summary["downloaded"] += 1
+                    else:
+                        self.forget(key)
+                        self.resolve_both_changed(account, relative, current, summary)
                     return summary
 
                 remote_changed = current["version"] != state.get("version", 0)
@@ -879,12 +664,11 @@ class LocalSync:
                             "resource_id": current["id"], "version": current["version"],
                             "sha256": local_sha, "deleted": False,
                         })
+                    elif local_sha is not None and not current.get("deleted_at"):
+                        self.resolve_both_changed(account, relative, current, summary)
                     elif local_sha is not None:
-                        result = self.push(relative, current)
-                        if result["status"] == "conflict":
-                            summary["conflicts"].append(relative)
-                        else:
-                            summary["uploaded"] += 1
+                        # Deleted in the cloud but edited here: the edit wins and is published again.
+                        count(self.push(relative, current), summary, relative)
                     else:
                         summary["conflicts"].append(relative)
                     return summary
@@ -899,11 +683,7 @@ class LocalSync:
                         })
                         summary["deleted_remote"] += 1
                     else:
-                        result = self.push(relative, current)
-                        if result["status"] == "conflict":
-                            summary["conflicts"].append(relative)
-                        elif result["status"] != "unchanged":
-                            summary["uploaded"] += 1
+                        count(self.push(relative, current), summary, relative)
                     return summary
 
                 if current.get("deleted_at"):
@@ -968,79 +748,14 @@ class LocalSync:
                 for name, value in delta.items():
                     totals[name] += value
         self.progress(phase="done", path=None, completed=len(paths), total=len(paths))
+        try:
+            state_file = self.path(STATE_FILE)
+            if state_file.is_file():
+                self.remember_state_base(account, {STATE_FILE: sha(self.read(state_file))})
+        except (OSError, CloudError):
+            pass  # Without a base, the next merge keeps every record of both sides.
+        self.prune_removed()
         return totals
 
-    def comparison(self, relative):
-        account = self.api("GET", "/me")["id"]
-        state, snapshot = self.load(self.key(account, relative))
-        if not state.get("transfer_id"):
-            raise CloudError(409, "No transfer to compare.")
-        result = self.api("GET", "/sync/transfers/" + state["transfer_id"])
-        if result["status"] == "resolved":
-            # Finish applying a choice after an interrupted local download/write.
-            return self.resolve(relative, result["resolution"], result["current"]["version"])
-        if result["status"] != "conflict":
-            return result
-        result["diff"] = None
-        if result["current"].get("deleted_at"):
-            return result
-        remote = self.download(result["current"]["revision_id"])
-        if snapshot and len(snapshot) <= 1024 ** 2 and len(remote) <= 1024 ** 2:
-            try:
-                local_text, remote_text = snapshot.decode("utf-8"), remote.decode("utf-8")
-                if "\x00" not in local_text + remote_text:
-                    result["diff"] = "".join(difflib.unified_diff(remote_text.splitlines(True), local_text.splitlines(True),
-                        fromfile="Version distante", tofile="Version locale", n=3))[:100000]
-            except UnicodeDecodeError:
-                pass
-        return result
 
-    def resolve(self, relative, choice, expected_version):
-        account = self.api("GET", "/me")["id"]
-        key = self.key(account, relative)
-        state, snapshot = self.load(key)
-        if not state.get("transfer_id") or snapshot is None:
-            raise CloudError(409, "No pending local conflict.")
-        target = self.path(relative)
-        expected_local_sha = sha(snapshot)
-        if choice == "keep_remote":
-            # The explicit remote choice also applies to edits made since upload.
-            # write_remote preserves those edits and checks for intervening saves.
-            expected_local_sha = sha(self.read(target)) if target.exists() else None
-        if choice == "keep_both" and sha(self.read(target)) != sha(snapshot):
-            previous = self.api("GET", "/sync/transfers/" + state["transfer_id"])
-            already_applied = (previous.get("resolution") == choice and previous["status"] == "resolved"
-                               and sha(self.read(target)) == previous["current"]["sha256"])
-            if not already_applied:
-                raise CloudError(409, "The local file changed since it was uploaded. Keep the local version, then upload your new changes.")
-            expected_local_sha = previous["current"]["sha256"]
-        result = self.api("POST", f"/sync/transfers/{state['transfer_id']}/resolve",
-                          {"choice": choice, "expected_version": expected_version}, conflict=True)
-        if result["status"] == "conflict":
-            return result
-        if choice == "keep_local":
-            self.save(key, {"resource_id": state["resource_id"], "version": result["result_version"],
-                            "sha256": sha(snapshot), "deleted": False})
-        else:
-            if choice == "keep_both":
-                copy = target.with_name(f"{target.stem[:100]} (conflit {state['transfer_id'][:8]}){target.suffix}")
-                if not copy.exists():
-                    self.write_remote(copy, snapshot, None)
-                elif sha(self.read(copy)) != sha(snapshot):
-                    raise CloudError(409, "The conflict copy exists with different content. Rename it before trying again.")
-                self.save(self.key(account, str(copy.relative_to(self.root))), {
-                    "resource_id": result["result"]["id"], "version": result["result_version"], "sha256": sha(snapshot)})
-            remote = result["current"]
-            if remote.get("deleted_at"):
-                result["backup"] = self.remove_local(relative, expected_local_sha)
-                self.save(key, {"resource_id": remote["id"], "version": remote["version"],
-                                "sha256": None, "deleted": True})
-            else:
-                data = self.download(remote["revision_id"])
-                if not target.exists() or sha(self.read(target)) != sha(data):
-                    result["backup"] = self.write_remote(target, data, expected_local_sha)
-                if remote.get("modified_at"):
-                    os.utime(target, (remote["modified_at"], remote["modified_at"]))
-                self.save(key, {"resource_id": remote["id"], "version": remote["version"],
-                                "sha256": sha(data), "deleted": False})
-        return result
+__all__ = ["CloudError", "LocalSync", "https_url", "s3_error"]

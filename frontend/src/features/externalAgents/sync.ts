@@ -85,7 +85,6 @@ export async function refreshAgentArtifacts() {
   forgetWorkspaceItems({ noteIds: previousNoteIds.filter(id => !state.notes.some(note => note.id === id)) });
   for (const path of previousPaths) if (!findWorkspaceNode(path)) forgetWorkspaceItems({ path });
   if (state.selectedProject) state.selectedProject = state.projects.find(project => project.id === state.selectedProject.id) || null;
-  if (!state.databases.some(database => database.id === state.collectionId)) state.collectionId = 'articles';
   if (state.selectedPaperId && !state.papers.some(paper => paper.id === state.selectedPaperId)) state.selectedPaperId = null;
   const resources = new Set<any>([state.primaryResource, state.secondaryResource,
     ...state.workspaceTabs.primary.map(tab => tab.resource),

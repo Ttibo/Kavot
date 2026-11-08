@@ -1,7 +1,6 @@
 import { viewShown, escapeHtml, formatDate, state } from '../../app/state';
 import { projectOptions } from '../../components/dialogs/controller';
 import { newTaskModal } from '../tasks/dialogs';
-import { conferenceModal } from '../research/actions';
 import { api } from '../../services/api';
 import { toast } from '../../app/navigation';
 import { openSheet, type SheetHandle } from '../sheet/sheet';
@@ -65,8 +64,6 @@ export function openCalendarEvent(eventId) {
   if (event.source === "manual") return calendarEventModal(event);
   if (event.source === "task_start" || event.source === "task_due")
     return newTaskModal(null, null, event.entity_id);
-  if (event.source === "conference" || event.source === "conference_deadline")
-    return conferenceModal(event.entity_id);
   if (event.web_url) window.open(event.web_url, "_blank", "noopener");
 }
 
@@ -207,4 +204,4 @@ function mountEventEditor(body: HTMLElement, sheet: { close: (force?: boolean) =
   return { beforeClose };
 }
 
-export function renderCalendar() { showView("calendar"); }
+function renderCalendar() { showView("calendar"); }

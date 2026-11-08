@@ -1,142 +1,112 @@
-"""Discover models from the installed clients, without sending an inference request."""
+"""The agent CLIs Kavot drives (Codex, Claude Code, OpenCode): their settings and executables."""
 from __future__ import annotations
 
-import json
-import queue
-import re
+import shutil
 import subprocess
+import sys
 import threading
-import time
-from contextlib import contextmanager
+from pathlib import Path
 
 from fastapi import HTTPException
 
-_cache: dict[tuple, tuple[float, dict]] = {}
+from app.core.agents import install
+from app.core.kernel.config import settings
+from app.core.kernel.user_settings import load_integrations, save_integration
+
+ENGINES = {
+    "codex": {"name": "Codex", "command": "codex"},
+    "claude": {"name": "Claude Code", "command": "claude"},
+    "opencode": {"name": "OpenCode", "command": "opencode"},
+}
+SHIMS = {".cmd", ".bat", ".ps1"}
 _lock = threading.Lock()
 
 
-@contextmanager
-def _protocol(command: list[str], cwd: str):
-    process = subprocess.Popen(command, cwd=cwd, stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                               stderr=subprocess.DEVNULL, text=True, encoding="utf-8", errors="replace",
-                               creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
-    messages: queue.Queue = queue.Queue()
+def resolve_executable(engine: str, configured: str = "", *, shims: bool = True) -> str | None:
+    """The program to run: the configured path, else the one found on the PATH and installer folders.
 
-    def read():
-        try:
-            for line in process.stdout:
-                try:
-                    messages.put(json.loads(line))
-                except ValueError:
-                    pass
-        finally:
-            messages.put(None)
+    Without ``shims`` (programs that receive the user's text as arguments), a Windows batch
+    shim is refused, so prompts never pass through cmd.exe expansion; OpenCode's npm shim is
+    replaced by its native executable.
+    """
+    candidate = configured.strip() or install.which(ENGINES[engine]["command"])
+    if not candidate:
+        return None
+    path = Path(candidate).expanduser()
+    if not shims and sys.platform == "win32":
+        if engine == "opencode" and path.suffix.lower() in {".cmd", ".ps1"}:
+            native = path.parent / "node_modules" / "opencode-ai" / "bin" / "opencode.exe"
+            if native.is_file():
+                path = native
+        if path.suffix.lower() in SHIMS:
+            return None
+    if not path.is_file():
+        found = install.which(str(path)) if shims else shutil.which(str(path))
+        if not found:
+            return None
+        path = Path(found)
+    return str(path.resolve())
 
-    reader = threading.Thread(target=read, daemon=True)
-    reader.start()
-    deadline = time.monotonic() + 25
 
-    def exchange(request: dict, accepts):
-        process.stdin.write(json.dumps(request) + "\n")
-        process.stdin.flush()
-        while True:
-            try:
-                value = messages.get(timeout=max(.01, deadline - time.monotonic()))
-            except queue.Empty:
-                raise ValueError("The program does not answer the model request.") from None
-            if value is None:
-                raise ValueError("The program closed the model discovery connection.")
-            if isinstance(value, dict) and accepts(value):
-                if value.get("error"):
-                    raise ValueError(str(value["error"]))
-                return value
+def configuration() -> dict:
+    stored = load_integrations().get("external_agents") or {}
+    result = {}
+    for engine in ENGINES:
+        values = stored.get(engine, {})
+        result[engine] = {
+            "enabled": bool(values.get("enabled", False)),
+            "executable": str(values.get("executable", "")),
+            "model": str(values.get("model", "")),
+            "effort": str(values.get("effort", "")),
+            # A lighter model and effort for questions (/answer), and the model that writes note summaries in the background.
+            "answer_model": str(values.get("answer_model", "")),
+            "answer_effort": str(values.get("answer_effort", "")),
+            "digest_model": str(values.get("digest_model", "")),
+            "access": values.get("access", "read"),
+        }
+    return result
 
+
+def public_settings() -> dict:
+    config = configuration()
+    return {"engines": [{
+        "id": engine, "name": meta["name"], **config[engine],
+        "detected_path": resolve_executable(engine, config[engine]["executable"], shims=False),
+    } for engine, meta in ENGINES.items()]}
+
+
+def configure(updates: dict) -> dict:
+    with _lock:
+        config = configuration()
+        for engine, update in updates.items():
+            if engine not in ENGINES:
+                raise HTTPException(422, "Moteur agentique inconnu.")
+            config[engine].update(update)
+        save_integration("external_agents", config)
+    return public_settings()
+
+
+def check(engine: str, executable: str = "") -> dict:
+    if engine not in ENGINES:
+        raise HTTPException(404, "Moteur agentique inconnu.")
+    binary = resolve_executable(engine, executable or configuration()[engine]["executable"], shims=False)
+    if not binary:
+        raise HTTPException(422, "Program not found. Give the path to its executable.")
     try:
-        yield process, exchange
-    finally:
-        if process.poll() is None:
-            process.terminate()
-        try:
-            process.wait(timeout=3)
-        except subprocess.TimeoutExpired:
-            process.kill()
-            process.wait(timeout=3)
-        reader.join(timeout=1)
-        process.stdin.close()
-        process.stdout.close()
-
-
-def _codex(binary: str, cwd: str) -> list[dict]:
-    with _protocol([binary, "app-server"], cwd) as (process, exchange):
-        exchange({"id": 1, "method": "initialize", "params": {
-            "clientInfo": {"name": "kavot", "version": "0.1.0"}}}, lambda m: m.get("id") == 1)
-        process.stdin.write('{"method":"initialized"}\n')
-        process.stdin.flush()
-        models, cursor = [], None
-        for index in range(100):
-            result = exchange({"id": index + 2, "method": "model/list", "params": {
-                "limit": 100, "cursor": cursor, "includeHidden": False}},
-                lambda m: m.get("id") == index + 2)["result"]
-            models.extend({"id": m.get("model") or m["id"], "name": m.get("displayName") or m["id"],
-                           "efforts": [e["reasoningEffort"] for e in m.get("supportedReasoningEfforts", [])],
-                           "default_effort": m.get("defaultReasoningEffort", ""),
-                           "description": m.get("description", "")} for m in result["data"] if not m.get("hidden"))
-            cursor = result.get("nextCursor")
-            if not cursor:
-                return models
-        raise ValueError("The model catalog is too large.")
-
-
-def _claude(binary: str, cwd: str) -> list[dict]:
-    with _protocol([binary, "--print", "--input-format", "stream-json", "--output-format", "stream-json",
-                    "--verbose", "--permission-mode", "plan", "--no-session-persistence"], cwd) as (_, exchange):
-        reply = exchange({"type": "control_request", "request_id": "kavot-models",
-                          "request": {"subtype": "initialize"}},
-                         lambda m: m.get("type") == "control_response" and
-                         m.get("response", {}).get("request_id") == "kavot-models")["response"]
-        if reply.get("subtype") == "error":
-            raise ValueError(str(reply.get("error", "Claude catalog unavailable.")))
-        return [{"id": m["value"], "name": m.get("displayName") or m["value"],
-                 "efforts": m.get("supportedEffortLevels", []), "description": m.get("description", "")}
-                for m in reply.get("response", {}).get("models", [])]
-
-
-def _opencode(binary: str, cwd: str, refresh: bool) -> list[dict]:
-    result = subprocess.run([binary, "models", "--verbose", *(["--refresh"] if refresh else [])],
-                            cwd=cwd, capture_output=True, text=True, encoding="utf-8", errors="replace",
-                            stdin=subprocess.DEVNULL, timeout=30,
-                            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0))
+        result = subprocess.run([binary, "--version"], capture_output=True, text=True,
+                                timeout=10, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+    except (OSError, subprocess.TimeoutExpired) as error:
+        raise HTTPException(502, f"Unable to start {ENGINES[engine]['name']} : {error}") from None
     if result.returncode:
-        raise ValueError((result.stderr or "OpenCode catalog unavailable.")[-500:])
-    output = re.sub(r"\x1b\[[0-9;]*m", "", result.stdout)
-    models = []
-    decoder = json.JSONDecoder()
-    for match in re.finditer(r"(?m)^([\w.-]+/[^\s]+)\s*$", output):
-        metadata = {}
-        try:
-            metadata, _ = decoder.raw_decode(output[match.end():].lstrip())
-        except ValueError:
-            pass
-        models.append({"id": match[1], "name": metadata.get("name") or match[1],
-                       "efforts": list((metadata.get("variants") or {}).keys()),
-                       "description": match[1]})
-    return models
+        raise HTTPException(502, (result.stderr or result.stdout or "The program failed.")[-600:])
+    return {"path": binary, "version": result.stdout.strip().splitlines()[-1] if result.stdout.strip() else "Detected"}
 
 
-def discover(engine: str, binary: str, cwd: str, refresh: bool = False) -> dict:
-    key = (engine, binary, cwd)
-    with _lock:
-        cached = _cache.get(key)
-        if cached and not refresh and time.monotonic() - cached[0] < 300:
-            return cached[1]
-    try:
-        models = _codex(binary, cwd) if engine == "codex" else _claude(binary, cwd) if engine == "claude" else _opencode(binary, cwd, refresh)
-        models = list({m["id"]: m for m in models}.values())
-        if not models:
-            raise ValueError("No models returned. Check the program’s connection to your account or provider.")
-    except (OSError, ValueError, KeyError, TypeError, subprocess.TimeoutExpired) as error:
-        raise HTTPException(502, f"Unable to load models: {error}") from None
-    value = {"engine": engine, "models": models, "source": "installed-client"}
-    with _lock:
-        _cache[key] = (time.monotonic(), value)
-    return value
+def models(engine: str, executable: str = "", refresh: bool = False) -> dict:
+    """The models the installed CLI offers (cached a few minutes)."""
+    from app.core.agents.models import discover
+    binary = resolve_executable(engine, executable or configuration()[engine]["executable"], shims=False)
+    if not binary:
+        raise HTTPException(422, "Program not found. Check its path in the settings.")
+    settings.storage_path.mkdir(parents=True, exist_ok=True)
+    return discover(engine, binary, str(settings.storage_path.resolve()), refresh)

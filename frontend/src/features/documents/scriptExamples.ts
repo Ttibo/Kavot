@@ -2,7 +2,7 @@
  * Ready-made scripts offered in Insert → Script and Settings → Scripts.
  * Script bodies avoid template literals so they can live in plain TS strings.
  */
-export type ScriptExample = { name: string; description: string; height: string; html: string; css: string; js: string };
+type ScriptExample = { name: string; description: string; height: string; html: string; css: string; js: string };
 
 const esc = "const esc = value => String(value ?? '').replace(/[&<>\"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '\"': '&quot;', \"'\": '&#39;' })[c]);\n";
 const shortDate = "const shortDate = value => new Date(String(value).length === 10 ? value + 'T12:00:00' : value).toLocaleDateString('en-US', { day: 'numeric', month: 'short' });\n";

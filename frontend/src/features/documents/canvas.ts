@@ -1,608 +1,33 @@
 import { changedSinceBase, setEditorBase } from './editorBase';
-import { canvasTextCss, canvasTextControls } from './canvasText';
-import { renderPdfPreviews } from './pdfPreview';
-import { mediaPreview, mediaKind } from './mediaPreview';
-import { workspaceColor } from '../../styles/palette';
-import { closestConnectorSides } from './canvasRouting';
+import { canvasTextControls } from './canvas/text';
+import { renderPdfPreviews } from './pdf/preview';
+import { mediaKind } from './mediaPreview';
 import { showContextMenu } from '../../components/contextMenu';
 import { registerAgentContext, suggestToAgent, suggestions } from '../externalAgents/context';
-import { escapeHtml, noteAssetBase, renderMarkdown, state, truncate } from '../../app/state';
+import { escapeHtml, noteAssetBase, state } from '../../app/state';
 import { api } from '../../services/api';
-import { flushSecondaryNoteAutosave, flushWorkspaceMarkdownSaves, findWorkspaceNode, interfaceIcon, noteContextLabel, refreshRelationalNotes, refreshWorkspaceTreeOnly, reloadNoteForOpen, replaceActiveWorkspaceTab, rerenderNotesContext, workspaceNoteTab, workspaceResourcePayload, workspaceResourceTab } from './workspace';
-import { iconPaths } from '../../components/Icon';
-import { collectionItems, collectionDragPayload, collectionItemCanvasPayload, findCollectionItem, openCollectionItem, parseCollectionDragPayload } from '../collections/catalog';
+import { flushSecondaryNoteAutosave, flushWorkspaceMarkdownSaves, findWorkspaceNode, refreshRelationalNotes, refreshWorkspaceTreeOnly, reloadNoteForOpen, replaceActiveWorkspaceTab, rerenderNotesContext, workspaceNoteTab } from './workspace';
+import { collectionDragPayload, collectionItemCanvasPayload, findCollectionItem, openCollectionItem, parseCollectionDragPayload } from '../collections/catalog';
 import { refreshData, toast } from '../../app/navigation';
 import { bindMarkdownBlockEditor, currentMarkdownBlockInput, markdownBlockEditorMarkup, setMarkdownBlockEditorContent } from './markdown';
 import { closeModal, openModal, templateEditorModal } from '../../components/dialogs/controller';
 import { previewPaperPdfModal } from '../library/documents';
-import { canvasHiddenNodes, migrateCanvasBranchFolds, canvasWebUrl, canvasMovementNodes, canvasTemplateIcon, canvasNoteTreeOpenPaths } from './canvasModel';
-import { conferenceModal, datasetModal } from '../research/actions';
-import { newTaskModal } from '../tasks/dialogs';
+import { canvasHiddenNodes, migrateCanvasBranchFolds, canvasWebUrl, canvasMovementNodes, canvasNoteTreeOpenPaths } from './canvas/model';
 import { openItemInSheet } from '../collections/itemSheet';
 import { bindNoteReferences, noteReferencePickerMarkup } from './references';
 import { editorSession } from '../../app/editorSession';
-
-import { canvasCollections, collectionCardPreview } from '../collections/canvasCollections';
-import { openCanvasCollectionPicker } from '../collections/canvasCollectionPicker';
+import { openCanvasItemPicker } from './canvas/itemPicker';
 import { loadReadingNote } from '../library/documents';
+import { drawingPreviewPng, emptyDrawing, openDrawingEditor } from './drawing';
+import { webPreviews, loadWebPreview, loadCanvasEmbed, canvasEmbedPath, canvasEditedHere, canvasEmbedSource, openEmbeddedCanvas, EMBED_PADDING, canvasEmbedMirror } from './canvas/embeds';
+import { panelIcon, canvasNoteTreeMarkup, canvasTemplatePickerMarkup, releaseNoteSheets, fitNoteSheets, canvasNodePreview, canvasNodeProtected, canvasNodeMarkup, canvasEdgeMarkup, canvasDraftEdgeMarkup, canvasPickerItems } from './canvas/markup';
+import { canvasSaveTimers, canvasSaveRequests, canvasDetailSaves, canvasDetailRequests, flushCanvasSaves } from './canvas/saves';
+import { oncePerFrame } from './domLifecycle';
+import { bindCanvasInspector } from './canvas/inspector';
+import { canvasUid, canvasNodeMinimumSize, canvasNodeSize, canvasSidePoint, canvasDefaultEdgeSides, canvasDraftTargetSide, CANVAS_OVERVIEW_ZOOM } from './canvas/geometry';
 
-import { drawingPreviewPng, emptyDrawing, flushInlineDrawings, openDrawingEditor } from './drawing';
-import { hydrateEmbeds } from './embeds';
-
-type WebPreview = { available: boolean; title: string; description: string; image?: string };
-const webPreviews = new Map<string, WebPreview>();
-const webPreviewRequests = new Map<string, Promise<void>>();
-async function loadWebPreview(url: string) {
-  if (webPreviews.has(url)) return;
-  if (!webPreviewRequests.has(url)) webPreviewRequests.set(url, api<WebPreview>("/workspace/link-preview", { method: "POST", body: JSON.stringify({ url }) }).then(preview => {
-    webPreviews.set(url, preview);
-  }).catch(() => { webPreviews.set(url, { available: false, title: new URL(url).hostname, description: "Preview unavailable. Open the website to read this source." }); }).finally(() => webPreviewRequests.delete(url)));
-  await webPreviewRequests.get(url);
-}
-
-// Canvases shown live inside other canvases, as last read from disk, keyed by path.
-const canvasEmbeds = new Map<string, any>();
-const canvasEmbedRequests = new Map<string, Promise<boolean>>();
-/** Read an embedded canvas again; resolves true when its content changed. */
-function loadCanvasEmbed(path: string): Promise<boolean> {
-  if (!canvasEmbedRequests.has(path)) canvasEmbedRequests.set(path, fetch(`/api/workspace/file?path=${encodeURIComponent(path)}`, { cache: "no-store" })
-    .then(response => response.ok ? response.json() : { missing: true }).catch(() => null).then(content => {
-      if (!content || typeof content !== "object") return false;
-      const changed = JSON.stringify(canvasEmbeds.get(path)) !== JSON.stringify(content);
-      canvasEmbeds.set(path, content);
-      return changed;
-    }).finally(() => canvasEmbedRequests.delete(path)));
-  return canvasEmbedRequests.get(path);
-}
-
-function canvasEmbedPath(node): string | null {
-  if (node.projectId) return state.projects.find(item => item.id === Number(node.projectId))?.canvas_path || null;
-  return node.canvasPath || null;
-}
-
-function openCanvasResources() {
-  return [state.primaryResource, state.secondaryResource,
-    ...state.workspaceTabs.primary.map(tab => tab.resource), ...state.workspaceTabs.secondary.map(tab => tab.resource)];
-}
-
-/** A canvas being edited in this window: its editor is shown, or its edits are not saved yet. */
-function canvasEditedHere(path: string) {
-  return Boolean(document.querySelector(`[data-canvas-path="${CSS.escape(path)}"]`) || canvasSaveTimers.has(path) || canvasSaveRequests.has(path));
-}
-
-/** A canvas being edited here shows its latest edits; any other is read from disk, never from a stale tab. */
-function canvasEmbedSource(path: string) {
-  const open = canvasEditedHere(path)
-    ? openCanvasResources().find(resource => resource?.path === path && resource.content && typeof resource.content === "object")
-    : null;
-  return open?.content || canvasEmbeds.get(path);
-}
-
-async function openEmbeddedCanvas(node) {
-  await flushCanvasSaves();
-  if (node.projectId) {
-    const { openProjectArea } = await import("../projects/navigation");
-    return openProjectArea(Number(node.projectId), "canvas");
-  }
-  const target = findWorkspaceNode(node.canvasPath);
-  if (!target) throw new Error("This canvas no longer exists");
-  const pane = state.activeNotePane === "secondary" && state.workspaceTabs.secondary.length ? "secondary" : "primary";
-  replaceActiveWorkspaceTab(pane, workspaceResourceTab(await workspaceResourcePayload(target)));
-  await rerenderNotesContext();
-}
-
-// The side inspector (note preview and quick edit): its default and largest width, in pixels.
-const INSPECTOR_WIDTH = 600, INSPECTOR_MAX_WIDTH = 960;
-const INSPECTOR_WIDTH_KEY = "kavot-canvas-inspector-width-v2";
-// The inspector's header buttons use the icons of the other side panels, so all look alike.
-const panelIcon = (name: string) => `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${iconPaths[name]}"/></svg>`;
-// A shown canvas is a frame holding the source's own cards at full size, so each can be linked from here.
-const EMBED_PADDING = 40;
-const EMBED_HEADER = 72;
-
-/** The source's cards and links placed in the frame; ids are `<frame id>~<source id>`, stable across reloads. */
-function canvasEmbedMirror(embed) {
-  const path = canvasEmbedPath(embed);
-  const source = path ? canvasEmbedSource(path) : null;
-  if (!source || source.missing) return { nodes: [], edges: [] };
-  const allNodes = source.nodes || [], allEdges = source.edges || [];
-  const hidden = canvasHiddenNodes(allNodes, allEdges);
-  const visible = allNodes.filter(item => !hidden.has(item.id));
-  if (!visible.length) return { nodes: [], edges: [] };
-  const left = Math.min(...visible.map(item => Number(item.x) || 0)), top = Math.min(...visible.map(item => Number(item.y) || 0));
-  const id = (sourceId: string) => `${embed.id}~${sourceId}`;
-  return {
-    nodes: visible.map(item => ({ ...item, ...canvasNodeSize(item), id: id(item.id), mirrorOf: embed.id,
-      x: (Number(embed.x) || 0) + EMBED_PADDING + (Number(item.x) || 0) - left,
-      y: (Number(embed.y) || 0) + EMBED_HEADER + (Number(item.y) || 0) - top })),
-    edges: allEdges.filter(edge => !hidden.has(edge.fromNode) && !hidden.has(edge.toNode))
-      .map(edge => ({ ...edge, id: id(edge.id), fromNode: id(edge.fromNode), toNode: id(edge.toNode), mirrorOf: embed.id })),
-  };
-}
-
-function canvasEmbedPreview(node) {
-  // A canvas shown inside a shown canvas stays a plain card: no endless nesting.
-  if (node.mirrorOf) return `<p class="canvas-embed-empty">${interfaceIcon("canvas")} Canvas</p>`;
-  const path = canvasEmbedPath(node);
-  const source = path ? canvasEmbedSource(path) : { missing: true };
-  const message = source?.missing ? "This canvas no longer exists." : !source ? "Loading canvas…" : !(source.nodes || []).length ? "This canvas is empty." : "";
-  return `<div class="canvas-embed" data-canvas-embed="${escapeHtml(path || "")}" title="Double-click to open this canvas">${message ? `<p class="canvas-embed-empty">${escapeHtml(message)}</p>` : ""}</div>`;
-}
-
-const canvasSaveTimers = new Map();
-const canvasSaveRequests = new Map<string, Promise<unknown>>();
-// Keep pending inspector edits alive when cards or views change.
-const canvasDetailSaves = new Map<string, { timer: ReturnType<typeof setTimeout>; save: () => Promise<void>; failed?: boolean }>();
-const canvasDetailRequests = new Map<string, Promise<void>>();
-export const hasCanvasDrafts = () => Boolean(canvasSaveTimers.size || canvasSaveRequests.size || canvasDetailSaves.size || canvasDetailRequests.size);
-
-export function removeNoteFromOpenCanvases(noteId) {
-  removeFromOpenCanvases(node => ["note", "drawing"].includes(node.type) && Number(node.noteId) === Number(noteId));
-}
-
-function removeFromOpenCanvases(matches) {
-  const resources = new Set(
-    [
-      state.primaryResource,
-      state.secondaryResource,
-      ...state.workspaceTabs.primary.map((tab) => tab.resource),
-      ...state.workspaceTabs.secondary.map((tab) => tab.resource),
-    ].filter((resource) => resource?.type === "canvas" || resource?.path?.endsWith(".canvas")),
-  );
-  resources.forEach((resource) => {
-    const content = resource.content;
-    if (!content || typeof content !== "object") return;
-    const removedIds = new Set(
-      (content.nodes || [])
-        .filter(matches)
-        .map((node) => String(node.id)),
-    );
-    if (!removedIds.size) return;
-    content.nodes = (content.nodes || []).filter((node) => !removedIds.has(String(node.id)));
-    content.edges = (content.edges || []).filter(
-      (edge) =>
-        !removedIds.has(String(edge.fromNode)) &&
-        !removedIds.has(String(edge.toNode)),
-    );
-    resource.renderVersion = Number(resource.renderVersion || 0) + 1;
-  });
-}
-
-/** Update presentation only: never rebuild an open editor or discard its draft. */
-export function refreshCanvasTemplatePresentation() {
-  document.querySelectorAll<HTMLElement>('[data-canvas-edit-template]').forEach(badge => {
-    const template = state.noteTemplates.find(item => item.id === Number(badge.dataset.canvasEditTemplate));
-    const card = badge.closest<HTMLElement>('[data-canvas-node]');
-    if (!template || !card) return;
-    badge.textContent = `${template.name}${template.archived ? ' · archived' : ''}`;
-    card.style.setProperty('--canvas-card-color', workspaceColor(template.color || '#087e86'));
-    const icon = card.querySelector('.canvas-node-header > span');
-    if (icon) icon.innerHTML = interfaceIcon(canvasTemplateIcon(template), 'canvas-card-icon');
-  });
-}
-
-function canvasUid(prefix = "node") {
-  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-}
-
-function canvasWorkspaceResources(kinds, nodes = state.workspaceTree, output = []) {
-  (nodes || []).forEach((node) => {
-    if (kinds.includes(node.kind)) output.push(node);
-    canvasWorkspaceResources(kinds, node.children || [], output);
-  });
-  return output;
-}
-
-function canvasNoteTreeMarkup(nodes, query = "", canvasNoteIds = new Set(), seenNoteIds = new Set(), ancestorMatches = false, openPaths = new Set<string>()) {
-  return (nodes || []).map((node) => {
-    if (node.path === "trash") return "";
-    const label = String(node.label || node.name || "Untitled");
-    const searchable = `${label} ${node.path || ""}`.toLocaleLowerCase();
-    const branchMatches = ancestorMatches || Boolean(query && searchable.includes(query));
-    if (node.kind === 'pdf' && node.paper_id) return ''; // The article is represented by its reading note.
-    if (node.note_id) {
-      const noteId = Number(node.note_id);
-      if (seenNoteIds.has(noteId) || (query && !branchMatches)) return "";
-      seenNoteIds.add(noteId);
-      const note = state.notes.find((item) => Number(item.id) === noteId);
-      const alreadyAdded = canvasNoteIds.has(noteId);
-      return `<button class="canvas-picker-note" data-canvas-note-id="${noteId}" ${alreadyAdded ? "disabled" : ""} style="--picker-color:${escapeHtml(workspaceColor(note?.template_color || "#087e86"))}">${interfaceIcon("note")}<span><strong>${escapeHtml(note?.title || label)}</strong><small>${alreadyAdded ? "Already on this canvas" : escapeHtml(noteContextLabel(note || {}))}</small></span></button>`;
-    }
-    if (node.protected && ["image", "pdf", "file"].includes(node.kind)) {
-      if (query && !branchMatches) return "";
-      const assetType = ["image", "pdf"].includes(node.kind) ? node.kind : "file";
-      return `<button class="canvas-picker-asset" data-canvas-asset-path="${escapeHtml(node.path || "")}" style="--picker-color:#087e86">${interfaceIcon(assetType)}<span><strong>${escapeHtml(label)}</strong><small>${escapeHtml(node.path || "Asset")}</small></span></button>`;
-    }
-    const children = canvasNoteTreeMarkup(node.children || [], query, canvasNoteIds, seenNoteIds, branchMatches, openPaths);
-    if (!children && (query || !node.folder_id && !openPaths.has(node.path))) return "";
-    return `<details class="canvas-picker-branch" data-canvas-tree-path="${escapeHtml(node.path || "")}" ${query || openPaths.has(node.path) ? "open" : ""}><summary>${interfaceIcon(node.kind === "project" ? "project" : "folder")}<span>${escapeHtml(label)}</span></summary><div>${children || '<p class="canvas-picker-empty">No notes in this folder.</p>'}</div></details>`;
-  }).join("");
-}
-
-function canvasTemplatePickerMarkup(includeText = false, query = "") {
-  const templates = state.noteTemplates.filter((template) =>
-    !template.archived && `${template.name} ${template.title_template || ""}`.toLocaleLowerCase().includes(query),
-  ).map((template) =>
-    `<button class="canvas-picker-template" data-canvas-template-choice="${template.id}" style="--picker-color:${escapeHtml(workspaceColor(template.color || "#087e86"))}">${interfaceIcon(canvasTemplateIcon(template))}<span><strong>${escapeHtml(template.name)}</strong><small>${escapeHtml(template.title_template || "Create from template")}</small></span></button>`,
-  ).join("");
-  return `<div class="canvas-picker-quick-actions"><button data-canvas-blank-note style="--picker-color:#087e86">${interfaceIcon("plus")}<span><strong>Blank note</strong><small>Create a new empty note</small></span></button>${includeText ? `<button data-canvas-connection-text style="--picker-color:#d4a850">${interfaceIcon("text")}<span><strong>Text card</strong><small>Add free text without creating a note</small></span></button>` : ""}</div><div class="canvas-picker-section-title">Templates</div><div class="canvas-picker-template-grid">${templates || "<p>No template available.</p>"}</div>`;
-}
-
-function canvasNodeMinimumSize(node) {
-  if (node.type === "zone") return { width: 320, height: 220 };
-  if (node.type === "shape") return { width: 120, height: 80 };
-  if (node.type === "text") return { width: 150, height: 80 };
-  return { width: 180, height: 120 };
-}
-
-function canvasNodeSize(node) {
-  const minimum = canvasNodeMinimumSize(node);
-  return {
-    width: Math.max(minimum.width, Number(node.width) || 300),
-    height: Math.max(minimum.height, Number(node.height) || 190),
-  };
-}
-
-const canvasSideNames = ["top", "right", "bottom", "left"];
-
-const canvasShapeNames = ["rectangle", "ellipse", "diamond"];
-
-function canvasSidePoint(node, side) {
-  const { width, height } = canvasNodeSize(node);
-  const left = Number(node.x) || 0;
-  const top = Number(node.y) || 0;
-  if (side === "top") return { x: left + width / 2, y: top };
-  if (side === "right") return { x: left + width, y: top + height / 2 };
-  if (side === "bottom") return { x: left + width / 2, y: top + height };
-  return { x: left, y: top + height / 2 };
-}
-
-function canvasDefaultEdgeSides(from, to) {
-  return closestConnectorSides(
-    { x: Number(from.x) || 0, y: Number(from.y) || 0, ...canvasNodeSize(from) },
-    { x: Number(to.x) || 0, y: Number(to.y) || 0, ...canvasNodeSize(to) },
-  );
-}
-
-function canvasSideControlPoint(point, side, distance) {
-  if (side === "top") return { x: point.x, y: point.y - distance };
-  if (side === "right") return { x: point.x + distance, y: point.y };
-  if (side === "bottom") return { x: point.x, y: point.y + distance };
-  return { x: point.x - distance, y: point.y };
-}
-
-function canvasEdgeGeometry(fromPoint, fromSide, toPoint, toSide) {
-  const distance = Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y);
-  const curve = Math.max(18, Math.min(180, distance * 0.25));
-  const fromControl = canvasSideControlPoint(fromPoint, fromSide, curve);
-  const toControl = canvasSideControlPoint(toPoint, toSide, curve);
-  return {
-    path: `M ${fromPoint.x} ${fromPoint.y} C ${fromControl.x} ${fromControl.y}, ${toControl.x} ${toControl.y}, ${toPoint.x} ${toPoint.y}`,
-    midpoint: {
-      x: (fromPoint.x + 3 * fromControl.x + 3 * toControl.x + toPoint.x) / 8,
-      y: (fromPoint.y + 3 * fromControl.y + 3 * toControl.y + toPoint.y) / 8,
-    },
-  };
-}
-
-function canvasEdgePath(fromPoint, fromSide, toPoint, toSide) {
-  return canvasEdgeGeometry(fromPoint, fromSide, toPoint, toSide).path;
-}
-
-function canvasDraftTargetSide(fromPoint, toPoint) {
-  const deltaX = toPoint.x - fromPoint.x;
-  const deltaY = toPoint.y - fromPoint.y;
-  if (Math.abs(deltaX) >= Math.abs(deltaY))
-    return deltaX >= 0 ? "left" : "right";
-  return deltaY >= 0 ? "top" : "bottom";
-}
-
-// Below this zoom, cards show only their title.
-const CANVAS_OVERVIEW_ZOOM = 0.2;
-
-// A note card shows its whole page: it is laid out at a document width, then zoomed
-// to the card. Narrow cards use a narrower page so the text stays readable.
-function canvasNotePageLayout(cardWidth: number) {
-  const width = Math.round(Math.min(820, Math.max(560, cardWidth * 1.6)));
-  return { width, zoom: cardWidth / width };
-}
-
-function applyNotePageLayout(sheet: HTMLElement) {
-  const page = sheet.querySelector<HTMLElement>(":scope > .canvas-note-page");
-  if (!page || !sheet.clientWidth) return;
-  const layout = canvasNotePageLayout(sheet.clientWidth);
-  page.style.width = `${layout.width}px`;
-  page.style.zoom = String(layout.zoom);
-}
-
-const noteSheetObserver = typeof ResizeObserver === "undefined" ? null
-  : new ResizeObserver(entries => entries.forEach(entry => applyNotePageLayout(entry.target as HTMLElement)));
-
-function fitNoteSheets(root: ParentNode) {
-  root.querySelectorAll<HTMLElement>("[data-canvas-note-sheet]").forEach(sheet => {
-    // Script blocks and collection views show their live interface, not their source.
-    hydrateEmbeds(sheet.querySelector<HTMLElement>(":scope > .canvas-note-page"));
-    applyNotePageLayout(sheet);
-    noteSheetObserver?.observe(sheet);
-  });
-}
-
-function canvasNodePreview(node) {
-  if (node.type === "articles" || node.type === "collection") return collectionCardPreview(node);
-  if (node.type === "canvas") return canvasEmbedPreview(node);
-  if (node.type === "project") {
-    const project = state.projects.find((item) => item.id === Number(node.projectId));
-    const description = project?.description || node.description || "Add the project objective.";
-    const tasks = state.tasks.filter(task => task.project_id === Number(node.projectId));
-    const done = tasks.filter(task => task.status === "done").length;
-    return `<div class="canvas-project-preview" data-canvas-open-card="${escapeHtml(node.id)}"><p>${escapeHtml(description)}</p><div class="canvas-project-progress"><span>${done} / ${tasks.length} tasks completed</span><progress value="${done}" max="${tasks.length || 1}" aria-label="Project task progress"></progress></div></div>`;
-  }
-  if (node.type === "note") {
-    const note = state.notes.find((item) => item.id === Number(node.noteId));
-    // The whole HTML page, zoomed to the card (see fitNoteSheets).
-    const paper = ({cream: '#fffaf0', slate: '#eef3f7'} as Record<string, string>)[note?.presentation?.theme];
-    const layout = canvasNotePageLayout(canvasNodeSize(node).width - 16);
-    return note
-      ? `<div class="canvas-note-sheet" data-canvas-note-sheet${paper ? ` data-paper style="--note-paper:${paper}"` : ""}><article class="canvas-note-page markdown-preview" aria-label="Content of ${escapeHtml(note.title)}" style="width:${layout.width}px;zoom:${layout.zoom}">${renderMarkdown(String(note.content || ""), noteAssetBase(note))}</article></div>`
-      : `<div class="canvas-missing-preview">This note no longer exists.</div>`;
-  }
-  if (["paper", "task", "conference", "dataset", "record"].includes(node.type)) {
-    const item = findCollectionItem({
-      type: node.collectionType || node.type,
-      id: node.recordId,
-      databaseId: node.databaseId,
-    });
-    const detail = item?.detail || node.detail || "Linked collection record";
-    const meta = item?.meta || node.status || node.databaseId || "Collection";
-    return `<div class="canvas-collection-preview"><span>${escapeHtml(node.collectionType || node.type)}</span><p>${escapeHtml(truncate(detail, 240))}</p><div class="canvas-card-tags"><small>${escapeHtml(meta)}</small>${node.databaseId ? `<small>Collection</small>` : ""}</div></div>`;
-  }
-  if (["video", "audio"].includes(node.type)) return mediaPreview(node.url || "", node.title || "File", node.type);
-  if (node.type === "pdf")
-    return `<div class="canvas-pdf-preview" data-canvas-pdf-preview="${escapeHtml(node.url || (node.paperId ? `/api/papers/${node.paperId}/file` : node.path ? `/api/workspace/file?path=${encodeURIComponent(node.path)}` : ""))}" aria-label="${escapeHtml(node.title || "PDF")}">Loading preview…</div>`;
-  if (node.type === "drawing")
-    return `<img draggable="false" src="${escapeHtml(node.preview || "")}" alt="${escapeHtml(node.title || "Drawing")}" title="Click to edit drawing">`;
-  if (node.type === "image")
-    return `<img draggable="false" src="${escapeHtml(node.url || "")}" alt="${escapeHtml(node.title || "Image")}" loading="lazy">`;
-  if (node.type === "link") {
-    const url = canvasWebUrl(node.url || "");
-    if (!url) return `<div class="canvas-missing-preview">Invalid web address</div>`;
-    const preview = webPreviews.get(url);
-    const image = preview?.image && canvasWebUrl(preview.image);
-    return `<div class="canvas-link-preview" data-web-preview="${escapeHtml(url)}">${image ? `<img class="canvas-web-image" src="${escapeHtml(image)}" alt="" loading="lazy" draggable="false" referrerpolicy="no-referrer">` : ""}<div class="canvas-web-copy"><span>${interfaceIcon("link")} ${escapeHtml(new URL(url).hostname)}</span><strong>${escapeHtml(preview?.title || node.title || new URL(url).hostname)}</strong><p>${escapeHtml(preview?.description || (preview ? "Website preview" : "Loading preview…"))}</p><a class="canvas-web-reference" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">Open website ↗</a></div></div>`;
-  }
-  if (node.type === 'code-file' || node.type === 'code-folder') return `<p>This old card can no longer be opened.</p>`;
-  if (node.type === "file")
-    return `<a class="canvas-file-reference" href="${escapeHtml(node.url || "#")}" target="_blank" rel="noreferrer"><span>${interfaceIcon("file")}</span><strong>${escapeHtml(node.title || "File")}</strong><small>Open reference ↗</small></a>`;
-  if (node.type === "zone")
-    return `<textarea class="canvas-zone-description" data-canvas-zone-description="${escapeHtml(node.id)}" placeholder="Describe this area…">${escapeHtml(node.description || "")}</textarea>`;
-  if (node.type === "shape") {
-    const kind = canvasShapeNames.includes(node.shape) ? node.shape : "rectangle";
-    const geometry = kind === "ellipse"
-      ? '<ellipse cx="50" cy="50" rx="47" ry="45"/>'
-      : kind === "diamond"
-        ? '<polygon points="50,3 97,50 50,97 3,50"/>'
-        : '<rect x="3" y="3" width="94" height="94" rx="8"/>';
-    return `<div class="canvas-shape-surface canvas-shape-${kind}"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">${geometry}</svg><textarea class="canvas-shape-label" data-canvas-shape-label="${escapeHtml(node.id)}" placeholder="Label…">${escapeHtml(node.text || "")}</textarea></div>`;
-  }
-  return `<textarea class="canvas-text-editor" data-canvas-text="${escapeHtml(node.id)}" placeholder="Write an idea…">${escapeHtml(node.text || "")}</textarea>`;
-}
-
-function canvasNodeIcon(node) {
-  const type = node?.type;
-  if (type === "note") {
-    const note = state.notes.find(item => item.id === Number(node.noteId));
-    const template = state.noteTemplates.find(item => item.id === Number(note?.template_id ?? node.templateId));
-    return interfaceIcon(canvasTemplateIcon(template), "canvas-card-icon");
-  }
-  const icons = {
-    'code-file': 'file',
-    'code-folder': 'folder',
-    link: "link",
-    project: "project",
-    canvas: "canvas",
-    articles: "database",
-    collection: "database",
-    note: "bulb",
-    pdf: "pdf",
-    image: "image",
-    drawing: "edit",
-    file: "file",
-    task: "task",
-    conference: "conference",
-    dataset: "database",
-    record: "database",
-    paper: "file",
-    shape: "diamond",
-    zone: "zone",
-    text: "text",
-  };
-  return interfaceIcon(icons[type] || "file", "canvas-card-icon");
-}
-
-/** The project card and the project home note stay on their own project canvas; elsewhere they are ordinary cards. */
-function canvasNodeProtected(node, hostProjectId): boolean {
-  if (!hostProjectId) return false;
-  if (node.type === "project") return !node.projectId || Number(node.projectId) === Number(hostProjectId);
-  const note = node.noteId != null ? state.notes.find(item => Number(item.id) === Number(node.noteId)) : null;
-  return note?.system_kind === "project_home" && Number(note.project_id) === Number(hostProjectId);
-}
-
-function canvasNodeMarkup(node, hostProjectId = null) {
-  const { width, height } = canvasNodeSize(node);
-  const zoneTones = ["teal", "blue", "green", "amber", "rose"];
-  const zoneTone = zoneTones.includes(node.tone) ? node.tone : "teal";
-  const note =
-    node.type === "note"
-      ? state.notes.find((item) => item.id === Number(node.noteId))
-      : null;
-  const shapeKind = canvasShapeNames.includes(node.shape) ? node.shape : "rectangle";
-  const project = node.type === "project" || node.type === "canvas" && node.projectId
-    ? state.projects.find((item) => item.id === Number(node.projectId))
-    : null;
-  const title = note?.title || project?.name || node.title || (node.type === "text" ? "Text" : node.type === "shape" ? shapeKind : node.type === "zone" ? "New zone" : "Resource");
-  const connectors = node.type === "zone" ? "" : canvasSideNames
-    .map((side) => `<button class="canvas-connector ${side}" data-canvas-connector="${side}" aria-label="Connect from the ${side} side" title="Drag to another side"></button>`)
-    .join("");
-  const titleMarkup = node.type === "zone"
-    ? `<input data-canvas-zone-title="${escapeHtml(node.id)}" value="${escapeHtml(title)}" maxlength="120" aria-label="Zone title">`
-    : `<strong>${escapeHtml(title)}</strong>`;
-  const typeColors = {
-    project: "#1f8a5b",
-    note: "#1f8a5b",
-    paper: "#2877ca",
-    pdf: "#2877ca",
-    file: "#2877ca",
-    image: "#2896b3",
-    task: "#20836c",
-    dataset: "#20836c",
-    record: "#20836c",
-    conference: "#a06c13",
-    text: "#bc4c81",
-  };
-  const template = state.noteTemplates.find(item => item.id === Number(note?.template_id ?? node.templateId));
-  const templateBadge = template ? `<button class="canvas-template-badge" data-canvas-edit-template="${template.id}" title="Edit card template">${escapeHtml(template.name)}${template.archived ? " · archived" : ""}</button>` : "";
-  const color = template?.color || (/^#[0-9a-f]{6}$/i.test(node.color || "")
-    ? node.color
-    : typeColors[node.type] || "#087e86");
-  // Cards of a shown canvas are edited in their source: here they can only be linked.
-  const mirrored = node.mirrorOf ? ` canvas-node-mirrored" data-mirror-of="${escapeHtml(node.mirrorOf)}` : "";
-  const deleteAction = node.mirrorOf || canvasNodeProtected(node, hostProjectId) ? "" : `<button data-canvas-delete-node="${escapeHtml(node.id)}" title="Remove from canvas" aria-label="Remove ${escapeHtml(title)} from canvas">×</button>`;
-  if (["image", "pdf", "video", "audio", "file", "link"].includes(node.type)) {
-    return `<article class="canvas-node canvas-node-${escapeHtml(node.type)} canvas-node-media${mirrored}" aria-label="${escapeHtml(title)}" data-canvas-node="${escapeHtml(node.id)}" style="left:${Number(node.x) || 0}px;top:${Number(node.y) || 0}px;width:${width}px;height:${height}px;--canvas-card-color:${escapeHtml(workspaceColor(color))}">${connectors}${deleteAction}<div class="canvas-node-content">${canvasNodePreview(node)}</div><span class="canvas-node-resize" aria-hidden="true"></span></article>`;
-  }
-  return `<article class="canvas-node canvas-node-${escapeHtml(node.type)} canvas-tone-${zoneTone}${mirrored}" data-canvas-node="${escapeHtml(node.id)}" style="left:${Number(node.x) || 0}px;top:${Number(node.y) || 0}px;width:${width}px;height:${height}px;--canvas-card-color:${escapeHtml(workspaceColor(color))}${canvasTextCss(node)}">${connectors}<header class="canvas-node-header"><span>${canvasNodeIcon(node)}</span>${titleMarkup}<div>${templateBadge}${node.type === "text" ? `<button data-canvas-text-style="${escapeHtml(node.id)}" aria-label="Bubble style" title="Bubble style">Aa</button>` : ""}${deleteAction}</div></header><div class="canvas-node-content">${canvasNodePreview(node)}</div><span class="canvas-node-resize" aria-hidden="true"></span></article>`;
-}
-
-function canvasEdgeMarkup(edge, nodes, edges = []) {
-  const from = nodes.find((node) => node.id === edge.fromNode);
-  const to = nodes.find((node) => node.id === edge.toNode);
-  if (!from || !to) return "";
-  const { fromSide, toSide } = canvasDefaultEdgeSides(from, to);
-  const fromPoint = canvasSidePoint(from, fromSide);
-  const toPoint = canvasSidePoint(to, toSide);
-  const siblings = edges.filter(item => {
-    if (item.fromNode !== from.id) return false;
-    const target = nodes.find(node => node.id === item.toNode);
-    return target && canvasDefaultEdgeSides(from, target).fromSide === fromSide;
-  });
-  const offset = (Math.max(0, siblings.indexOf(edge)) - (siblings.length - 1) / 2) * 28;
-  const junction = canvasSideControlPoint(fromPoint, fromSide, Math.min(26, Math.max(16, Math.hypot(toPoint.x - fromPoint.x, toPoint.y - fromPoint.y) / 5)));
-  if (fromSide === "left" || fromSide === "right") junction.y += offset;
-  else junction.x += offset;
-  const opposite = { top: "bottom", right: "left", bottom: "top", left: "right" }[fromSide];
-  const stub = canvasEdgeGeometry(fromPoint, fromSide, junction, opposite);
-  const geometry = canvasEdgeGeometry(junction, fromSide, toPoint, toSide);
-  const path = edge.collapsed ? stub.path : `${stub.path} ${geometry.path.slice(geometry.path.indexOf(" C ") + 1)}`;
-  const labelX = Math.round(geometry.midpoint.x);
-  let labelY = Math.round(geometry.midpoint.y);
-  const color = /^#[0-9a-f]{6}$/i.test(edge.color || "") && edge.color !== "#77746d" ? edge.color : (to.color || (to.type === "note" ? "#72d4e8" : to.type === "articles" ? "#92b1b7" : "#71a991"));
-  const displayLabel = truncate(edge.label || "", 42);
-  const labelWidth = Math.max(64, displayLabel.length * 10 + 28);
-  // Keep relation captions outside cards, even when two cards sit close together.
-  for (let attempt = 0; displayLabel && attempt <= nodes.length; attempt++) {
-    const collisions = nodes.filter(node => node.type !== 'zone' && node.type !== 'canvas'
-      && labelX + labelWidth / 2 + 8 > Number(node.x)
-      && labelX - labelWidth / 2 - 8 < Number(node.x) + canvasNodeSize(node).width
-      && labelY + 21 > Number(node.y)
-      && labelY - 21 < Number(node.y) + canvasNodeSize(node).height);
-    if (!collisions.length) break;
-    labelY = Math.min(...collisions.map(node => Number(node.y))) - 30 - Math.max(0, edges.indexOf(edge)) * 44;
-  }
-  const leader = labelY !== Math.round(geometry.midpoint.y) && !edge.collapsed
-    ? `<path d="M ${labelX} ${geometry.midpoint.y} L ${labelX} ${labelY + 17}" fill="none" stroke="${escapeHtml(workspaceColor(color))}" stroke-width="1.5" stroke-dasharray="3 4" pointer-events="none"/>` : '';
-  const label = displayLabel && !edge.collapsed
-    ? `${leader}<g class="canvas-edge-label" style="--edge-color:${escapeHtml(workspaceColor(color))}" data-canvas-edge="${escapeHtml(edge.id)}" transform="translate(${labelX} ${labelY})"><rect x="${-labelWidth / 2}" y="-17" width="${labelWidth}" height="34" rx="8"/><title>${escapeHtml(edge.label || "")}</title><text text-anchor="middle" dominant-baseline="central">${escapeHtml(displayLabel)}</text></g>`
-    : "";
-  const targetNote = to.type === "note" ? state.notes.find(note => note.id === Number(to.noteId)) : null;
-  const targetTitle = targetNote?.title || to.title || to.text || "Card";
-  const actionLabel = `${edge.collapsed ? "Expand" : "Collapse"} connection to ${targetTitle}`;
-  const anchor = fromSide === "left" ? "end" : "start";
-  const textX = fromSide === "left" ? -20 : 20;
-  const collapsedLabel = edge.collapsed ? `<text class="canvas-folded-title" x="${textX}" y="4" text-anchor="${anchor}">${escapeHtml(truncate(targetTitle, 24))}</text>` : "";
-  const toggle = `<g class="canvas-connection-toggle ${edge.collapsed ? "is-collapsed" : ""}" data-canvas-collapse-edge="${escapeHtml(edge.id)}" transform="translate(${junction.x} ${junction.y})" role="button" tabindex="0" aria-expanded="${!edge.collapsed}" aria-label="${escapeHtml(actionLabel)}"><title>${escapeHtml(actionLabel)}</title><circle r="13"/><text class="canvas-connection-symbol" text-anchor="middle" dominant-baseline="central">${edge.collapsed ? "+" : "−"}</text>${collapsedLabel}</g>`;
-  return `<path class="canvas-edge-hit" data-canvas-edge="${escapeHtml(edge.id)}" d="${path}"/><path class="canvas-edge ${edge.collapsed ? "canvas-edge-folded" : ""}" style="stroke:${escapeHtml(workspaceColor(color))}" ${edge.collapsed ? "" : 'marker-end="url(#canvas-arrow)"'} d="${path}"/>${label}${toggle}`;
-}
-
-function canvasDraftEdgeMarkup(connection) {
-  if (!connection) return "";
-  const from = connection.nodes.find((node) => node.id === connection.fromNode);
-  if (!from) return "";
-  const target = connection.toNode
-    ? connection.nodes.find((node) => node.id === connection.toNode)
-    : null;
-  const fromPoint = canvasSidePoint(from, connection.fromSide);
-  const toPoint = target
-    ? canvasSidePoint(target, connection.toSide)
-    : { x: connection.x, y: connection.y };
-  const toSide = connection.toSide || canvasDraftTargetSide(fromPoint, toPoint);
-  const path = canvasEdgePath(fromPoint, connection.fromSide, toPoint, toSide);
-  return `<path class="canvas-edge canvas-edge-draft" d="${path}"/>`;
-}
-
-export function canvasEditorMarkup(resource, pane = "primary") {
-  const tool = (type, icon, label, aria) => `<button data-canvas-add="${type}" title="${aria}" aria-label="${aria}">${interfaceIcon(icon)}<span>${label}</span></button>`;
-  return `<section class="canvas-document-pane canvas-studio inspector-closed secondary-resource-pane" data-canvas-path="${escapeHtml(resource.path)}" data-${pane}-path="${escapeHtml(resource.path)}" data-pane-drop="${pane}">
-    <div class="canvas-workbench">
-      <div class="canvas-board">
-        <div class="canvas-resource-picker hidden"><header><strong data-canvas-picker-title>Add to canvas</strong><button data-canvas-picker-close aria-label="Close">×</button></header><nav class="canvas-picker-tabs hidden" aria-label="Note source"><button class="active" data-canvas-picker-view="templates">${interfaceIcon("template")}<span>Templates</span></button><button data-canvas-picker-view="tree">${interfaceIcon("folder")}<span>Tree</span></button></nav><input type="search" data-canvas-picker-search placeholder="Search…"><div data-canvas-picker-results></div></div>
-        <div class="canvas-viewport" tabindex="0" aria-label="Canvas workspace; right-drag to pan, left-drag to select, double-click to write, paste images or links">
-          <div class="canvas-stage"><svg class="canvas-edges" width="4000" height="2600"><defs><marker id="canvas-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z"/></marker></defs><g data-canvas-edges></g></svg><div data-canvas-nodes></div></div>
-          <div class="canvas-empty-hint"><span class="canvas-welcome-icon">${interfaceIcon("canvas")}</span><strong>A space for your next discovery</strong><ol><li>Add notes, sources and hypotheses below.</li><li>Double-click anywhere to capture an idea.</li><li>Connect your thinking, one branch at a time.</li></ol></div>
-        </div>
-        <div class="canvas-interaction-hint">Right-drag to pan · Left-drag to select · Ctrl-click to add to the selection · Double-click to write</div>
-        <div class="canvas-toolbar" aria-label="Canvas tools">
-          ${tool("notes", "note", "Note", "Add a note")}${tool("text", "text", "Text", "Add text")}${tool("drawing", "edit", "Drawing", "Add drawing card")}
-          <button data-canvas-upload-image aria-label="Upload image" title="Upload image">${interfaceIcon("image")}<span>Image</span></button><input class="hidden" type="file" accept="image/png,image/jpeg,image/gif,image/webp" data-canvas-image-input>
-          ${tool("link", "link", "Link", "Add web link")}${tool("zone", "zone", "Zone", "Add zone")}${tool("collection", "database", "Collection", "Collection")}
-          <button data-canvas-group hidden aria-label="Group the selection into a zone" title="Group into a zone (Ctrl+G)">${interfaceIcon("zone")}<span>Group</span></button>
-          <button data-canvas-delete-selection hidden aria-label="Remove the selected cards from the canvas" title="Remove the selected cards (Delete)">${interfaceIcon("trash")}<span>Remove</span></button>
-          <span class="canvas-toolbar-separator"></span>
-          <button class="canvas-save-state" aria-label="Canvas save status; click to retry" title="Saved" aria-live="polite">Saved</button>
-          <button data-canvas-inspector-toggle aria-label="Toggle card details" aria-expanded="false" title="Card details">${interfaceIcon("edit")}</button>
-        </div>
-
-        <div class="canvas-navigation-dock"><div class="canvas-minimap"><svg data-canvas-minimap role="img" aria-label="Canvas overview; click to navigate"></svg></div><div class="canvas-zoom-tools"><button data-canvas-zoom="out" aria-label="Zoom out">${interfaceIcon("zoomout")}</button><output data-canvas-zoom-label>100 %</output><button data-canvas-zoom="in" aria-label="Zoom in">${interfaceIcon("zoomin")}</button><button data-canvas-zoom="fit" aria-label="Fit canvas" title="Fit canvas">${interfaceIcon("fit")}</button></div></div>
-      </div>
-      <div class="canvas-inspector-resizer" data-canvas-inspector-resizer role="separator" aria-label="Resize card details" aria-orientation="vertical" tabindex="0" title="Drag to resize · double-click to reset"></div>
-      <aside class="canvas-inspector" aria-label="Card details"><div class="canvas-inspector-bar"><strong>Card details</strong><button type="button" class="icon-button" data-canvas-inspector-close aria-label="Close card details" title="Close">${panelIcon("close")}</button></div><div data-canvas-inspector-content><div class="canvas-inspector-empty"><h3>Your thinking, in detail</h3><p>Select a card to edit its title and content.</p></div></div></aside>
-    </div>
-  </section>`;
-}
-
-function canvasPickerItems(type) {
-  if (type === "template")
-    return state.noteTemplates.filter(template => !template.archived).map((template) => ({
-      key: String(template.id),
-      title: template.name,
-      detail: `Create ${template.title_template}`,
-      color: template.color,
-      item: { type: "template", templateId: template.id },
-    }));
-  if (type === "note")
-    return state.notes.map((note) => ({
-      key: String(note.id),
-      title: note.title,
-      detail: noteContextLabel(note),
-      item: { type: "note", noteId: note.id, title: note.title },
-    }));
-  if (type === "pdf")
-    return state.papers
-      .filter((paper) => paper.file_path)
-      .map((paper) => ({
-        key: `paper:${paper.id}`,
-        title: paper.title,
-        detail: (paper.authors || []).join(", ") || "Library article",
-        item: { type: "library-paper", paperId: paper.id },
-      }));
-  return canvasWorkspaceResources(type === "pdf" ? ["pdf"] : ["image"]).map(
-    (node) => ({
-      key: node.path,
-      title: node.label || node.name,
-      detail: node.path,
-      item: { type, path: node.path, url: node.url, paperId: node.paper_id || null, title: node.label || node.name },
-    }),
-  );
-}
+export { refreshCanvasTemplatePresentation, canvasEditorMarkup } from './canvas/markup';
+export { hasCanvasDrafts, removeNoteFromOpenCanvases, flushCanvasSaves } from './canvas/saves';
 
 export function bindCanvasEditors(root) {
   root?.querySelectorAll("[data-canvas-path]").forEach((container) => {
@@ -644,69 +69,7 @@ export function bindCanvasEditors(root) {
     const saveState = container.querySelector(".canvas-save-state");
     const imageInput = container.querySelector("[data-canvas-image-input]");
     const inspector = container.querySelector("[data-canvas-inspector-content]") as HTMLElement;
-    const workbench = container.querySelector(".canvas-workbench") as HTMLElement;
-    const resizeHandle = container.querySelector("[data-canvas-inspector-resizer]") as HTMLElement;
-    const sidebarToggle = container.querySelector("[data-canvas-inspector-toggle]") as HTMLButtonElement;
-    // A wide inspector by default: a note opened there can be read and edited without expanding it.
-    // The key changed with the default, so widths saved for the former narrow panel no longer apply.
-    const storedWidth = Number(localStorage.getItem(INSPECTOR_WIDTH_KEY));
-    let preferredWidth = Number.isFinite(storedWidth) && storedWidth > 0 ? storedWidth : INSPECTOR_WIDTH;
-    const resizeBounds = () => {
-      const max = Math.min(INSPECTOR_MAX_WIDTH, workbench.clientWidth - Math.min(180, workbench.clientWidth * .35));
-      return { min: Math.min(280, max), max };
-    };
-    const setInspectorWidth = (width: number, persist = false) => {
-      const { min, max } = resizeBounds();
-      const actual = Math.round(Math.max(min, Math.min(max, width)));
-      container.style.setProperty("--canvas-inspector-width", `${actual}px`);
-      resizeHandle.setAttribute("aria-valuemin", String(Math.round(min)));
-      resizeHandle.setAttribute("aria-valuemax", String(Math.round(max)));
-      resizeHandle.setAttribute("aria-valuenow", String(actual));
-      if (persist) { preferredWidth = actual; localStorage.setItem(INSPECTOR_WIDTH_KEY, String(actual)); }
-      return actual;
-    };
-    setInspectorWidth(preferredWidth);
-    const openInspector = () => {
-      container.classList.remove("inspector-closed"); sidebarToggle.setAttribute("aria-expanded", "true");
-      setInspectorWidth(preferredWidth); renderMinimap();
-    };
-    const closeInspector = async () => {
-      try {
-        await flushCanvasSaves();
-        container.classList.add("inspector-closed"); sidebarToggle.setAttribute("aria-expanded", "false");
-        sidebarToggle.focus({ preventScroll: true }); renderMinimap();
-      } catch { inspector.querySelector<HTMLElement>("[data-detail-save-state]")?.focus(); }
-    };
-    sidebarToggle.addEventListener("click", () => container.classList.contains("inspector-closed") ? openInspector() : closeInspector());
-    container.addEventListener("click", event => { if ((event.target as HTMLElement).closest("[data-canvas-inspector-close]")) void closeInspector(); });
-    resizeHandle.addEventListener("focus", () => setInspectorWidth(preferredWidth));
-    resizeHandle.addEventListener("dblclick", () => { setInspectorWidth(INSPECTOR_WIDTH, true); renderMinimap(); });
-    resizeHandle.addEventListener("keydown", event => {
-      if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) return;
-      event.preventDefault();
-      const { min, max } = resizeBounds();
-      const current = Number(resizeHandle.getAttribute("aria-valuenow"));
-      setInspectorWidth(event.key === "Home" ? min : event.key === "End" ? max : current + (event.key === "ArrowLeft" ? 1 : -1) * (event.shiftKey ? 50 : 20), true);
-      renderMinimap();
-    });
-    resizeHandle.addEventListener("pointerdown", event => {
-      if (event.button !== 0) return;
-      event.preventDefault(); resizeHandle.focus({ preventScroll: true }); resizeHandle.setPointerCapture(event.pointerId);
-      const startX = event.clientX;
-      const startWidth = (container.querySelector(".canvas-inspector") as HTMLElement).getBoundingClientRect().width;
-      container.classList.add("inspector-resizing");
-      const move = (next: PointerEvent) => { setInspectorWidth(startWidth + startX - next.clientX, true); renderMinimap(); };
-      const finish = () => {
-        container.classList.remove("inspector-resizing");
-        resizeHandle.removeEventListener("pointermove", move);
-        resizeHandle.removeEventListener("pointerup", finish);
-        resizeHandle.removeEventListener("pointercancel", finish);
-        if (resizeHandle.hasPointerCapture(event.pointerId)) resizeHandle.releasePointerCapture(event.pointerId);
-      };
-      resizeHandle.addEventListener("pointermove", move);
-      resizeHandle.addEventListener("pointerup", finish);
-      resizeHandle.addEventListener("pointercancel", finish);
-    });
+    const { openInspector } = bindCanvasInspector(container, inspector, () => renderMinimap());
     const inspectorDrafts = new Map();
     // The version of each card's note its inspector edits from, kept with an unsaved draft: saves send it.
     const inspectorBases = new Map<string, string | undefined>();
@@ -792,6 +155,9 @@ export function bindCanvasEditors(root) {
       minimap.setAttribute("viewBox", `${minX} ${minY} ${Math.max(1, maxX - minX)} ${Math.max(1, maxY - minY)}`);
       minimap.innerHTML = nodes.map(node => `<rect x="${Number(node.x) || 0}" y="${Number(node.y) || 0}" width="${canvasNodeSize(node).width}" height="${canvasNodeSize(node).height}" rx="12" class="${node.type === "zone" ? "minimap-zone" : "minimap-card"} ${node.id === selectedNodeId ? "minimap-selected" : ""}"/>`).join("") + `<rect class="minimap-viewport" x="${-panX / zoom}" y="${-panY / zoom}" width="${viewport.clientWidth / zoom}" height="${viewport.clientHeight / zoom}"/>`;
     };
+    // Panning and dragging fire many pointer moves per frame: redraw the minimap and links once per frame.
+    const scheduleMinimap = oncePerFrame(() => renderMinimap());
+    const scheduleEdges = oncePerFrame(() => renderEdges());
     minimap.addEventListener("click", event => {
       const point = new DOMPoint(event.clientX, event.clientY).matrixTransform(minimap.getScreenCTM().inverse());
       panX = viewport.clientWidth / 2 - point.x * zoom;
@@ -805,7 +171,7 @@ export function bindCanvasEditors(root) {
       container.classList.toggle("canvas-overview", zoom < CANVAS_OVERVIEW_ZOOM);
       container.style.setProperty("--canvas-inverse-zoom", String(1 / zoom));
       container.querySelector("[data-canvas-zoom-label]").textContent = `${Math.round(zoom * 100)} %`;
-      renderMinimap();
+      scheduleMinimap();
     };
     const visibleNodes = () => {
       const hidden = canvasHiddenNodes(content.nodes, content.edges);
@@ -900,7 +266,7 @@ export function bindCanvasEditors(root) {
     };
     const embeddedCanvasPaths = (): string[] => [...new Set<string>(visibleNodes().filter(node => node.type === "canvas").map(canvasEmbedPath).filter(Boolean))];
     const renderNodes = () => {
-      nodesLayer.querySelectorAll("[data-canvas-note-sheet]").forEach(sheet => noteSheetObserver?.unobserve(sheet));
+      releaseNoteSheets(nodesLayer);
       computeMirrors();
       nodesLayer.innerHTML = allNodes()
         .map((node) => canvasNodeMarkup(node, content.projectId))
@@ -911,11 +277,6 @@ export function bindCanvasEditors(root) {
         if (!canvasEmbedSource(sourcePath)) void loadCanvasEmbed(sourcePath).then(changed => { if (changed) refreshCanvasEmbeds(); });
       }
       paintSelection();
-      const tasks = state.tasks.filter(task => Number(task.project_id) === Number(content.projectId) && content.projectId);
-      const tasksDone = tasks.filter(task => task.status === "done").length;
-      const hidden = content.nodes.length - visibleNodes().length;
-      const summary = container.querySelector("[data-canvas-summary]");
-      if (summary) summary.innerHTML = `<span>${content.nodes.filter(node => !["project", "zone"].includes(node.type)).length} cards${hidden ? ` · ${hidden} hidden` : ""}</span>${tasks.length ? `<span>${tasksDone}/${tasks.length} project tasks done</span>` : ""}`;
       const hasUserContent = content.nodes.some(
         (node) => node.type !== "project" && node.id !== "project-root",
       );
@@ -1399,36 +760,14 @@ export function bindCanvasEditors(root) {
       const created = addNode(payload, position);
       fitCanvas(); return created;
     };
-    const collectionOnCanvas = (databaseId, scope) => content.nodes.find(node =>
-      (node.type === "collection" && node.databaseId === databaseId && (node.scope || "all") === scope && (scope !== "project" || Number(node.projectId) === Number(content.projectId))) ||
-      (node.type === "articles" && databaseId === "articles" && scope === "project" && Number(node.projectId) === Number(content.projectId)));
-    const openCollections = () => {
+    const openItemPicker = () => {
       picker.classList.add("hidden");
-      openCanvasCollectionPicker({
-        projectId:Number(content.projectId) || null,
-        hasCollection:(databaseId, scope) => Boolean(collectionOnCanvas(databaseId,scope)),
-        hasItem:(item, representation) => Boolean(itemOnCanvas(item,representation)),
-        addCollection:async (databaseId,scope) => {
-          if (collectionOnCanvas(databaseId,scope)) return;
-          const database = canvasCollections().find(item => item.id === databaseId);
-          const right = Math.max(0,...content.nodes.map(node => Number(node.x) + canvasNodeSize(node).width));
-          const created = addNode({ type:"collection", databaseId, scope, projectId:scope === "project" ? Number(content.projectId) : null, title:`${scope === "project" ? "Project · " : ""}${database.name}` }, { x:right+380,y:500 });
-          const project = content.nodes.find(node => node.type === "project");
-          if (project) content.edges.push({id:canvasUid("edge"),fromNode:project.id,toNode:created.id,label:"collection"});
-          renderNodes(); queueSave(); fitCanvas();
-        },
-        addItem:async (item,representation) => {
-          const created = await importResource(item,null,representation);
-          if (created?.type === "note") editCardDetails(created,false,true);
-        },
-        createItem:async databaseId => {
-          const onSaved = async record => {
-            const item = collectionItems(databaseId).find(item => String(item.id) === String(record.id));
-            await importResource(item);
-          };
-          const projectId = Number(content.projectId) || null;
-          if (databaseId === "conferences") conferenceModal(null,{projectId,onSaved});
-          else datasetModal(null,{projectId,onSaved});
+      openCanvasItemPicker({
+        projectId: Number(content.projectId) || null,
+        hasItem: (item, representation) => Boolean(itemOnCanvas(item, representation)),
+        addItem: async (item, representation) => {
+          const created = await importResource(item, null, representation);
+          if (created?.type === "note") editCardDetails(created, false, true);
         },
       });
     };
@@ -1538,8 +877,8 @@ export function bindCanvasEditors(root) {
       button.addEventListener("click", () => {
         container.querySelector(".canvas-more-tools")?.removeAttribute("open");
         const type = button.dataset.canvasAdd;
-        if (type === "collection") {
-          void flushCanvasSaves().then(refreshData).then(openCollections).catch(error => toast(error.message,"error"));
+        if (type === "item") {
+          void flushCanvasSaves().then(refreshData).then(openItemPicker).catch(error => toast(error.message,"error"));
           return;
         }
         if (type === "drawing") {
@@ -1557,16 +896,6 @@ export function bindCanvasEditors(root) {
           });
         openPicker(type, type === "notes" ? "templates" : "tree");
       }),
-    );
-    container.querySelectorAll("[data-canvas-shape]").forEach((button) =>
-      button.addEventListener("click", () =>
-        addNode({
-          type: "shape",
-          shape: button.dataset.canvasShape,
-          text: "",
-          tone: "teal",
-        }),
-      ),
     );
     container.querySelectorAll("[data-canvas-picker-view]").forEach((button) =>
       button.addEventListener("click", () => {
@@ -1920,11 +1249,6 @@ export function bindCanvasEditors(root) {
           embedCanvas({ projectId: project.id, title: project.name }, canvasDropPoint(event));
           return;
         }
-        if (transfer.startsWith('database:')) {
-          const database = state.databases.find(item => item.id === transfer.slice(9));
-          if (database) addNode({ type: 'collection', databaseId: database.id, title: database.name, scope: 'project', projectId: content.projectId }, canvasDropPoint(event));
-          return;
-        }
         const webUrl = canvasWebUrl(transfer);
         if (webUrl) { addNode({ type: "link", title: new URL(webUrl).hostname, url: webUrl }, canvasDropPoint(event)); return; }
         if (collectionReference) {
@@ -2028,7 +1352,7 @@ export function bindCanvasEditors(root) {
           const memberElement = elements.get(member.node.id);
           if (memberElement) { memberElement.style.left = `${member.node.x}px`; memberElement.style.top = `${member.node.y}px`; }
         });
-        renderEdges();
+        scheduleEdges();
       };
       const up = (upEvent) => {
         if (upEvent.pointerId !== pointerId) return;
@@ -2121,7 +1445,7 @@ export function bindCanvasEditors(root) {
           connectionDraft.toNode = targetConnector
             ?.closest("[data-canvas-node]")?.dataset.canvasNode || null;
           connectionDraft.toSide = targetConnector?.dataset.canvasConnector || null;
-          renderEdges();
+          scheduleEdges();
         };
         const finishConnection = () => {
           const completed = connectionDraft;
@@ -2184,7 +1508,7 @@ export function bindCanvasEditors(root) {
           node.height = Math.max(minimum.height, Math.round(size.height + (moveEvent.clientY - startY) / zoom));
           element.style.width = `${node.width}px`;
           element.style.height = `${node.height}px`;
-          renderEdges();
+          scheduleEdges();
         };
         const finishResize = () => {
           resizeHandle.removeEventListener("pointermove", resize);
@@ -2343,16 +1667,4 @@ export function bindCanvasEditors(root) {
     renderNodes();
     fitCanvas();
   });
-}
-
-export async function flushCanvasSaves() {
-  await flushInlineDrawings();
-  await Promise.all([...canvasDetailSaves.values()].map(entry => { clearTimeout(entry.timer); return entry.save(); }));
-  await Promise.all([...canvasDetailRequests.values()]);
-  const pending = [...canvasSaveTimers.values()];
-  await Promise.all(pending.map(item => {
-    clearTimeout(item.timer);
-    return item.save();
-  }));
-  await Promise.all([...canvasSaveRequests.values()]);
 }

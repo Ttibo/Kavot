@@ -1,10 +1,8 @@
-import { openWatchers } from '../features/collections/CollectionWatchers';
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRuntime } from '../app/runtime';
 import { publish } from '../app/viewBridge';
 import { refreshState, toast } from '../app/navigation';
 import { api } from '../services/api';
-import { Menu } from '../components/Menu';
 import { cssVars, EmptyState } from '../components/common';
 import { Icon } from '../components/Icon';
 import { PaperRow } from '../features/library/PaperRow';
@@ -19,6 +17,9 @@ import { useZotero } from '../features/library/useZotero';
 import { ZoteroSyncProgress } from '../features/library/ZoteroSyncProgress';
 import { ZoteroContentSummary } from '../features/library/ZoteroContentSummary';
 import { ZoteroPdfSummary } from '../features/library/ZoteroPdfSummary';
+import { ArticleWatches } from '../features/library/ArticleWatches';
+import { graphSeed } from '../features/library/Suggestions';
+import { useArticleWatches, useWatchesIntent, type WatchesIntent } from '../features/library/useArticleWatches';
 import { Pagination, useFitPagination, ViewHeader, ViewPage } from '../components/ViewLayout';
 import '../styles/features/discovery.css';
 
@@ -26,10 +27,17 @@ export function LibraryView() {
   const runtime = useRuntime();
   const { state, labels } = runtime;
   const [quickAddOpen, setQuickAddOpen] = useState(false);
+  const [quickAddSeed, setQuickAddSeed] = useState('');
   const exploration = useExplorations();
   const [previewPaper, setPreviewPaper] = useState<Paper | null>(null);
   const graphPaper = exploration.paper;
   const zotero = useZotero();
+  // The Library shows either its articles or its article watches.
+  const [section, setSection] = useState<'articles' | 'watches'>('articles');
+  const watchData = useArticleWatches();
+  const [watchIntent, setWatchIntent] = useState<(WatchesIntent & { at: number }) | null>(null);
+  useWatchesIntent(intent => { setSection('watches'); setWatchIntent({ ...intent, at: Date.now() }); });
+  const watchesOpen = section === 'watches';
   const [sort, setSort] = useState('recent');
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [folderWidth, setFolderWidth] = useState(() => {
@@ -46,8 +54,15 @@ export function LibraryView() {
   const toggleFolders = () => setFoldersOpen(open => { try { localStorage.setItem('kavot-library-folders-open', String(!open)); } catch { /* Kept for this session. */ } return !open; });
   const [explorationsOpen, setExplorationsOpen] = useState(false);
   const project = state.projects.find((item: Project) => item.id === Number(state.paperProjectFilter));
-  const years = [...new Set<string>(state.papers.map((item: Paper) => runtime.paperPublicationYear(item)).filter(Boolean))].sort().reverse();
-  const hasFilters = Boolean(favoritesOnly || state.paperSearch || state.paperStatusFilter || state.paperYearFilter !== 'all');
+  // Articles per project, counted once per loaded library rather than once per project on every redraw.
+  const projectCounts = useMemo(() => {
+    const counts = new Map<number, number>();
+    for (const paper of state.papers as Paper[]) for (const link of paper.projects) counts.set(link.id, (counts.get(link.id) || 0) + 1);
+    return counts;
+  }, [state.papers]);
+  // The year filter is gone from the bar: never let a stale one hide articles.
+  if (state.paperYearFilter !== 'all') state.paperYearFilter = 'all';
+  const hasFilters = Boolean(favoritesOnly || state.paperSearch || state.paperStatusFilter);
   const papers = ([...runtime.paperFilteredItems()] as Paper[]).filter(paper => !favoritesOnly || paper.favorite);
   if (sort === 'title') papers.sort((a, b) => a.title.localeCompare(b.title));
   if (sort === 'year') papers.sort((a, b) => runtime.paperPublicationYear(b).localeCompare(runtime.paperPublicationYear(a)) || a.title.localeCompare(b.title));
@@ -73,6 +88,12 @@ export function LibraryView() {
   const allSelected = visibleIds.length > 0 && selectedIds.length === visibleIds.length;
   const selectAll = () => setSelection(allSelected ? new Set() : new Set(visibleIds));
   const [working, setWorking] = useState(false);
+  useEffect(() => {
+    if (!selection.size) return;
+    const clear = (event: KeyboardEvent) => { if (event.key === 'Escape' && !(event.target as HTMLElement).closest('input, select, textarea, [role=dialog]')) setSelection(new Set()); };
+    document.addEventListener('keydown', clear);
+    return () => document.removeEventListener('keydown', clear);
+  }, [selection.size]);
   const bulk = async (label: string, run: (id: number) => Promise<unknown>) => {
     if (!selectedIds.length || working) return;
     setWorking(true);
@@ -92,6 +113,12 @@ export function LibraryView() {
     id => state.papers.find((paper: Paper) => paper.id === id)?.projects.some(link => link.id === projectId) ? Promise.resolve() : api(`/papers/${id}/projects/${projectId}`, { method: 'POST' }));
   const unlinkFrom = (projectId: number) => void bulk('removed from the project', id => api(`/papers/${id}/projects/${projectId}`, { method: 'DELETE' }));
   const setStatus = (status: string) => void bulk(`marked “${labels[status]}”`, id => api(`/papers/${id}`, { method: 'PATCH', body: JSON.stringify({ status }) }));
+  const deleteSelected = async () => {
+    const count = selectedIds.length;
+    if (!count || !window.confirm(`Delete ${count} ${count === 1 ? 'article' : 'articles'}, with their PDFs and reading notes? This cannot be undone.`)) return;
+    await bulk('deleted', id => api(`/papers/${id}`, { method: 'DELETE' }));
+    setSelection(new Set());
+  };
   // Folders in tree order, indented, for the “Move to folder” menu.
   const folderOptions = (parentId: number | null = null, depth = 0, seen = new Set<number>()): { id: number; label: string }[] =>
     state.paperFolders.filter((folder: PaperFolder) => folder.parent_id === parentId && !seen.has(folder.id)).flatMap((folder: PaperFolder) =>
@@ -99,7 +126,14 @@ export function LibraryView() {
   // The search also takes a DOI or a link: it is then looked up instead of searched.
   const identifier = state.paperSearch.trim();
   const looksLikeIdentifier = /^(https?:\/\/|doi:|10\.\d{4,9}\/)/i.test(identifier);
-  const lookUp = (event?: FormEvent) => { event?.preventDefault(); if (looksLikeIdentifier) void exploration.exploreIdentifier(undefined, identifier); };
+  // Reading-status chips, counted over the current folder and search.
+  const statusChips: [string, string, number][] = (() => {
+    const current = state.paperStatusFilter;
+    state.paperStatusFilter = '';
+    const scope = ([...runtime.paperFilteredItems()] as Paper[]).filter(paper => !favoritesOnly || paper.favorite);
+    state.paperStatusFilter = current;
+    return [['', 'All', scope.length], ...['to_read', 'reading', 'read', 'key'].map(status => [status, labels[status], scope.filter(paper => paper.status === status).length] as [string, string, number])];
+  })();
   const search = useRef<HTMLInputElement>(null);
   useEffect(() => {
     const main = document.querySelector('#main-content');
@@ -110,12 +144,9 @@ export function LibraryView() {
 
   if (graphPaper) return <div className="library-graph-view"><CitationGraph paper={graphPaper} onBack={exploration.close} initialTabs={exploration.resumeTabs} onTabsChange={tabs => void exploration.saveTabs(tabs)}/></div>;
   if (state.libraryReadingPaperId) return <div className="library-workspace library-refined library-reader-view"><section className="library-content"><LibraryReader paperId={state.libraryReadingPaperId} onBack={closeReader}/></section></div>;
-  const zoteroLabel = zotero.syncing ? 'Synchronizing Zotero…' : zotero.connection?.configured ? 'Sync Zotero' : 'Import from Zotero';
-  const zoteroAction = () => { if (zotero.connection?.configured) void zotero.synchronize(); else void runtime.openSettings('integrations'); };
-  const zoteroBusy = zotero.loading || zotero.connecting || zotero.syncing;
   const activeProjects = state.projects.filter((item: Project) => item.status !== 'archived');
-  return <ViewPage className={`library-view library-workspace library-refined library-v2 ${foldersOpen ? '' : 'library-folders-hidden'}`} label="Article library" style={cssVars({ '--library-folder-width': `${folderWidth}px` })}>
-    {foldersOpen && <><aside id="library-folder-nav" className="library-folder-nav" aria-label="Library organization">
+  return <ViewPage className={`library-view library-workspace library-refined library-v2 ${foldersOpen && !watchesOpen ? '' : 'library-folders-hidden'}${watchesOpen ? ' library-watches-mode' : ''}`} label="Article library" style={cssVars({ '--library-folder-width': `${folderWidth}px` })}>
+    {foldersOpen && !watchesOpen && <><aside id="library-folder-nav" className="library-folder-nav" aria-label="Library organization">
       <div className="library-nav-heading">Library</div>
       <button className={`library-folder-scope ${!favoritesOnly && !project && state.paperFolderFilter === 'all' ? 'active' : ''}`} data-library-paper-folder="all" onClick={() => setFavoritesOnly(false)}><Icon name="papers" size={16}/><strong>All articles</strong><small>{state.papers.length}</small></button>
       <button className={`library-folder-scope ${favoritesOnly ? 'active' : ''}`} aria-pressed={favoritesOnly} onClick={() => { setFavoritesOnly(!favoritesOnly); update('paperPage', 1); }}><span>★</span><strong>Favorites</strong><small>{state.papers.filter((paper: Paper) => paper.favorite).length}</small></button>
@@ -123,7 +154,7 @@ export function LibraryView() {
       <div className="library-nav-heading" data-paper-folder-drop="root" title="Drop a folder here to move it to the top level"><span>Folders</span><button className="library-nav-add" data-action="new-paper-folder" aria-label="Create a library folder" title="New folder"><Icon name="plus" size={12}/>New</button></div>
       <div className="library-folder-tree"><FolderTree/>{!state.paperFolders.length && <button className="library-nav-empty" data-action="new-paper-folder"><Icon name="folder" size={14}/>Create a first folder to file your articles</button>}</div>
       <div className="library-nav-heading"><span>Projects</span>{project && <button className="library-nav-add" onClick={() => { Object.assign(state, { paperProjectFilter: 'all', paperPage: 1 }); publish(); }} title="Show the articles of every project">All</button>}</div>
-      <div className="library-project-nav">{activeProjects.map((item: Project) => <button key={item.id} className={`library-project-scope ${project?.id === item.id ? 'active' : ''}`} data-paper-project-drop={item.id} onClick={() => { Object.assign(state, { paperProjectFilter: String(item.id), paperFolderFilter: 'all', paperPage: 1 }); publish(); }}><i style={cssVars({ '--project-color': item.color })}/><strong>{item.name}</strong><small>{state.papers.filter((paper: Paper) => paper.projects.some(link => link.id === item.id)).length}</small></button>)}</div>
+      <div className="library-project-nav">{activeProjects.map((item: Project) => <button key={item.id} className={`library-project-scope ${project?.id === item.id ? 'active' : ''}`} data-paper-project-drop={item.id} onClick={() => { Object.assign(state, { paperProjectFilter: String(item.id), paperFolderFilter: 'all', paperPage: 1 }); publish(); }}><i style={cssVars({ '--project-color': item.color })}/><strong>{item.name}</strong><small>{projectCounts.get(item.id) || 0}</small></button>)}</div>
       <p className="library-nav-hint">Select articles to file them, or drag them onto a folder or a project.</p>
     </aside>
     <div className="library-folder-resizer" role="separator" tabIndex={0} aria-label="Resize library folders" aria-orientation="vertical" aria-controls="library-folder-nav" aria-valuemin={180} aria-valuemax={520} aria-valuenow={folderWidth}
@@ -137,23 +168,17 @@ export function LibraryView() {
     </>}
     <section className="library-content">
       <ViewHeader icon="papers" title="Library" count={state.papers.length}>
-        <button className={`icon-button ${foldersOpen ? 'active' : ''}`} aria-pressed={foldersOpen} aria-controls="library-folder-nav" title={foldersOpen ? 'Hide folders and projects' : 'Show folders and projects'} aria-label={foldersOpen ? 'Hide folders and projects' : 'Show folders and projects'} onClick={toggleFolders}><Icon name="sidebar" size={15}/></button>
+        <div className="aw-segmented" role="group" aria-label="Library section">
+          <button type="button" className={watchesOpen ? '' : 'active'} aria-pressed={!watchesOpen} onClick={() => setSection('articles')}>Articles</button>
+          <button type="button" className={watchesOpen ? 'active' : ''} aria-pressed={watchesOpen} title="Article watches: new articles suggested every week" onClick={() => setSection('watches')}>
+            Watches{watchData.newCount > 0 && <b className="aw-count" aria-label={`${watchData.newCount} new suggestions`}>{watchData.newCount}</b>}</button>
+        </div>
+        {!watchesOpen && <button className={`icon-button ${foldersOpen ? 'active' : ''}`} aria-pressed={foldersOpen} aria-controls="library-folder-nav" title={foldersOpen ? 'Hide folders and projects' : 'Show folders and projects'} aria-label={foldersOpen ? 'Hide folders and projects' : 'Show folders and projects'} onClick={toggleFolders}><Icon name="sidebar" size={15}/></button>}
         {zotero.syncing && <span className="sync-spinner zotero-sync-spinner" aria-label="Synchronizing Zotero" role="img"/>}
-        <Menu label="More" button={(open, toggle) => <button className="icon-button" aria-label="More" title="Explorations, watchers, Zotero" aria-haspopup="menu" aria-expanded={open} onClick={toggle}>•••</button>}>
-          {close => <>
-            <button role="menuitem" onClick={() => { close(); setExplorationsOpen(value => !value); }}><Icon name="graph" size={13}/><span>Citation explorations</span>{exploration.explorations?.length ? <small>{exploration.explorations.length}</small> : null}</button>
-            <button role="menuitem" onClick={() => { close(); openWatchers({ collectionId: 'articles' }); }}><Icon name="sparkle" size={13}/><span>Watchers</span></button>
-            <button role="menuitem" disabled={zoteroBusy} onClick={() => { close(); zoteroAction(); }}><Icon name="link" size={13}/><span>{zoteroLabel}</span></button>
-          </>}
-        </Menu>
-        <Menu label="Add" button={(open, toggle) => <button className="button button-primary" aria-haspopup="menu" aria-expanded={open} onClick={toggle}><Icon name="plus" size={14}/>Add<Icon name="chevron" size={11}/></button>}>
-          {close => <>
-            <button role="menuitem" onClick={() => { close(); setQuickAddOpen(true); }}><Icon name="notes" size={13}/><span>Add a reference</span></button>
-            <button role="menuitem" onClick={() => { close(); search.current?.focus(); }}><Icon name="search" size={13}/><span>From a DOI or a link…</span></button>
-            <button role="menuitem" disabled={zoteroBusy} onClick={() => { close(); zoteroAction(); }}><Icon name="link" size={13}/><span>{zoteroLabel}</span></button>
-          </>}
-        </Menu>
+        {!watchesOpen && <button className={`icon-button ${explorationsOpen ? 'active' : ''}`} aria-pressed={explorationsOpen} aria-controls="library-explorations" title="Saved citation explorations" aria-label="Saved citation explorations" onClick={() => setExplorationsOpen(value => !value)}><Icon name="graph" size={15}/></button>}
+        {!watchesOpen && <button className="button button-primary" onClick={() => setQuickAddOpen(true)}><Icon name="plus" size={14}/>Add</button>}
       </ViewHeader>
+      {watchesOpen ? <ArticleWatches data={watchData} intent={watchIntent} onGraph={item => void exploration.start(graphSeed(item))}/> : <>
       {zotero.syncing && <ZoteroSyncProgress progress={zotero.progress} warning={zotero.connectionWarning}/>}
       {zotero.result && !zotero.syncing && <details className="library-sync-report">
         <summary><span>Zotero · {zotero.result.created} added · {zotero.result.updated} updated</span>{Boolean(zotero.result.pdfs?.errors.length || zotero.result.notes?.errors.length) && <span className="library-sync-attention">{(zotero.result.pdfs?.errors.length || 0) + (zotero.result.notes?.errors.length || 0)} needing attention</span>}<span className="library-sync-details-label">Details</span></summary>
@@ -161,14 +186,19 @@ export function LibraryView() {
       </details>}
       {zotero.error && <p className="integration-error" role="alert">{zotero.error}</p>}
       {exploration.error && <p className="integration-error" role="alert">{exploration.error}</p>}
-      <form className="library-filter-bar" onSubmit={lookUp} role="search">
-        <label className="library-search" htmlFor="paper-search"><Icon name="search" size={16}/><input ref={search} id="paper-search" type="search" value={state.paperSearch} onChange={event => update('paperSearch', event.target.value)} placeholder="Search titles, authors, tags — or paste a DOI or a link" aria-label="Search the library, or paste a DOI or a link"/></label>
-        <select aria-label="Reading status" value={state.paperStatusFilter} onChange={event => update('paperStatusFilter', event.target.value)}><option value="">Any status</option>{['to_read', 'reading', 'read', 'key'].map(status => <option key={status} value={status}>{labels[status]}</option>)}</select>
-        <select aria-label="Publication year" value={state.paperYearFilter} onChange={event => update('paperYearFilter', event.target.value)}><option value="all">Any year</option>{years.map(year => <option key={year}>{year}</option>)}</select>
-        <select aria-label="Sort articles" value={sort} onChange={event => { setSort(event.target.value); update('paperPage', 1); }}><option value="recent">Recently added</option><option value="year">Newest first</option><option value="title">Title A–Z</option></select>
-        {hasFilters && <button type="button" className="text-link" onClick={reset}>Clear</button>}
-      </form>
-      {looksLikeIdentifier && <div className="library-lookup-hint" role="status"><Icon name="search" size={14}/><span>This looks like a DOI or a link.</span><button className="button button-small button-primary" onClick={() => lookUp()} disabled={exploration.busy}>{exploration.busy ? 'Looking up…' : 'Look it up'}</button></div>}
+      <div className="library-filter-bar" role="search">
+        <label className="library-search" htmlFor="paper-search"><Icon name="search" size={15}/><input ref={search} id="paper-search" type="search" value={state.paperSearch} onChange={event => update('paperSearch', event.target.value)} placeholder="Search titles, authors, tags…" aria-label="Search the library"/>
+          {state.paperSearch && <button type="button" className="library-search-clear" aria-label="Clear the search" onClick={() => { update('paperSearch', ''); search.current?.focus(); }}><Icon name="close" size={12}/></button>}</label>
+        <label className="library-sort"><span>Sort by</span><select value={sort} onChange={event => { setSort(event.target.value); update('paperPage', 1); }}><option value="recent">Date added</option><option value="year">Publication year</option><option value="title">Title</option></select></label>
+      </div>
+      <div className="library-status-filter" role="group" aria-label="Filter by reading status">
+        {statusChips.map(([value, label, count]) => <button key={value || 'all'} type="button" aria-pressed={state.paperStatusFilter === value} onClick={() => update('paperStatusFilter', value)}>
+          {value && <span className={`library-status-dot status-${value}`}/>}{label}<small>{count}</small></button>)}
+        {hasFilters && <button type="button" className="text-link library-filter-clear" onClick={reset}>Clear filters</button>}
+      </div>
+      {looksLikeIdentifier && <div className="library-lookup-hint" role="status"><Icon name="link" size={14}/><span>{papers.length ? 'This DOI or link is already in your library.' : 'This DOI or link is not in your library yet.'}</span>
+        {!papers.length && <button className="button button-small button-primary" onClick={() => { setQuickAddSeed(identifier); setQuickAddOpen(true); }}><Icon name="plus" size={13}/>Add it</button>}
+        <button className="button button-small" onClick={() => void exploration.exploreIdentifier(undefined, identifier)} disabled={exploration.busy}>{exploration.busy ? 'Looking up…' : 'Explore its citations'}</button></div>}
       {selectedIds.length > 0 ? <div className="library-bulk-bar" role="toolbar" aria-label="Selected articles">
         <strong>{selectedIds.length} selected</strong>
         <select aria-label="Move the selected articles to a folder" value="" disabled={working} onChange={event => moveTo(event.target.value)}>
@@ -183,14 +213,16 @@ export function LibraryView() {
         {project && <button className="button button-small" disabled={working} onClick={() => unlinkFrom(project.id)}>Remove from {project.name}</button>}
         <button className="button button-small" data-action="new-paper-folder"><Icon name="folder" size={13}/>New folder</button>
         <span className="library-bulk-spacer"/>
+        <button className="button button-small button-danger" disabled={working} onClick={() => void deleteSelected()}><Icon name="trash" size={13}/>Delete</button>
         <button className="text-link" onClick={() => setSelection(new Set())}>Clear selection</button>
       </div> : <div className="library-list-heading"><div><h2>{location}</h2><span aria-live="polite">{papers.length} {papers.length === 1 ? 'article' : 'articles'}</span></div>{project && <button className="button button-small" data-action="add-project-paper" data-project-id={project.id}>Link articles</button>}</div>}
       <div id="paper-results" className="fit-list"><div className="fit-body" ref={fit.ref}>{papers.length ? <div className="view-table-wrap"><table className="view-table article-table paper-table" aria-label="Articles"><thead><tr><th scope="col" className="paper-cell-select"><input type="checkbox" checked={allSelected} aria-label="Select every article shown" onChange={selectAll}/></th><th scope="col">Article</th><th scope="col">Year</th><th scope="col">Status</th><th scope="col"><span className="sr-only">Actions</span></th></tr></thead><tbody data-fit-list>{fit.pageItems.map(paper => <PaperRow key={paper.id} paper={paper} projectId={project?.id} selected={selection.has(paper.id)} onSelect={toggleSelected} onCitationGraph={paper => void exploration.start(paper)} onPreview={setPreviewPaper}/>)}</tbody></table></div>
-        : <EmptyState icon="▤" title={hasFilters || location !== 'All articles' ? 'No articles match this view' : 'Build your research library'} action={hasFilters || location !== 'All articles' ? 'reset-paper-filters' : undefined} onAction={hasFilters || location !== 'All articles' ? () => setFavoritesOnly(false) : () => setQuickAddOpen(true)} actionLabel={hasFilters || location !== 'All articles' ? 'Reset filters' : 'Add article'}>{hasFilters || location !== 'All articles' ? 'Try a different search, status or folder.' : 'Add a reference, paste a DOI in the search, or import your Zotero library.'}</EmptyState>}</div>
+        : <EmptyState icon="▤" title={hasFilters || location !== 'All articles' ? 'No articles match this view' : 'Build your research library'} action={hasFilters || location !== 'All articles' ? 'reset-paper-filters' : undefined} onAction={hasFilters || location !== 'All articles' ? () => setFavoritesOnly(false) : () => setQuickAddOpen(true)} actionLabel={hasFilters || location !== 'All articles' ? 'Reset filters' : 'Add article'}>{hasFilters || location !== 'All articles' ? 'Try a different search, status or folder.' : 'Add an article from a link or a DOI, drop PDF files, or import your Zotero library.'}</EmptyState>}</div>
         {papers.length > 0 && <Pagination label="Library pages" page={fit.page} pages={fit.pages} total={fit.total} from={fit.from} to={fit.to} onPage={fit.setPage}/>}</div>
+      </>}
     </section>
-    {explorationsOpen && <aside id="library-explorations" className="library-explorations-panel" aria-labelledby="library-explorations-heading">
-      <div className="library-nav-heading"><span id="library-explorations-heading">Graph explorations</span><small>{exploration.explorations?.length ?? '…'}</small></div>
+    {explorationsOpen && !watchesOpen && <aside id="library-explorations" className="library-explorations-panel" aria-labelledby="library-explorations-heading">
+      <div className="library-nav-heading"><span id="library-explorations-heading">Citation explorations</span><button className="library-nav-add" onClick={() => setExplorationsOpen(false)} aria-label="Close the explorations" title="Close"><Icon name="close" size={11}/></button></div>
       <div className="library-explorations">{exploration.explorations?.length ? exploration.explorations.map(record => <div className="discovery-exploration" key={record.id}>
         <button type="button" className="discovery-exploration-open" title={`Resume “${record.title}”`} onClick={() => exploration.resume(record)}>
           <strong>{record.title}</strong>
@@ -199,7 +231,7 @@ export function LibraryView() {
         <button type="button" className="discovery-icon-button discovery-icon-danger" title="Delete" aria-label={`Delete exploration: ${record.title}`} onClick={() => void exploration.remove(record.id)}><Icon name="trash" size={13}/></button>
       </div>) : exploration.explorations && <p className="library-nav-hint">Open an article's graph or explore a DOI — explorations are saved here automatically.</p>}</div>
     </aside>}
-    {quickAddOpen && <QuickAdd projectId={project?.id} onClose={() => setQuickAddOpen(false)}/>}
+    {quickAddOpen && <QuickAdd projectId={project?.id} initialIdentifier={quickAddSeed} onClose={() => { setQuickAddOpen(false); setQuickAddSeed(''); }}/>}
     {previewPaper && <ArticlePreview paper={previewPaper} projectId={project?.id} onClose={() => setPreviewPaper(null)} onExplore={seed => { setPreviewPaper(null); void exploration.start(seed); }}/>}
     {exploration.lookupPreview && <ArticlePreview lookup={exploration.lookupPreview} projectId={project?.id} onClose={exploration.closeLookup} onExplore={seed => { exploration.closeLookup(); exploration.setIdentifier(''); void exploration.start(seed); }}/>}
   </ViewPage>;

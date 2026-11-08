@@ -82,10 +82,6 @@ def _install(target: Registry, manifest: dict[str, Any]) -> None:
     target.state_collections.extend(manifest.get("state_collections", []))
     for link in manifest.get("link_types", []):
         target.link_types[link["id"]] = {**link, "plugin": plugin_id}
-    if manifest.get("settings"):
-        target.settings[plugin_id] = manifest["settings"]
-    for connector in manifest.get("connectors", []):
-        target.connectors[f"{plugin_id}.{connector['id']}"] = {**connector, "plugin": plugin_id}
     module = importlib.import_module(f"app.plugins.{plugin_id}")
     if hasattr(module, "register"):
         module.register(target, manifest)

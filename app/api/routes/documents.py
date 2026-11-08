@@ -5,10 +5,11 @@ import json
 import mimetypes
 import shutil
 import uuid
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, File, Form, HTTPException, Response, UploadFile
+from fastapi import APIRouter, File, Form, HTTPException, Query, Response, UploadFile
 from fastapi.responses import FileResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 
@@ -22,7 +23,7 @@ from app.models.documents import (
 from app.core.workspace import documents, web_preview, asset_metadata
 from app.core.projects import projects
 from app.core.projects import canvas_store as canvas_tasks
-from app.core.workspace import html_documents, write_guard
+from app.core.workspace import html_documents, tree, write_guard
 from app.core.records.repository import json_values, now, store
 
 
@@ -39,6 +40,23 @@ class WorkspaceWrite(BaseModel):
 def file_version(path: Path) -> str:
     """Identifies the bytes of a workspace file, to tell an editor its copy is no longer the current one."""
     return hashlib.sha256(path.read_bytes()).hexdigest()[:20] if path.is_file() else ""
+
+
+def _editable(path: Path) -> bool:
+    """Files an editor may write back (and so needs their version): not PDFs and media, which are only shown."""
+    kind = mimetypes.guess_type(path.name)[0] or ""
+    return kind != "application/pdf" and not kind.startswith(("image/", "audio/", "video/"))
+
+
+def _note_at(state: dict[str, Any], target: Path) -> dict[str, Any] | None:
+    """The note stored at ``target``. Notes whose saved file name differs are skipped without computing their path."""
+    for note in state["notes"]:
+        hint = note.get("storage_path") or (None if note.get("source_image_path") else note.get("file_name"))
+        if hint and Path(hint).name != target.name:
+            continue
+        if documents.note_path(note, state) == target:
+            return note
+    return None
 
 
 class WorkspaceRename(BaseModel):
@@ -64,11 +82,6 @@ class CanvasCreate(BaseModel):
 
 class LinkPreviewRequest(BaseModel):
     url: str = Field(min_length=1, max_length=2048)
-
-
-
-
-
 
 
 @router.post("/workspace/link-preview")
@@ -186,7 +199,8 @@ def note_asset(note_id: int, filename: str) -> FileResponse:
 @router.get("/note-folders")
 def note_folders() -> list[dict[str, Any]]:
     state = store.read()
-    return [{**item, "note_count": sum(note.get("folder_id") == item["id"] and not note.get("trashed_at") for note in state["notes"])} for item in state["note_folders"]]
+    counts = Counter(note.get("folder_id") for note in state["notes"] if not note.get("trashed_at"))
+    return [{**item, "note_count": counts[item["id"]]} for item in state["note_folders"]]
 
 
 @router.post("/note-folders", status_code=201)
@@ -338,7 +352,7 @@ def preview_template(payload: NoteTemplatePreview) -> dict[str, str]:
 
 @router.get("/workspace/tree")
 def workspace_tree() -> list[dict[str, Any]]:
-    return documents.workspace_tree()
+    return tree.workspace_tree()
 
 
 @router.get("/workspace/file")
@@ -353,7 +367,7 @@ def read_workspace_file(path: str):
         target = workspace_path(path)
     if not target.is_file():
         raise HTTPException(status_code=404, detail="File not found")
-    version = {"X-Kavot-Version": file_version(target)}
+    version = {"X-Kavot-Version": file_version(target)} if _editable(target) else {}
     if target.suffix.lower() in {".md", ".txt"}:
         return PlainTextResponse(target.read_text(encoding="utf-8"), headers=version)
     if target.suffix.lower() == '.html':
@@ -380,7 +394,7 @@ def write_workspace_file(payload: WorkspaceWrite) -> dict[str, Any]:
         return {"path": payload.path, "name": target.name, "content": payload.content}
     else:
         state = store.read()
-        note = next((item for item in state["notes"] if documents.note_path(item, state) == target), None)
+        note = _note_at(state, target)
         if note:
             if payload.expected_version is None and write_guard.blind_write_blocked(note['id']):
                 raise HTTPException(409, STALE_DOCUMENT)
@@ -476,7 +490,7 @@ def trash_workspace_item(payload: WorkspaceTrash) -> dict[str, str]:
     target = workspace_path(payload.path)
     protect_generated_note(target)
     protect_project_note_path(target)
-    note = next((item for item in state["notes"] if documents.note_path(item, state) == target), None)
+    note = _note_at(state, target)
     if note:
         documents.delete_note(note["id"])
         return {"trash_id": store.find("notes", note["id"])["trash_id"]}
@@ -542,3 +556,33 @@ def delete_workspace_item(trash_id: str) -> Response:
     asset_metadata.remove(root)
     shutil.rmtree(root)
     return Response(status_code=204)
+
+
+class WorkspaceOpen(BaseModel):
+    path: str = Field(min_length=1, max_length=2000)
+
+
+@router.get("/workspace/preview")
+def workspace_preview(path: str = Query(min_length=1)) -> dict[str, Any]:
+    """A read-only preview of a Word, Excel, PowerPoint or CSV file stored with the notes."""
+    from app.core.workspace import document_preview
+    target = workspace_path(path)
+    if not target.is_file():
+        raise HTTPException(404, "File not found")
+    return document_preview.preview(target)
+
+
+@router.post("/workspace/open", status_code=204)
+def workspace_open(payload: WorkspaceOpen) -> None:
+    """Open a document with the app the system uses for it; programs and scripts are refused."""
+    import os
+    import subprocess
+    import sys
+    from app.core.workspace import document_preview
+    target = workspace_path(payload.path)
+    if not target.is_file() or target.suffix.lower() not in document_preview.DOCUMENTS:
+        raise HTTPException(422, "Kavot opens documents with their app, not programs or scripts.")
+    if sys.platform == "win32":
+        os.startfile(target)  # noqa: S606 - a validated document
+    else:
+        subprocess.Popen(["open" if sys.platform == "darwin" else "xdg-open", str(target)])

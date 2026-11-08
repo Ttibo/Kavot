@@ -4,14 +4,13 @@ import { useOptionalRuntime } from '../../app/runtime';
 import type { ExternalEngine } from '../../components/ExternalAgentSettings';
 import { Icon } from '../../components/Icon';
 import { lockAgentEditors, prepareAgentContext, refreshAgentArtifacts } from '../externalAgents/sync';
-import { cost, tokens } from '../atelier/types';
+import { cost, tokens } from './format';
 import { budgetAlert, budgetOf, budgetTitle } from './budget';
-import { openAtelier } from '../projects/navigation';
-import { agents, ENGINE_NAMES, STATUS_LABELS, statusOf, type Code, type Mode, type Run, type Session, type Summary } from './api';
+import { agents, ENGINE_NAMES, STATUS_LABELS, statusOf, type Run, type Session, type Summary } from './api';
 import type { PickedItem } from '../externalAgents/picker';
 import { Composer, type EngineChoice, type NewConversationDraft, type Outgoing } from './Composer';
 import { ConversationList } from './ConversationList';
-import { ChangesPanel, ContextBar, UsagePanel } from './Panels';
+import { UsagePanel } from './Panels';
 import { Thread } from './Thread';
 import { onRunUpdate, rememberedSelection, rememberSelection, watchRun } from './runWatcher';
 import '../../styles/components/agent-workspace.css';
@@ -37,7 +36,7 @@ function RunMenu({ items }: { items: [string, () => void, boolean?][] }) {
 }
 
 /** Agent conversations, the same everywhere: the assistant panel, the Chat view and the Atelier.
- * `page` shows the list beside the conversation and the changes beside the thread; `panel` (narrow)
+ * `page` shows the list beside the conversation and the usage beside the thread; `panel` (narrow)
  * puts the list in a drawer and the changes over the thread. With `projectId`, it lists and starts
  * the conversations of that project. */
 export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', selected, onSelect, visible = true, onClose, onChanged, emptyHint, preset }: {
@@ -59,7 +58,7 @@ export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', 
   const selectedId = selected !== undefined ? selected : ownSelection;
   const [session, setSession] = useState<Session | null>(null);
   const [run, setRun] = useState<Run | null>(null);
-  const [side, setSide] = useState<'changes' | 'usage' | null>(null);
+  const [side, setSide] = useState<'usage' | null>(null);
   // The budget alert dismissed for one request of one conversation; a later request can raise it again.
   const [dismissed, setDismissed] = useState('');
   const [listOpen, setListOpen] = useState(false);
@@ -177,7 +176,6 @@ export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', 
         if (openId.current === loaded.id && !loaded.messages.some(message => message.run_id === next.id)) setRun(next);
         void loadList(); onChanged?.();
       });
-      void agents.get(next.session_id).then(session => { if (session.code?.status === 'review') setSide(current => current || (layout === 'page' ? 'changes' : current)); });
     });
     return unsubscribe;
   }, [run?.id, run?.status]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -200,11 +198,6 @@ export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', 
         model: message.model, effort: message.effort,
         messages: [...previous.messages, { role: 'user', content: message.text, context: started.scope, at: new Date().toISOString(), mode: message.mode }] }));
       void loadList();
-      // The code given with this message is now part of the conversation.
-      if (message.context.code_folder_ids?.length || message.context.resource_folder_ids?.length) {
-        void agents.get(current.id).then(next => setSession(previous => previous && previous.id === next.id ? { ...previous, code: next.code, project_id: next.project_id } : previous));
-        onChanged?.();
-      }
       return true;
     } catch (reason) {
       lockAgentEditors(false);
@@ -262,16 +255,9 @@ export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', 
     catch (reason) { toast((reason as Error).message, 'error'); }
   }
 
-  const codeChanged = (code: Code | null) => {
-    setSession(previous => previous && ({ ...previous, code }));
-    void loadList(); onChanged?.();
-  };
   const reveal = () => { if (layout === 'panel' && window.matchMedia('(max-width: 820px)').matches) onClose?.(); };
 
   const status = session ? statusOf({ ...session, active_run_id: running ? run!.id : null }) : 'new';
-  const code = session?.code;
-  const files = code?.workspaces.flatMap(space => space.files || []) || [];
-  const additions = files.reduce((sum, file) => sum + file.additions, 0), deletions = files.reduce((sum, file) => sum + file.deletions, 0);
   const usage = session?.usage;
   const budget = budgetOf(session, run);
   const alert = budgetAlert(budget);
@@ -281,7 +267,6 @@ export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', 
   const name = session ? ENGINE_NAMES[session.engine] : engines.find(item => item.id === engine)?.name || 'The agent';
   const menu: [string, () => void, boolean?][] = session ? [
     ['Rename', () => void rename()],
-    ...(sessionProject && !projectId ? [['Open in the Atelier', () => void openAtelier(sessionProject, 'agents')] as [string, () => void]] : []),
     ...(!running ? [['Remove from the list', () => void remove(), true] as [string, () => void, boolean]] : []),
   ] : [];
 
@@ -289,7 +274,8 @@ export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', 
     <Icon name="agents" size={22}/>
     <h3>{projectId ? 'Ask the agent, or have it build' : 'A question, an idea, a change?'}</h3>
     <p>{emptyHint || <>The agent reads your workspace through Kavot's tools: notes, articles, collections, tasks, canvas.
-      In <strong>/edit</strong> it prepares changes you approve; give it a project's <strong>code</strong> (＋ or @) and it changes it in a worktree you review before any commit.</>}</p>
+      It sees what you are looking at (the open note, the canvas and its selected card, the citation graph); add more with ＋ or @.
+      In <strong>/edit</strong> it prepares changes you approve, in <strong>/auto</strong> it makes them.</>}</p>
     {!engines.length && <p className="atelier-warning">No agent is enabled. <button className="text-link" onClick={() => window.dispatchEvent(new Event('kavot:open-settings'))}>Enable Claude Code, Codex or OpenCode in Settings → AI and agents</button>.</p>}
   </div>;
 
@@ -327,28 +313,19 @@ export function AgentSurface({ layout, projectId, scopeLabel, pane = 'primary', 
           onClick={() => setSide(value => value === 'usage' ? null : 'usage')} aria-pressed={side === 'usage'} title={budgetTitle(budget)}>
           <i className="agent-budget-dot" aria-hidden="true"/>{budget.total ? tokens(budget.total) : '—'}
           {budget.last > 0 && <small>last {tokens(budget.last)}</small>}{usage?.cost_usd ? <small className="agent-budget-cost">· {cost(usage.cost_usd)}</small> : null}</button>
-        {!!code?.workspaces.length && <button className={`atelier-pill ${side === 'changes' ? 'active' : ''}`} onClick={() => setSide(value => value === 'changes' ? null : 'changes')} aria-pressed={side === 'changes'} title="Files changed by the agent">
-          <Icon name="panel" size={12}/>{files.length ? <>{files.length}<span className="add">+{additions}</span><span className="del">−{deletions}</span></> : <span className="agent-label">No change</span>}</button>}
         <RunMenu items={menu}/>
         {compact && <span className="agent-head-tools">{compactTools}</span>}
       </header>}
-      {session && <ContextBar session={session} pane={pane}/>}
       <Thread session={session} run={run} name={name} busy={busy} empty={empty} onDecide={(runId, proposalId, decision) => void decide(runId, proposalId, decision)} onApplyAll={(runId, ids) => void applyAll(runId, ids)} onNavigate={reveal}/>
       {session && alert && dismissed !== alertKey && <div className={`agent-budget-alert ${budget.level}`} role="alert" style={{ '--budget-hue': budget.hue } as CSSProperties}>
         <Icon name="sparkle" size={13}/><span>{alert}</span>
         <button type="button" disabled={running} onClick={() => select(null)}>New conversation</button>
         <button type="button" className="icon-button" aria-label="Hide this alert" onClick={() => setDismissed(alertKey)}><Icon name="close" size={11}/></button>
       </div>}
-      {code?.status === 'review' && files.length > 0 && side !== 'changes' && <button className="atelier-changes-banner" onClick={() => setSide('changes')}>
-        <Icon name="check" size={13}/><strong>{files.length} file{files.length > 1 ? 's' : ''} changed</strong><span className="add">+{additions}</span><span className="del">−{deletions}</span>
-        <span className="atelier-head-spacer"/>Review and commit<Icon name="arrow" size={12}/></button>}
-      {code?.status === 'accepted' && side !== 'changes' && <button className="atelier-changes-banner" onClick={() => setSide('changes')}>
-        <Icon name="check" size={13}/><span>Committed on <code>{code.workspaces[0]?.branch}</code></span><span className="atelier-head-spacer"/>Merge<Icon name="arrow" size={12}/></button>}
       <Composer session={session} engines={engines} engine={session?.engine || engine} onEngineChange={changeEngine} projectId={projectId || sessionProject}
         running={running} busy={busy} onSend={send} onStop={() => void stop()} autoFocus={layout === 'page'} preset={preset}
         draft={modelDraft} onDraftChange={setModelDraft}/>
     </div>
-    {session && side === 'changes' && code && <ChangesPanel session={session} onChanged={codeChanged} onClose={() => setSide(null)}/>}
     {session && side === 'usage' && <UsagePanel session={session} run={run} onClose={() => setSide(null)}/>}
   </div>;
 

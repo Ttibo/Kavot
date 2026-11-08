@@ -60,13 +60,14 @@ def register(registry, manifest):
         "state_key": "conferences",              # where the items live
         "apply": lambda payload, identifier, values: {"id": service.save(payload)["id"]},
         "summary": "Create a conference.",       # one line shown by list_actions
-        "areas": ["conferences"],                # named MCP tool in these views
+        "areas": ["conferences"],                # unused since the terminal agents: changes go through apply_action
         "partial": False,                        # True: updates may omit unchanged fields
     }
 ```
 
-Other registries: `mcp_tools` (functions receiving a `ToolContext` with
-`tool`, `lock`, `run`, `emit`, `active()`, `compact()`), `agent_guides`
+Other registries: `mcp_tools` (functions receiving the `ToolContext` of
+`app/mcp/tools`: `tool`, `read_only`, `network_read`, `annotations`, `run`
+(the session's state), `lock`, `compact()`; tool bodies already run under the lock), `agent_guides`
 (topic -> text read with `get_guide`), `search_sources` (yield
 `core.search.documents.Document`, or `Unchanged(group)` when a group did not
 change), `link_sources`, `card_builders` (collection id -> function

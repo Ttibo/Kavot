@@ -1,15 +1,20 @@
-"""Proposals an agent prepares for a note: applied one by one, each on the note as it is then."""
+"""Changes an agent makes to a note: applied one by one, each on the note as it is then."""
 import re
+
+
+def agent_run():
+    """The state an agent session starts from: the whole workspace."""
+    from app.mcp.session import Session
+    session = Session()
+    with session.lock:
+        return session.current()
 
 
 def test_several_block_proposals_for_one_note_all_apply(client):
     """An answer often proposes one insertion per section of a note: applying one must not block the others."""
-    from app.core.agents import actions, context as agent_context
-    from app.core.kernel.config import settings
+    from app.mcp import actions
     note = client.post("/api/notes", json={"title": "Paper notes", "content": "<h2>Summary</h2><p>.</p><h2>Key points</h2><p>.</p>"}).json()
-    snapshot, _, _ = agent_context.prepare({"area": "notes", "note_id": note["id"], "target_note_id": note["id"]}, "question")
-    run = {"id": "test", "mode": "propose", "status": "running", "workspace": str(settings.storage_path.resolve()),
-           "context": snapshot, "baseline": actions.baseline(snapshot), "proposals": [], "engine": "claude"}
+    run = agent_run()
     text = actions.load_note(run, note["id"])["text"]
     blocks = re.findall(r'<h2[^>]*id="([^"]+)"', text)
     assert len(blocks) == 2, text
@@ -24,13 +29,10 @@ def test_several_block_proposals_for_one_note_all_apply(client):
 
 
 def test_a_block_that_disappeared_still_refuses(client):
-    from app.core.agents import actions, context as agent_context
-    from app.core.kernel.config import settings
+    from app.mcp import actions
     from fastapi import HTTPException
     note = client.post("/api/notes", json={"title": "Short notes", "content": "<h2>Only</h2><p>.</p>"}).json()
-    snapshot, _, _ = agent_context.prepare({"area": "notes", "note_id": note["id"], "target_note_id": note["id"]}, "question")
-    run = {"id": "test", "mode": "propose", "status": "running", "workspace": str(settings.storage_path.resolve()),
-           "context": snapshot, "baseline": actions.baseline(snapshot), "proposals": [], "engine": "claude"}
+    run = agent_run()
     block = re.findall(r'<h2[^>]*id="([^"]+)"', actions.load_note(run, note["id"])["text"])[0]
     proposal = actions.prepare({"kind": "note_block_insert", "id": note["id"], "values": {"after_block_id": block, "html": "<p>x</p>"}}, run)
     client.patch(f"/api/notes/{note['id']}", json={"content": "<p>Rewritten</p>"})
@@ -44,12 +46,9 @@ def test_a_block_that_disappeared_still_refuses(client):
 
 def test_an_editor_without_version_cannot_restore_the_text_an_agent_just_replaced(client):
     """Right after an agent's change, a client write without the version it started from is refused."""
-    from app.core.agents import actions, context as agent_context
-    from app.core.kernel.config import settings
+    from app.mcp import actions
     note = client.post("/api/notes", json={"title": "Guarded", "content": "<p>old</p>"}).json()
-    snapshot, _, _ = agent_context.prepare({"area": "notes", "note_id": note["id"], "target_note_id": note["id"]}, "question")
-    run = {"id": "test", "mode": "propose", "status": "running", "workspace": str(settings.storage_path.resolve()),
-           "context": snapshot, "baseline": actions.baseline(snapshot), "proposals": [], "engine": "claude"}
+    run = agent_run()
     actions.load_note(run, note["id"])
     actions.apply(actions.prepare({"kind": "note_content_replace", "id": note["id"], "values": {"content": "<p>agent table</p>"}}, run))
     assert client.patch(f"/api/notes/{note['id']}", json={"content": "<p>old</p>"}).status_code == 409

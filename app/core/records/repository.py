@@ -17,9 +17,6 @@ from app.core.kernel.files import atomic_write_json, read_json_object
 # kavot.state.json keys owned by the core; plugins add theirs through the registry.
 CORE_COLLECTIONS = (
     "projects",
-    "workflows",
-    "watchers",
-    "collection_watchers",
     "topics",
     "notes",
     "note_folders",
@@ -60,9 +57,28 @@ class JsonRepository:
     def __init__(self) -> None:
         self._lock = threading.RLock()
         self._batch = threading.local()
+        # (path, size, mtime) of the catalogue last checked by ensure(): while the
+        # file is unchanged, reading it skips the folder checks and migrations.
+        self._checked: tuple[str, int, int] | None = None
+
+    @staticmethod
+    def _signature() -> tuple[str, int, int] | None:
+        try:
+            info = settings.state_path.stat()
+        except OSError:
+            return None
+        return str(settings.state_path), info.st_size, info.st_mtime_ns
 
     def ensure(self) -> dict[str, Any] | None:
         """Upgrade the catalogue if needed and return it, so readers parse it once."""
+        signature = self._signature()
+        if signature is not None and signature == self._checked:
+            return read_json_object(settings.state_path)
+        state = self._ensure()
+        self._checked = self._signature() if state is not None else None
+        return state
+
+    def _ensure(self) -> dict[str, Any] | None:
         settings.storage_path.mkdir(parents=True, exist_ok=True)
         for path in (settings.library_path, settings.projects_path, settings.notes_path, settings.databases_path):
             path.mkdir(parents=True, exist_ok=True)

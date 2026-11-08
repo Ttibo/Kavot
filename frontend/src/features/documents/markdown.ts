@@ -22,5 +22,5 @@ export function markdownTableStart(lines: string[], index: number): boolean {
   return columns.length === divider.length && divider.every(cell => /^:?-{3,}:?$/.test(cell));
 }
 
-export { bindMarkdownBlockEditor, currentMarkdownBlockInput, markdownBlockEditorMarkup, markdownBlockSourceOffset, setMarkdownBlockEditorContent } from './live-editor';
+export { bindMarkdownBlockEditor, currentMarkdownBlockInput, markdownBlockEditorMarkup, markdownBlockSourceOffset, setMarkdownBlockEditorContent } from './rich-editor';
 

@@ -1,4 +1,4 @@
-from app.core.storage.cloud_sync import client as cloud
+from app.core.storage.cloud_sync import ledger as cloud
 from app.core.storage.cloud_sync.client import LocalSync
 
 

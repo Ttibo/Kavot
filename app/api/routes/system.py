@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 from app.core.kernel.config import settings
 from app.core.kernel.user_settings import load_backup_settings, load_preferences, save_backup_settings, save_preferences, save_storage_path
 from app.core.records.repository import store
-from app.core.kernel.system import dashboard, load_demo
+from app.core.kernel.system import load_demo
 from app.core.storage import backups as workspace_backups
 
 
@@ -46,11 +46,6 @@ class StorageUpdate(BaseModel):
 @router.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "application": "Kavot", "storage": "files"}
-
-
-@router.get("/dashboard")
-def get_dashboard() -> dict[str, Any]:
-    return dashboard()
 
 
 @router.post("/demo", status_code=201)
@@ -129,8 +124,9 @@ def change_storage(payload: StorageUpdate) -> dict[str, str]:
     target.mkdir(parents=True, exist_ok=True)
     if any(target.iterdir()):
         raise HTTPException(status_code=409, detail="The selected folder must be empty")
-    from app.core.agents.sessions import workspace_change as external_workspace_change
-    with external_workspace_change():
+    from app.mcp.session import SESSION
+    from app.core.agents.sessions import workspace_change as conversations_change
+    with conversations_change(), SESSION.workspace_change():
         for item in current.iterdir() if current.is_dir() else ():
             shutil.move(str(item), str(target / item.name))
         save_storage_path(target)

@@ -24,8 +24,7 @@ def catalog(with_counts: bool = True) -> list[dict[str, Any]]:
                  "plugin": item.get("plugin", "core" if item else None), "title_field": item.get("title_field", "title")}
         if with_counts:
             key = item.get("state_key")
-            entry["count"] = (sum(1 for row in state.get(key, []) if not row.get("trashed_at")) if key
-                              else len(databases.records(definition["id"])))
+            entry["count"] = sum(1 for row in state.get(key, []) if not row.get("trashed_at")) if key else 0
         if definition.get("fields"):
             entry["fields"] = [{k: f[k] for k in ("id", "name", "type", "required", "options") if k in f} for f in definition["fields"]]
         result.append(entry)
@@ -42,7 +41,7 @@ def items(collection: str) -> list[dict[str, Any]]:
     key = _state_key(collection)
     if key:
         return [row for row in store.read().get(key, []) if not row.get("trashed_at")]
-    return databases.records(collection)
+    return []
 
 
 def get(collection: str, item_id: Any) -> dict[str, Any]:

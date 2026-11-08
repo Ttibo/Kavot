@@ -6,8 +6,8 @@ import type { CitationNode } from './CitationCanvas';
 import type { LookupPreview } from './ArticlePreview';
 
 type Direction = 'all' | 'reference' | 'citation';
-export type ExplorationTab = { direction: Direction; seed: CitationNode | null };
-export type SavedExploration = { id: number; title: string; kind: 'library' | 'external'; paper_id: number | null; seed: CitationNode | null; tabs: ExplorationTab[]; created_at: string; updated_at?: string };
+type ExplorationTab = { direction: Direction; seed: CitationNode | null };
+type SavedExploration = { id: number; title: string; kind: 'library' | 'external'; paper_id: number | null; seed: CitationNode | null; tabs: ExplorationTab[]; created_at: string; updated_at?: string };
 
 function seedSnapshot(seed: Paper | CitationNode): CitationNode {
   return { ...(seed as CitationNode), id: String(seed.id), relation: 'focus' };

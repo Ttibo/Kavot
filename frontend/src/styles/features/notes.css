@@ -13,16 +13,6 @@
 .notes-contexts-head.folders { margin-top: 14px; border-top: 1px solid #dad8d0; padding-top: 15px; }
 .notes-contexts-head button { border: 0; border-radius: 6px; background: transparent; color: var(--accent); font-size: 15px; cursor: pointer; }
 .notes-contexts-head button:hover { background: var(--surface-raised); }
-.note-scope { width: 100%; display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; align-items: center; gap: 7px; border: 0; border-radius: 8px; background: transparent; padding: 8px 9px; color: var(--muted); text-align: left; cursor: pointer; }
-.note-scope:hover { background: rgba(255,255,255,.62); color: var(--ink); }
-.note-scope.active { background: var(--surface-raised); color: var(--ink); box-shadow: 0 1px 3px rgba(0,0,0,.06); }
-.note-scope > span { color: var(--accent); text-align: center; }
-.note-scope > i { width: 8px; height: 8px; margin-left: 5px; border-radius: 3px; }
-.note-scope strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
-.note-scope small { display: grid; place-items: center; min-width: 20px; height: 19px; border-radius: 99px; background: #e2e0d9; color: #777872; font: 9px "DM Mono"; }
-.note-scope.active small { background: var(--accent-soft); color: var(--accent); }
-.note-space-tree { margin: 1px 0; }
-.folder-branch { display: block; }
 .note-space-root, .note-folder-row { display: flex; align-items: center; min-height: 34px; margin: 1px 0; border: 1px solid transparent; border-radius: 8px; transition: 120ms ease; }
 .note-folder-row { padding-left: calc(var(--folder-depth, 0) * 14px + 14px); }
 .note-space-root:hover, .note-space-root.active, .note-folder-row:hover, .note-folder-row.active { background: rgba(255,255,255,.7); }
@@ -32,10 +22,6 @@
 .tree-toggle:hover { background: #deddd6; color: var(--ink); }
 .tree-toggle.empty { cursor: default; }
 .tree-toggle.empty:hover { background: transparent; }
-.folder-actions { opacity: 0; padding-right: 3px; }
-.note-space-root:hover .folder-actions, .note-space-root.active .folder-actions, .note-folder-row:hover .folder-actions, .note-folder-row.active .folder-actions { opacity: 1; }
-.folder-actions button { border: 0; border-radius: 6px; background: transparent; color: var(--subtle); cursor: pointer; }
-.folder-actions button:hover { background: #eceae4; color: var(--ink); }
 .note-folder-row.dragging { opacity: .4; }
 .tree-note-menu { display: grid; place-items: center; width: 24px; height: 24px; border: 0; border-radius: 6px; background: transparent; color: var(--subtle); font-size: 9px; opacity: 0; cursor: pointer; }
 .note-item-row:hover .tree-note-menu,
@@ -56,7 +42,6 @@
 .notes-contexts-head.workspace-root-head > button[data-workspace-toggle] > span { color: #92938c; font-size: 13px; text-align: center; }
 .notes-contexts-head.workspace-root-head > button[data-workspace-toggle] > strong { overflow: hidden; font-size: 10px; letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .notes-contexts-head.workspace-root-head > button[data-workspace-toggle] > small { display: grid; min-width: 18px; height: 18px; place-items: center; border-radius: 99px; background: #dfddd6; color: #7f8079; font: 8px "DM Mono", monospace; letter-spacing: 0; }
-.notes-contexts-head.workspace-root-head > button[data-add-workspace] { flex: 0 0 26px; width: 26px; height: 26px; padding: 0; }
 .workspace-create-actions { display: flex; align-items: center; gap: 1px; }
 .workspace-create-actions button { display: grid; width: 24px; height: 24px; place-items: center; border: 0; border-radius: 6px; background: transparent; padding: 0; color: #777872; cursor: pointer; }
 .workspace-create-actions button:hover { background: #e8e5dc; color: var(--accent); }
@@ -124,7 +109,6 @@
 .workspace-empty-pane h3 { margin: 0 0 7px; color: var(--ink); font-size: 16px; }
 .workspace-empty-pane p { margin: 0; font-size: 12px; line-height: 1.6; }
 .workspace-empty-pane small { margin-top: 12px; color: var(--subtle); font-size: 10px; line-height: 1.5; }
-.workspace-empty-actions { display: flex; justify-content: center; flex-wrap: wrap; gap: 7px; margin-top: 16px; }
 .secondary-note-pane { position: relative; background: var(--surface); }
 .secondary-resource-pane > header { display: flex; min-height: 48px; align-items: center; justify-content: space-between; gap: 10px; padding: 7px 10px 7px 13px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
 .secondary-resource-pane > header div:first-of-type { min-width: 0; flex: 1; }
@@ -143,29 +127,7 @@
 [data-pane-drop].active-note-pane { box-shadow: inset 0 3px 0 var(--accent); }
 [data-pane-drop].pane-dragging { opacity: .58; }
 [data-pane-drop].pane-drop-target { box-shadow: inset 0 0 0 3px var(--accent); }
-.note-pane > .note-pane-header { display: grid; grid-template-columns: 24px minmax(0, 1fr) 24px; min-height: 32px; align-items: center; gap: 5px; padding: 3px 7px; border-bottom: 1px solid var(--line); background: var(--surface-soft); }
-.note-pane-title { min-width: 0; }
-.note-pane > .note-pane-header .note-pane-title > span { display: block; margin: 0; color: var(--subtle); font-size: 8px; font-weight: 700; line-height: 1; letter-spacing: .06em; text-transform: uppercase; }
-.note-pane > .note-pane-header .note-pane-title > strong { display: block; margin-top: 1px; overflow: hidden; font-size: 10px; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
-.note-title-input { display: block; min-width: 0; width: 100%; height: 19px; margin-top: 0; border: 1px solid transparent; border-radius: 5px; outline: 0; background: transparent; padding: 1px 4px; color: var(--ink); font-size: 10px; font-weight: 650; line-height: 1.2; }
-.note-title-input:hover { background: rgba(255,255,255,.7); }
-.note-title-input:focus { border-color: #a2e2ef; background: var(--surface); box-shadow: 0 0 0 3px rgba(88,208,232,.08); }
-.note-pane-actions { display: flex; align-items: center; justify-content: flex-end; gap: 1px; }
-.note-pane-actions button, .note-pane-external { display: grid; width: 23px; height: 23px; place-items: center; border: 0; border-radius: 6px; background: transparent; color: #777872; text-decoration: none; cursor: pointer; }
-.note-pane-actions button:hover, .note-pane-external:hover { background: #e6e4dd; color: var(--accent); }
-.workspace-markdown-pane.note-pane > .note-pane-header { grid-template-columns: 24px minmax(0, 1fr) auto; }
-.note-pane-action-spacer, .note-pane-handle-spacer { display: block; width: 23px; height: 23px; }
-.note-pane > .note-pane-header .pane-drag-handle { width: 23px; height: 23px; }
-.note-pane > .note-pane-header .pane-drag-handle .ui-icon { width: 14px; height: 14px; }
-.note-pane-controls { min-height: 33px; gap: 5px; padding: 3px 7px; }
-.notes-main-workspace.with-secondary > .note-editor .note-pane-controls { align-items: center; flex-direction: row; gap: 5px; padding: 3px 7px; }
-.note-pane-controls .markdown-toolbar { min-width: 0; flex: 1; gap: 1px; overflow-x: auto; scrollbar-width: none; }
-.note-pane-controls .markdown-toolbar::-webkit-scrollbar { display: none; }
-.note-pane-controls .markdown-toolbar button { min-width: 25px; width: 25px; height: 25px; border-radius: 5px; padding: 0 3px; font-size: 10px; }
-.note-pane-controls .note-editor-state { min-width: 0; flex: 0 0 auto; gap: 4px; }
-.note-pane-controls .note-autosave-state { max-width: 88px; overflow: hidden; font-size: 9px; text-overflow: ellipsis; }
 .note-pane .note-link-picker { top: 69px; }
-.note-editor-state { display: flex; align-items: center; gap: 10px; }
 .note-autosave-state { color: var(--subtle); font: 8px "DM Mono", monospace; white-space: nowrap; }
 .note-autosave-state[data-state="saving"], .note-autosave-state[data-state="pending"] { color: #8a681a; }
 .note-autosave-state[data-state="error"] { color: #b95050; }
@@ -246,7 +208,6 @@
 .note-empty p { max-width: 340px; line-height: 1.55; }
 
 /* Multiline tables are a single block, with readable cells in every editor. */
-.markdown-block[data-block-kind="table"] .markdown-block-input { min-height: 120px; overflow-x: auto; white-space: pre; }
 
 .note-rename-button { display: grid; place-items: center; flex: 0 0 26px; width: 26px; height: 28px; border: 0; border-radius: 6px; background: transparent; color: var(--muted); cursor: pointer; }
 .note-rename-button .ui-icon { width: 14px; height: 14px; }
@@ -260,12 +221,9 @@
 .workspace-file-row:is(:hover, :focus-within) > .workspace-item-actions { display: flex; opacity: 1; }
 .workspace-file-row:is(:hover, :focus-within) > .workspace-open-side { display: grid; opacity: 1; }
 .workspace-file-row:focus-within .workspace-item-actions .danger { opacity: 1; }
-.workspace-row-menu { display: none; width: 24px; height: 24px; border: 0; border-radius: 5px; padding: 0; background: transparent; color: var(--muted); cursor: pointer; }
-.workspace-row-menu:hover, .workspace-row-menu:focus-visible { background: var(--hover); color: var(--accent); }
 @container document-sidebar (max-width: 320px) {
   .workspace-file-row.file, .workspace-file-row.directory.with-actions { grid-template-columns: 20px minmax(0, 1fr) auto; }
   .workspace-file-row:is(:hover, :focus-within) > :is(.workspace-item-actions, .workspace-open-side) { display: none; }
-  .workspace-file-row:is(:hover, :focus-within) > .workspace-row-menu { display: grid; place-items: center; }
   .workspace-file-label { grid-template-columns: 23px minmax(0, 1fr) auto; gap: 3px; }
   .workspace-file-row.file .workspace-file-label small { display: none; }
 }
@@ -288,5 +246,4 @@
 .workspace-tab .pane-drag-handle { align-self: center; width: 22px; height: 24px; border-radius: 4px; }
 .workspace-tab .pane-drag-handle .ui-icon { width: 14px; height: 14px; }
 .collection-item-row:has([data-resource-mode="both"]) { grid-template-columns: 26px minmax(0, 1fr) auto auto auto; }
-.workspace-collection-items .collection-item-row.compact:has([data-resource-mode="both"]) { grid-template-columns: 16px minmax(0, 1fr) auto auto; }
 .resource-kind-pdf .pdf-capture-toolbar { flex-wrap: wrap; }

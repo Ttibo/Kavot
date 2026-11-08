@@ -1,4 +1,4 @@
-"""Workspace search shared by the interface, the agents and workflows."""
+"""Workspace search shared by the interface and the agents."""
 from __future__ import annotations
 
 from typing import Any

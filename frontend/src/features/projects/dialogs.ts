@@ -105,7 +105,7 @@ export function editProjectModal(projectId) {
         await refreshData();
         toast("Project updated");
         if (returnToCanvas) await openProjectArea(project.id, "canvas");
-        else await navigate("dashboard");
+        else await navigate("notes");
       } catch (error) {
         toast(error.message, "error");
       }

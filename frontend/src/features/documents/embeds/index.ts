@@ -1,17 +1,12 @@
 /**
  * Live blocks stored as inert HTML inside a note:
- * - script blocks (HTML/CSS/JS) run in an isolated, opaque-origin iframe;
- * - collection views render a collection as a table, list, gallery or kanban.
+ * - script blocks (HTML/CSS/JS) run in an isolated, opaque-origin iframe.
  * The document only keeps data attributes and <pre> text, so exported files stay inert.
  */
 import "../../../styles/features/embeds.css";
-import { parseConfig, type Layout } from "./collectionData";
-import { mountCollectionView } from "./collectionView";
 import { mountScript } from "./scriptBlock";
 import { scriptFromElement } from "./scriptRuntime";
 
-export { defaultConfig, serializeCollection } from "./collectionData";
-export { CollectionView, openCollectionConfig } from "./collectionView";
 export { ScriptBlock, openScriptEditor, openScriptLibrary } from "./scriptBlock";
 export { emptyScript } from "./scriptRuntime";
 export { scriptExamples } from "../scriptExamples";
@@ -31,13 +26,6 @@ export function hydrateEmbeds(container: HTMLElement | null, noteTitle?: () => s
     const script = scriptFromElement(element);
     mountScript(replaceWithHost(element), script, { editable: () => false, noteTitle });
   });
-  container.querySelectorAll<HTMLElement>('div[data-type="collection-view"]').forEach(element => {
-    const collection = element.getAttribute("data-collection") || "tasks";
-    const attrs = {
-      collection,
-      layout: (element.getAttribute("data-layout") || "table") as Layout,
-      config: parseConfig(element.getAttribute("data-config"), collection),
-    };
-    mountCollectionView(replaceWithHost(element), attrs, { editable: () => false });
-  });
+  // Collection views were retired: an old one is left out of the reading view.
+  container.querySelectorAll<HTMLElement>('div[data-type="collection-view"]').forEach(element => element.remove());
 }

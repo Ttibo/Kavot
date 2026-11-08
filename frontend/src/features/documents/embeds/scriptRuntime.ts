@@ -5,7 +5,7 @@
  */
 import { toast } from "../../../app/navigation";
 import { openCollectionItem } from "../../collections/catalog";
-import { activeItems, itemFields } from "./collectionData";
+import { activeItems, itemFields } from "./scriptData";
 import { scriptFetch, type ScriptRequest } from "./scriptNetwork";
 import { collectionList, plainText } from "./shared";
 

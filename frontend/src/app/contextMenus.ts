@@ -4,7 +4,6 @@ import { openShareDialog, type ShareSource } from '../components/SharingPanel';
 import { findWorkspaceNode, interfaceIcon } from '../features/documents/workspace';
 import { isTreeRowSelected, selectedTreePaths } from '../features/documents/treeSelection';
 import { flushCollectionSaves } from '../features/collections/noteEditor';
-import { parseCollectionDragPayload } from '../features/collections/catalog';
 import { ContextAction, closeContextMenu, initializeContextMenuDismissal, showContextMenu } from '../components/contextMenu';
 
 // Route commands through the existing controls to preserve validation, autosave,
@@ -21,7 +20,7 @@ function command(label: string, data: Record<string, string | number>, danger = 
 }
 
 function control(element: HTMLElement, label?: string): ContextAction {
-  const standard = element.matches('.workspace-file-label, .note-item, [data-collection-open]') ? 'Open'
+  const standard = element.matches('.workspace-file-label, .note-item') ? 'Open'
     : element.matches('[data-action="edit-note"]') ? 'Note settings'
     : element.matches('[data-workspace-tab]') ? 'Activate tab' : null;
   const text = label || standard || element.title || element.getAttribute('aria-label') || element.querySelector(':scope > span')?.textContent?.trim() || element.textContent?.trim() || 'Open';
@@ -60,11 +59,6 @@ function rowShare(row: HTMLElement): ContextAction[] {
   if (node?.note_id) return [share({kind: 'note', id: String(node.note_id)})];
   if (node?.paper_id) return [share({kind: 'item', collection: 'articles', id: String(node.paper_id)})];
   if (node?.project_id && node.kind === 'directory') return [share({kind: 'project', id: String(node.project_id)})];
-  const payload = row.querySelector<HTMLElement>('[data-collection-open]')?.dataset.collectionOpen;
-  if (payload) {
-    const ref = parseCollectionDragPayload(payload);
-    if (ref) return [share(ref.type === 'note' ? {kind: 'note', id: String(ref.id)} : {kind: 'item', collection: ref.databaseId, id: String(ref.id)})];
-  }
   return [];
 }
 
@@ -150,24 +144,13 @@ function actionsFor(target: HTMLElement): ContextAction[] {
       command('Add PDF', { action: 'add-paper-pdf', ...source }),
       projectId ? command('Remove from project', { removePaperProject: id, projectId }, true) : command('Delete article', { deletePaper: id }, true)];
   }
-  const project = target.closest<HTMLElement>('.project-card, .sidebar-project');
-  if (project) {
-    if (project.matches('.project-card')) {
-      const id = project.dataset.projectId || project.querySelector<HTMLElement>('[data-project-id]')?.dataset.projectId;
-      return [...controls(project, '[data-project-area], .project-admin-actions button, a[download]'), ...(id ? [share({kind: 'project', id})] : [])];
-    }
-    const id = project.dataset.projectId;
-    return [control(project, 'Open project'), share({kind: 'project', id}), command('Edit project', { action: 'edit-project', projectId: id }), command('Archive project', { action: 'archive-project', projectId: id }), command('Delete project', { action: 'delete-project', projectId: id }, true)];
-  }
   const treeRow = target.closest<HTMLElement>('.workspace-file-row, .note-item-row');
   if (treeRow) return treeActions(treeRow);
   if (target.closest('#notes-tree')) return treeAreaActions(target);
-  const row = target.closest<HTMLElement>('.workspace-file-row, .note-item-row, .paper-folder-row, .workspace-tab, .collection-item-row');
+  const row = target.closest<HTMLElement>('.paper-folder-row, .workspace-tab');
   if (row) return [...controls(row), ...rowShare(row)];
   const notePane = target.closest<HTMLElement>('[data-primary-note-id], [data-secondary-note-id]');
   if (notePane) return [share({kind: 'note', id: notePane.dataset.primaryNoteId || notePane.dataset.secondaryNoteId})];
-  const registry = target.closest<HTMLElement>('.registry-edit-target');
-  if (registry) return [control(registry, 'Edit record')];
   const calendarEvent = target.closest<HTMLElement>('.calendar-event');
   if (calendarEvent) return [control(calendarEvent, 'Open event')];
   const day = target.closest<HTMLElement>('[data-calendar-day]');
@@ -224,8 +207,7 @@ function actionsFor(target: HTMLElement): ContextAction[] {
     .map(el => control(el));
   if (scope.matches('#main-content') && viewShown('calendar')) actions.push({ label: 'New event', run: () => runtime.calendarEventModal() });
   if (!scope.closest('[role="dialog"]')) actions.push(
-    command('Research Home', { nav: 'dashboard' }),
-    command('Workspace', { nav: 'notes' }),
+    command('Notes', { nav: 'notes' }),
     command('Settings', { nav: 'settings' }),
   );
   return actions.filter((item, index) => actions.findIndex(other => other.label === item.label) === index);

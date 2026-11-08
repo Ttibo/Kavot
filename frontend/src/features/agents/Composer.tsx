@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type FormEvent } from 'react';
 import { useOptionalRuntime } from '../../app/runtime';
+import { subscribe } from '../../app/viewBridge';
 import { ContextPicker } from '../../components/ContextPicker';
 import { ExternalModelPicker } from '../../components/ExternalModelPicker';
 import type { ExternalEngine } from '../../components/ExternalAgentSettings';
@@ -7,7 +8,7 @@ import { Icon } from '../../components/Icon';
 import { api } from '../../services/api';
 import { captureAgentContext, suggestions, takePendingSuggestion } from '../externalAgents/context';
 import { folderOptions, KIND_ICONS, KIND_LABELS, loadPicked, pickedContext, pickerOptions, savePicked, type PickedItem, type ProjectFolder } from '../externalAgents/picker';
-import { agents, ENGINE_NAMES, type Mode, type Resource, type Session } from './api';
+import { agents, ENGINE_NAMES, type ContextPreview, type Mode, type Resource, type Session } from './api';
 
 export type EngineChoice = { id: ExternalEngine; name: string; model: string; effort: string };
 export type Outgoing = { text: string; context: any; model: string; effort: string; mode: Mode; engine: ExternalEngine };
@@ -77,7 +78,7 @@ export function Composer({ session, engines, engine, onEngineChange, projectId, 
   const [showFiles, setShowFiles] = useState(false);
   const [fileSearch, setFileSearch] = useState('');
   const [resources, setResources] = useState<Resource[]>([]);
-  const [preview, setPreview] = useState<{ resources: Resource[]; target: Resource | null; note_intent?: string } | null>(null);
+  const [preview, setPreview] = useState<ContextPreview | null>(null);
   const [error, setError] = useState('');
   const [viewSignature, setViewSignature] = useState(() => JSON.stringify(captureAgentContext(runtime)));
   const composer = useRef<HTMLTextAreaElement>(null);
@@ -106,10 +107,21 @@ export function Composer({ session, engines, engine, onEngineChange, projectId, 
     window.addEventListener('kavot:storage-updated', reload);
     return () => window.removeEventListener('kavot:storage-updated', reload);
   }, []);
-  // The view changes as the user works: follow it.
+  // The view changes as the user works: follow it when the state or the selection changes, not on a tight timer
+  // (capturing the context reads the layout and, in the Library, filters every article).
   useEffect(() => {
-    const timer = window.setInterval(() => setViewSignature(JSON.stringify(captureAgentContext(runtime))), 700);
-    return () => window.clearInterval(timer);
+    let pending = 0;
+    const capture = () => { pending = 0; if (!document.hidden) setViewSignature(JSON.stringify(captureAgentContext(runtime))); };
+    const schedule = () => { if (!pending) pending = window.setTimeout(capture, 200); };
+    const unsubscribe = subscribe(schedule);
+    const events = ['selectionchange', 'pointerup', 'keyup', 'focusin', 'visibilitychange'];
+    events.forEach(name => document.addEventListener(name, schedule));
+    // Components that describe themselves (a canvas selection) change without telling: a slow safety net.
+    const timer = window.setInterval(schedule, 3000);
+    return () => {
+      unsubscribe(); window.clearTimeout(pending); window.clearInterval(timer);
+      events.forEach(name => document.removeEventListener(name, schedule));
+    };
   }, [runtime]);
   useEffect(() => {
     const apply = (text: string) => {
@@ -160,8 +172,7 @@ export function Composer({ session, engines, engine, onEngineChange, projectId, 
     if (!drawer) return;
     const controller = new AbortController();
     const timer = window.setTimeout(() => {
-      void api<{ resources: Resource[]; target: Resource | null; note_intent?: string }>('/external-agents/context', { method: 'POST', signal: controller.signal,
-        body: JSON.stringify({ text: draft || 'Context', context: makeContext() }) })
+      void agents.preview(draft || 'Context', makeContext(), controller.signal)
         .then(result => { if (!controller.signal.aborted) { setPreview(Array.isArray(result.resources) ? result : null); setError(''); } })
         .catch(reason => { if (!controller.signal.aborted) setError(reason.message); });
     }, 400);

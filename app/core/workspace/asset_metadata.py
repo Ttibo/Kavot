@@ -38,11 +38,30 @@ def metadata_path(path: Path, extension: str = "json") -> Path:
     return resolve_inside(settings.storage_path, f".meta_kavot/{media}/{relative(path)}.{extension}")
 
 
+# Hashing a PDF reads all of it: reuse the digest while size and mtime are unchanged.
+_digests: dict[str, tuple[tuple[int, int], str]] = {}
+# Summaries of large extraction files (every page's text), by the file's size and mtime.
+_summaries: dict[str, tuple[tuple[int, int], dict]] = {}
+CACHE_ENTRIES = 4096
+
+
+def _remember(cache: dict, key: str, signature: tuple[int, int], value) -> None:
+    if len(cache) >= CACHE_ENTRIES:
+        cache.clear()
+    cache[key] = (signature, value)
+
+
 def fingerprint(path: Path) -> str:
+    info = path.stat()
+    key, signature = str(path), (info.st_size, info.st_mtime_ns)
+    cached = _digests.get(key)
+    if cached and cached[0] == signature:
+        return cached[1]
     digest = hashlib.sha256()
     with path.open("rb") as handle:
         for block in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(block)
+    _remember(_digests, key, signature, digest.hexdigest())
     return digest.hexdigest()
 
 
@@ -118,11 +137,21 @@ def read(path: Path) -> dict | None:
 
 
 def summary(path: Path) -> dict | None:
-    try:
-        data = read_json_object(metadata_path(path)) if kind(path) else None
-    except ValueError:
+    if not kind(path):
         return None
-    return {key: data.get(key) for key in ("status", "artifacts", "extracted_at")} if data else None
+    try:
+        target = metadata_path(path)
+        info = target.stat()
+    except (OSError, ValueError):
+        return None
+    key, signature = str(target), (info.st_size, info.st_mtime_ns)
+    cached = _summaries.get(key)
+    if cached and cached[0] == signature:
+        return dict(cached[1]) if cached[1] else None
+    data = read_json_object(target)
+    result = {name: data.get(name) for name in ("status", "artifacts", "extracted_at")} if data else None
+    _remember(_summaries, key, signature, result)
+    return dict(result) if result else None
 
 
 

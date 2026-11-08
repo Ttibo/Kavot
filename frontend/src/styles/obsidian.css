@@ -25,12 +25,6 @@ html[data-theme="dark"], html[data-theme="dark"] .research-shell {
 html, body { background: var(--canvas); }
 .research-shell { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
 
-/* Sidebar groups: tight spacing, quiet separators. */
-.research-shell .research-nav-section { margin-top: 12px; }
-.research-sidebar .sidebar-custom-collections { margin-top: 12px; }
-.research-shell .nav-item.active, .research-shell .sidebar-collection-item.active { background: var(--active); color: var(--ink); }
-.research-shell .sidebar-collection-item.active > svg { color: var(--accent); }
-
 /* Flat, Obsidian-like controls. */
 .research-shell .button { min-height: 28px; padding-inline: 10px; border-radius: 5px; font-weight: 500; }
 .research-shell .button-primary { box-shadow: none; }
@@ -50,18 +44,6 @@ html, body { background: var(--canvas); }
 .modal { border: 1px solid var(--line); border-radius: 10px; }
 
 * { scrollbar-width: thin; scrollbar-color: var(--line-strong) transparent; }
-
-/* Notes explorer: one compact row (search + icon actions), Obsidian file-explorer style. */
-.research-shell .notes-sidebar-header.notes-explorer-header { padding: 6px 6px 6px; border-bottom: 1px solid var(--line); background: var(--sidebar-surface); }
-.research-shell .notes-explorer-bar { display: flex; align-items: center; gap: 4px; min-height: 26px; margin: 0; padding: 0; }
-.research-shell .notes-explorer-bar .notes-search { position: relative; flex: 1 1 auto; min-width: 0; margin: 0; }
-.research-shell .notes-explorer-bar .notes-search > span { left: 7px; color: var(--subtle); }
-.research-shell .notes-explorer-bar .notes-search .ui-icon { width: 12px; height: 12px; }
-.research-shell .notes-explorer-bar .notes-search input { width: 100%; height: 26px; min-height: 26px; padding: 3px 6px 3px 24px; border: 1px solid var(--line); border-radius: 4px; background: var(--canvas); font-size: 12px; box-shadow: none; }
-.research-shell .notes-explorer-bar > span { display: flex; flex: 0 0 auto; gap: 0; }
-.research-shell .notes-explorer-bar button { display: grid; width: 24px; height: 24px; place-items: center; padding: 0; border: 0; border-radius: 4px; background: transparent; color: var(--subtle); cursor: pointer; }
-.research-shell .notes-explorer-bar button:hover { background: var(--hover); color: var(--ink); }
-.research-shell .notes-explorer-bar button .ui-icon { width: 15px; height: 15px; }
 /* Notes fill the workspace edge to edge, like Obsidian panes. */
 .research-shell #main-content.notes-mode { padding: 0; }
 .research-shell #main-content.notes-mode .notes-layout { border: 0; border-radius: 0; }
@@ -82,12 +64,6 @@ html, body { background: var(--canvas); }
 .research-shell .canvas-studio .canvas-node.is-selected { outline: 2px solid var(--accent); outline-offset: 2px; }
 /* The canvas header was removed: the work area takes the whole pane. */
 .research-shell .canvas-studio.canvas-document-pane { grid-template-rows: minmax(0,1fr); }
-/* Old hover-expanding sidebar rules must not resize the compact rows. */
-.research-shell .research-sidebar .nav-item, .research-shell .research-sidebar:hover .nav-item, .research-shell .research-sidebar:focus-within .nav-item { justify-content: flex-start; width: 100%; min-height: 26px; height: 26px; padding: 0 8px; font-size: 13px; }
-/* The collapsed ribbon stays a ribbon: hovering never reveals labels or moves icons. */
-.research-shell.sidebar-collapsed .research-sidebar .nav-item, .research-shell.sidebar-collapsed .research-sidebar:hover .nav-item, .research-shell.sidebar-collapsed .research-sidebar:focus-within .nav-item { justify-content: center; padding: 0; }
-.research-shell .research-sidebar .nav-item > .nav-copy { width: auto; opacity: 1; }
-.collection-browser { text-align: left; }
 
 /* Canvas overview (zoomed out): each card is reduced to its title, drawn large enough to read. */
 .canvas-studio.canvas-overview .canvas-node:not(.canvas-node-zone):not(.canvas-node-media):not(.canvas-node-shape):not(.canvas-node-text) { display: grid; grid-template-rows: minmax(0, 1fr); container-type: size; }

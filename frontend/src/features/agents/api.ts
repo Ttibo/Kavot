@@ -1,8 +1,8 @@
 import { api } from '../../services/api';
 import type { ExternalAgentConfiguration, ExternalEngine } from '../../components/ExternalAgentSettings';
-import type { Diff, Usage } from '../atelier/types';
+import type { Usage } from './format';
 
-/** Agent conversations, shared by the assistant panel, the Chat view and the Atelier. */
+/** Agent conversations, shared by the assistant panel and the Agents view. */
 
 export type Mode = 'answer' | 'propose' | 'auto';
 export type AgentEvent = { id: number; kind: string; label: string; detail: string; at: string };
@@ -15,11 +15,11 @@ export type Message = {
   role: 'user' | 'assistant'; content: string; at?: string; context?: any; mode?: Mode;
   run_id?: string; events?: AgentEvent[]; proposals?: Proposal[]; status?: string; error?: string;
 };
-export type CodeSpace = {
+type CodeSpace = {
   folder_id: string; name: string; worktree: string | null; branch: string; base_sha: string; base_branch: string;
   files: { path: string; status: string; additions: number; deletions: number }[]; commit: string | null; merged: boolean; open?: boolean;
 };
-export type CodeStatus = 'open' | 'review' | 'accepted' | 'merged' | 'discarded';
+type CodeStatus = 'open' | 'review' | 'accepted' | 'merged' | 'discarded';
 export type Code = {
   project_id: number; workspaces: CodeSpace[]; resources: { folder_id: string; name: string; path: string; file?: boolean }[];
   status: CodeStatus; worktree_exists?: boolean; files?: (CodeSpace['files'][number] & { folder_id: string })[];
@@ -36,6 +36,8 @@ export type Session = {
 };
 export type Summary = Omit<Session, 'messages' | 'last_run' | 'usage_history'> & { message_count: number; last_status?: string };
 export type Resource = { id: string; title: string; path: string; kind: string; note_id?: number; paper_id?: number };
+/** The sources the server would give the next message. */
+export type ContextPreview = { resources: Resource[]; target: Resource | null; note_intent?: string };
 
 export const ENGINE_NAMES: Record<ExternalEngine, string> = { codex: 'Codex', claude: 'Claude Code', opencode: 'OpenCode' };
 
@@ -54,17 +56,12 @@ export const agents = {
   cancel: (id: string) => api<Run>(`/external-agents/runs/${id}/cancel`, json('POST')),
   decide: (runId: string, proposalId: string, decision: 'apply' | 'dismiss') =>
     api<Run>(`/external-agents/runs/${runId}/proposals/${proposalId}`, json('POST', { decision })),
-  preview: (text: string, context: any) => api<{ resources: Resource[]; target: Resource | null; note_intent?: string }>('/external-agents/context', json('POST', { text, context })),
+  preview: (text: string, context: any, signal?: AbortSignal) => api<ContextPreview>('/external-agents/context', { ...json('POST', { text, context }), signal }),
   resources: () => api<Resource[]>('/external-agents/resources'),
   attach: (file: File) => { const body = new FormData(); body.append('file', file); return api<Resource>('/external-agents/attachments', { method: 'POST', body }); },
-  // The code of a conversation (Atelier plugin).
-  diff: (id: string) => api<Diff>(`/atelier/conversations/${id}/diff`),
-  accept: (id: string, message: string, merge: boolean) => api<Code>(`/atelier/conversations/${id}/accept`, json('POST', { message, merge })),
-  merge: (id: string) => api<Code>(`/atelier/conversations/${id}/merge`, json('POST')),
-  discard: (id: string) => api<Code>(`/atelier/conversations/${id}/discard`, json('POST')),
 };
 
-export type ConversationStatus = 'running' | 'review' | 'failed' | 'cancelled' | 'answered' | 'accepted' | 'merged' | 'discarded' | 'new';
+type ConversationStatus = 'running' | 'review' | 'failed' | 'cancelled' | 'answered' | 'accepted' | 'merged' | 'discarded' | 'new';
 export const STATUS_LABELS: Record<ConversationStatus, string> = {
   running: 'Running', review: 'To review', failed: 'Failed', cancelled: 'Stopped', answered: 'Answered',
   accepted: 'Committed', merged: 'Merged', discarded: 'Discarded', new: 'New',

@@ -29,7 +29,7 @@ def test_parser_reads_common_dotenv_forms():
 def test_environment_wins_over_the_user_file(monkeypatch):
     env.write("KAVOT_TEST_PIN", "file")
     monkeypatch.setenv("KAVOT_TEST_PIN", "shell")
-    assert env.get("KAVOT_TEST_PIN") == "shell" and env.overridden("KAVOT_TEST_PIN")
+    assert env.get("KAVOT_TEST_PIN") == "shell"
     assert env.stored("KAVOT_TEST_PIN") == "file"
     env.write("KAVOT_TEST_PIN", None)
 

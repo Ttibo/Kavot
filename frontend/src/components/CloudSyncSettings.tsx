@@ -15,6 +15,8 @@ type SyncSummary = {
   deleted_remote: number;
   conflicts: string[];
   preserved: string[];
+  merged?: string[];
+  held_deletions?: number;
   skipped: string[];
   errors: {path: string; detail: string}[];
 };
@@ -245,8 +247,18 @@ export function CloudSyncSettings({ localStorage, storageBusy = false }: { local
         {(busy || message) && <p ref={feedbackRef} className="storage-notice" role="status">{busy ? storageBusy ? 'Moving the folder…' : 'Working…' : message}</p>}
         {!!summary?.errors.length && <details className="storage-activity"><summary>{summary.errors.length} file(s) could not be synced</summary><ul>{summary.errors.map(error => <li key={`${error.path}:${error.detail}`}><strong>{error.path}</strong> — {error.detail}</li>)}</ul></details>}
         {!!summary?.skipped.length && <details className="storage-activity"><summary>{summary.skipped.length} unreadable file(s) skipped</summary><ul>{summary.skipped.map(path => <li key={path}>{path}</li>)}</ul></details>}
-        {!!summary?.preserved?.length && <details className="storage-activity"><summary>{summary.preserved.length} local cop(ies) kept during the first merge</summary><ul>{summary.preserved.map(path => <li key={path}>{path}</li>)}</ul></details>}
+        {!!summary?.preserved?.length && <details className="storage-activity"><summary>{summary.preserved.length} conflict cop{summary.preserved.length === 1 ? 'y' : 'ies'} created</summary><p>These files changed on this device and on another one. Both versions are kept: the cloud version keeps the name, yours is saved next to it as a “conflict copy”.</p><ul>{summary.preserved.map(path => <li key={path}>{path}</li>)}</ul></details>}
+        {!!summary?.merged?.length && <p className="storage-notice">The workspace details changed on two devices and were merged.</p>}
       </article>
+
+      {!!summary?.held_deletions && <article className="settings-card storage-conflicts" aria-label="Deletions waiting"><h4>Deletions waiting for your confirmation <span className="storage-badge">{summary.held_deletions}</span></h4>
+        <p>{summary.held_deletions} files disappeared from this folder at once. To protect your other devices, they were not deleted from the cloud. If you deleted them on purpose, confirm; otherwise put them back in the folder and they will stay synced.</p>
+        <div className="form-actions"><button className="button button-primary button-small" disabled={busy} onClick={() => void run(async () => {
+          const result: SyncSummary = await cloud('/workspace/deletions/confirm', {});
+          setMessage(`${result.deleted_remote} file(s) deleted from the cloud.`);
+          setWorkspace(await cloud('/workspace/status'));
+        })}>Delete them from the cloud</button></div>
+      </article>}
 
       {!!summary?.conflicts.length && <article className="settings-card storage-conflicts" aria-label="Sync conflicts"><h4>Conflicts to resolve <span className="storage-badge">{summary.conflicts.length}</span></h4><p>These files changed on two devices. Compare them and choose what to keep.</p>
         {summary.conflicts.map(path => <div className="storage-conflict-row" key={path}><strong>{path}</strong><button className="button button-small" disabled={busy} onClick={() => void run(() => compare(path))}>Compare</button></div>)}

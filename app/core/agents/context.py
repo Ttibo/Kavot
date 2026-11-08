@@ -136,7 +136,7 @@ def prepare(context: dict | None, prompt: str, *, include_sources: bool = True) 
         selected = next((node for node in canvas.get("nodes", []) if node.get("id") == context["selected_node_id"]), None)
         if selected and selected.get("type") == "note" and selected.get("noteId"):
             context["note_id"] = _id(selected["noteId"])
-    resources, target = resolve_context(context)
+    resources, target = resolve_context(context, catalog)
     project_id = _id(context.get("project_id"))
     project = next((p for p in state.get("projects", []) if p["id"] == project_id), None)
     if project_id and not project:

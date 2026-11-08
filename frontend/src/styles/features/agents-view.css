@@ -1,0 +1,31 @@
+/* The Agents page: the agents and what is shared on the left, the active agent's terminal on the right. */
+.view-page.agents-view { display: flex; height: 100%; min-height: 0; padding: 0; gap: 0; }
+.agents-side { display: flex; flex: 0 0 240px; min-height: 0; flex-direction: column; gap: 16px; padding: 14px 12px; overflow-y: auto; border-right: 1px solid var(--line); font-size: 13px; }
+.agents-side section { display: flex; flex-direction: column; gap: 8px; }
+.agents-side header { display: flex; align-items: center; justify-content: space-between; }
+.agents-side h3 { margin: 0; color: var(--subtle); font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+.agents-side section > .button { align-self: flex-start; }
+.agents-engines { display: flex; flex-wrap: wrap; gap: 6px; }
+.agents-engines .button, .agents-side section > .button { display: inline-flex; align-items: center; gap: 6px; }
+.agents-hint { margin: 0; color: var(--subtle); font-size: 12px; line-height: 1.45; }
+.agents-list { display: flex; flex-direction: column; gap: 2px; margin: 0; padding: 0; list-style: none; }
+.agents-list li { display: flex; align-items: center; gap: 4px; border-radius: 6px; }
+.agents-list li:hover { background: var(--hover); }
+.agents-list li.active { background: var(--accent-soft); }
+.agents-list-open { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; padding: 6px; border: 0; background: none; color: var(--ink); font: inherit; text-align: left; cursor: pointer; }
+.agents-list-open span:nth-child(2) { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.agents-list-open small { color: var(--subtle); font-size: 11px; }
+.agents-status { flex: 0 0 8px; width: 8px; height: 8px; border-radius: 50%; background: var(--subtle); }
+.agents-status.running { background: #2f9e5b; }
+
+.agents-stage { position: relative; display: flex; flex: 1; min-width: 0; min-height: 0; background: var(--canvas); }
+.agent-terminal { flex: 1; min-width: 0; min-height: 0; padding: 8px 0 4px 10px; }
+.agent-terminal[hidden] { display: none; }
+.agent-terminal .xterm { height: 100%; }
+.agents-empty { display: flex; flex: 1; flex-direction: column; align-items: center; justify-content: center; gap: 12px; padding: 24px; color: var(--subtle); text-align: center; }
+.agents-empty p { max-width: 420px; margin: 0; line-height: 1.5; }
+
+@media (max-width: 720px) {
+  .view-page.agents-view { flex-direction: column; }
+  .agents-side { flex: 0 0 auto; max-height: 40%; border-right: 0; border-bottom: 1px solid var(--line); }
+}

@@ -5,30 +5,27 @@ from app.core.kernel.registry import Registry
 
 def test_manifests_fill_the_registry(client):
     registry = plugins.load()
-    assert {"papers", "planning", "research"} <= set(registry.plugins)
+    assert {"papers", "planning"} <= set(registry.plugins)
+    assert not {"research", "atelier"} & set(registry.plugins)
     from app.core.records import databases
     # Same catalogue order as before the plugins existed.
-    assert [item["id"] for item in databases.builtins()] == ["articles", "notes", "tasks", "conferences", "datasets"]
-    assert databases.optional_builtins() == {"conferences", "datasets"}
-    assert {"task_create", "conference_create", "paper_import"} <= set(registry.agent_actions)
+    assert [item["id"] for item in databases.builtins()] == ["articles", "notes", "tasks"]
+    assert {"task_create", "paper_import"} <= set(registry.agent_actions)
     assert "cites" in registry.link_types and "planning" in registry.agent_guides
 
 
-def test_a_removable_plugin_can_be_disabled(monkeypatch):
-    monkeypatch.setenv("KAVOT_DISABLED_PLUGINS", "research,planning")
+def test_a_required_plugin_cannot_be_disabled(monkeypatch):
+    monkeypatch.setenv("KAVOT_DISABLED_PLUGINS", "planning")
     registry = plugins.load(Registry())
-    assert "research" not in registry.plugins
-    assert "conferences" not in registry.state_collections
     # Planning is still required by the core, so it stays loaded.
     assert "planning" in registry.plugins
 
 
 def test_plugin_listing(client):
     listed = {item["id"]: item for item in client.get("/api/plugins").json()}
-    assert listed["research"]["enabled"] and listed["research"]["removable"]
+    assert listed["papers"]["enabled"] and not listed["papers"]["removable"]
     zotero = next(item for item in listed["papers"]["connectors"] if item["id"] == "zotero")
     assert zotero["label"] == "Zotero" and zotero["permissions"] == ["network:api.zotero.org"]
-    assert {"id": "conferences", "name": "Conferences", "removable": True} in listed["research"]["collections"]
 
 
 def test_manifest_validation(tmp_path):

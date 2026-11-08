@@ -28,12 +28,10 @@ export function registerAgentContext(element: Element, read: () => Record<string
 // What the agent is told the user is looking at: a page of the registry, or an area inside one.
 const viewNames: Record<string, string> = {
   ...Object.fromEntries(Object.entries(pages).map(([id, page]) => [id, page.title])),
-  project: 'Research Hub', canvas: 'Canvas', notes: 'Notes and editor', reader: 'Lecteur PDF', citations: 'Graphe de citations',
+  canvas: 'Canvas', notes: 'Notes and editor', reader: 'Lecteur PDF', citations: 'Graphe de citations',
 };
 export const suggestions: Record<string, string[]> = {
   dashboard: ['Where do I stand on my active projects?', 'Which reading or task should I pick up?'],
-  projects: ['Compare the progress of my projects.', 'Which projects lack sources or a next step?'],
-  project: ['Summarize the findings and limitations of this project with their sources.', 'Suggest a reading plan and next steps.'],
   canvas: ['Question this card: what do my other notes and articles say about it?', 'Explain this relation and its direction.', 'Compare these findings and their sources.', 'Write a synthesis in the open note.'],
   notes: ['Summarize this note with its references.', 'Suggest a rewording of the selected passage and keep the rest.'],
   papers: ['Compare the displayed articles and their limitations.', 'Find duplicates and gaps in this collection.'],
@@ -41,9 +39,6 @@ export const suggestions: Record<string, string[]> = {
   citations: ['Analyze the graph pack with its abstracts: findings, methods, limitations and references.', 'Retrieve the articles related to the selected reference and justify five relevant readings.', 'Find relevant articles for this question: '],
   tasks: ['Break this research down into verifiable tasks with a completion criterion.', 'Suggest priorities for the displayed tasks.'],
   calendar: ['Detect conflicts between these deadlines.', 'Suggest a realistic reading and writing schedule.'],
-  datasets: ['Compare the coverage, format, license and limitations of the datasets.', 'Which dataset fits the project’s question?'],
-  conferences: ['Compare the relevant conferences and check the deadlines on their official websites.', 'Suggest a list of possible submissions.'],
-  database: ['Synthesize the displayed records with their references.', 'Suggest an update that follows the collection’s fields.'],
 };
 
 let selection: { note_id: number | null; text: string } | null = null;
@@ -74,7 +69,6 @@ function documentPane(state: any): Pane {
 function tabProject(state: any, tab: any): number | null {
   if (tab?.type === 'note') return state.notes.find((note: any) => note.id === Number(tab.noteId))?.project_id || null;
   const resource = tab?.resource;
-  if (resource?.type === 'atelier') return Number(resource.projectId) || null;
   if (resource?.path) return state.projects.find((project: any) => project.canvas_path === resource.path)?.id
     || Number(findWorkspaceNode(resource.path)?.creation_context?.project_id || findWorkspaceNode(resource.path)?.project_id) || null;
   return null;
@@ -86,10 +80,10 @@ export function captureAgentContext(runtime?: Runtime) {
   const tab = activeTab(state, pane);
   const active = tab?.resource || null;
   // A page open in that pane (Library, Tasks…) is the view the user is in; a note or a file, the editor.
-  const view = state?.view === 'notes' ? (active?.type === 'view' ? active.view : active?.type === 'atelier' ? 'project' : 'notes') : state?.view || 'dashboard';
+  const view = state?.view === 'notes' ? (active?.type === 'view' ? active.view : 'notes') : state?.view || 'dashboard';
   let noteId: number | null = tab?.type === 'note' ? Number(tab.noteId) || null : null;
-  // Atelier and page tabs are not files: they give their own context (registerAgentContext, the view below).
-  const isFile = (resource: any) => resource?.path && !['atelier', 'view'].includes(resource.type);
+  // Page tabs are not files: they give their own context (the view below).
+  const isFile = (resource: any) => resource?.path && resource.type !== 'view';
   const resourcePath = view === 'notes' && isFile(active) ? active.path : null;
   const openDocuments: Record<string, any>[] = [];
   const addDocument = (detail: Record<string, any>) => {
@@ -103,7 +97,7 @@ export function captureAgentContext(runtime?: Runtime) {
       });
     }
   }
-  // Components on screen describe what they show (the canvas selection, the reader's article, the Atelier);
+  // Components on screen describe what they show (the canvas selection, the reader's article);
   // the one in the document pane describes the request's subject.
   let extension: Record<string, any> = {};
   for (const [element, read] of contexts) {
@@ -124,14 +118,14 @@ export function captureAgentContext(runtime?: Runtime) {
   const keys: Record<string, string[]> = {
     papers: ['paperSearch', 'paperStatusFilter', 'paperYearFilter', 'paperFolderFilter', 'paperProjectFilter'],
     tasks: ['taskProjectFilter'], calendar: ['calendarProjectFilter', 'calendarSourceFilter', 'calendarCursor'],
-    conferences: ['conferenceProjectFilter'], datasets: ['datasetProjectFilter'], notes: ['noteScope', 'noteFolderId'],
+    notes: ['noteScope', 'noteFolderId'],
   };
   for (const key of keys[view] || []) filters[key] = state?.[key];
   return JSON.parse(JSON.stringify({ view, area, view_label: viewNames[area] || area,
     project_id: project?.id || null, project_name: project?.name || null,
     note_id: noteId, resource_path: resourcePath, canvas_path: resourcePath?.endsWith('.canvas') ? resourcePath : null,
     paper_id: view === 'papers' ? state?.libraryReadingPaperId || null : null,
-    collection_id: view === 'database' ? (active?.type === 'view' && active.collectionId) || state?.collectionId : null, filters,
+    filters,
     calendar_range: view === 'calendar' && runtime ? runtime.calendarMonthRange(state.calendarCursor) : null,
     visible_paper_ids: view === 'papers' && runtime ? runtime.paperFilteredItems().map(item => item.id) : null,
     open_documents: openDocuments,

@@ -61,9 +61,9 @@ def trash(project_id: int) -> str:
             "tasks": [item for item in state["tasks"] if item.get("project_id") == project_id],
             "notes": [item for item in state["notes"] if item.get("project_id") == project_id],
             "note_folders": [item for item in state["note_folders"] if item.get("project_id") == project_id],
-            "linked": {collection: [item["id"] for item in state[collection]
+            "linked": {collection: [item["id"] for item in state.get(collection, [])
                                     if project_id in item.get("project_ids", [])]
-                       for collection in ("papers", "conferences", "datasets")},
+                       for collection in ("papers",)},
             "files": files,
         }
         atomic_write_json(entry / "manifest.json", manifest)
@@ -75,8 +75,7 @@ def trash(project_id: int) -> str:
         current["projects"] = [item for item in current["projects"] if item["id"] != project_id]
         for collection in ("tasks", "notes", "note_folders"):
             current[collection] = [item for item in current[collection] if item.get("project_id") != project_id]
-        for collection in ("papers", "conferences", "datasets"):
-            for item in current[collection]:
+        for item in current["papers"]:
                 item["project_ids"] = [value for value in item.get("project_ids", []) if value != project_id]
     for relative in files:
         path = settings.storage_path / relative
@@ -117,9 +116,9 @@ def restore(identifier: str) -> dict:
             current["projects"].append(project)
             for collection in ("tasks", "notes", "note_folders"):
                 current[collection].extend(manifest[collection])
-            for collection in ("papers", "conferences", "datasets"):
-                for item in current[collection]:
-                    if item["id"] in manifest["linked"][collection]:
+            for collection, linked in manifest["linked"].items():
+                for item in current.get(collection, []):
+                    if item["id"] in linked:
                         item["project_ids"] = list(dict.fromkeys([*item.get("project_ids", []), project["id"]]))
     except Exception:
         for path in reversed(copied):

@@ -55,22 +55,18 @@ html[data-theme="dark"] body,
 html[data-theme="dark"] #main-content,
 html[data-theme="dark"] .workspace { background: var(--canvas); color: var(--ink); }
 html[data-theme="dark"] .sidebar { border-color: var(--line); background: #242521; }
-html[data-theme="dark"] .nav-item.active,
 html[data-theme="dark"] .button,
 html[data-theme="dark"] .icon-button,
 html[data-theme="dark"] .paper-table,
 html[data-theme="dark"] .paper-row,
-html[data-theme="dark"] .paper-table-head,
 html[data-theme="dark"] .library-search,
 html[data-theme="dark"] .notes-sidebar,
 html[data-theme="dark"] .notes-main-workspace,
 html[data-theme="dark"] .workspace-pane-stack,
 html[data-theme="dark"] .workspace-tab.active,
 html[data-theme="dark"] .note-editor,
-html[data-theme="dark"] .note-pane-header,
 html[data-theme="dark"] .modal,
 html[data-theme="dark"] .settings-card,
-html[data-theme="dark"] .settings-panels,
 html[data-theme="dark"] input,
 html[data-theme="dark"] textarea,
 html[data-theme="dark"] select { border-color: var(--line); background: var(--surface); color: var(--ink); }
@@ -100,16 +96,7 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,.66); }
 .brand > span:last-child { opacity: 0; transition: opacity 120ms ease; }
 .sidebar:hover .brand > span:last-child, .sidebar:focus-within .brand > span:last-child { opacity: 1; }
 
-.primary-nav { display: grid; gap: 4px; }
-.nav-item { width: 100%; height: 42px; display: flex; align-items: center; justify-content: center; gap: 11px; border: 0; border-radius: 10px; background: transparent; padding: 10px 11px; color: #61625d; text-align: left; white-space: nowrap; cursor: pointer; overflow: hidden; font-size: 0; transition: 150ms ease; }
-.nav-item span { width: 20px; color: #777870; font-size: 18px; text-align: center; }
-.sidebar:hover .nav-item, .sidebar:focus-within .nav-item { justify-content: flex-start; font-size: 12px; }
-.nav-item:hover { background: rgba(255,255,255,.6); color: var(--ink); }
-.nav-item.active { background: #fff; color: var(--ink); box-shadow: 0 1px 2px rgba(0,0,0,.05); font-weight: 600; }
-.nav-item.active span { color: var(--accent); }
-
 .project-dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 3px; }
-.sidebar-footer { margin-top: auto; padding-top: 18px; border-top: 1px solid #dddbd3; }
 
 .workspace { position: relative; min-width: 0; min-height: calc(100vh - var(--titlebar-height)); margin-left: 66px; }
 
@@ -124,6 +111,5 @@ html[data-theme="dark"] .modal-backdrop { background: rgba(0,0,0,.66); }
 
 #main-content { width: 100%; margin: 0 auto; padding: 14px clamp(12px, 1.8vw, 28px) 36px; outline: none; }
 .tasks-mode { display: flex; height: calc(100vh - var(--titlebar-height)); min-height: 0; flex-direction: column; overflow: hidden; padding-bottom: 14px !important; }
-.tasks-mode .board-toolbar { flex: 0 0 auto; }
 .tasks-mode .kanban { flex: 1; min-height: 0; align-items: stretch; overflow-y: hidden; }
 .tasks-mode .kanban-column { height: 100%; min-height: 0; max-height: none; }

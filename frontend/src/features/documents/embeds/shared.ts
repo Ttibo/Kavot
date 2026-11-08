@@ -1,6 +1,5 @@
 /** Helpers shared by the script and collection blocks. */
 import type { Editor } from "@tiptap/core";
-import { state } from "../../../app/state";
 
 const icons: Record<string, string> = {
   script: "m8 6-6 6 6 6M16 6l6 6-6 6M13 4l-2 16",
@@ -27,12 +26,6 @@ export const embedIcon = (name: string, size = 14) =>
 /** Strip HTML and collapse whitespace. */
 export const plainText = (value: unknown) =>
   String(value ?? "").replace(/<[^>]*>/g, " ").replace(/&nbsp;/g, " ").replace(/\s+/g, " ").trim();
-
-/** Lowercase without accents, for forgiving search. */
-export const fold = (value: string) => value.normalize("NFD").replace(/[̀-ͯ]/g, "").toLocaleLowerCase();
-
-export const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? "" : "s"}`;
-
 /** A modal <dialog> appended to the page and removed when closed. */
 export function dialogShell(className: string, label: string) {
   const dialog = document.createElement("dialog");
@@ -51,11 +44,7 @@ export function deleteNode(editor: Editor, getPos: () => number | undefined) {
   if (typeof pos === "number" && node && editor.isEditable) editor.chain().focus().deleteRange({ from: pos, to: pos + node.nodeSize }).run();
 }
 
-const builtInCollections: Record<string, string> = { notes: "Notes", articles: "Articles", tasks: "Tasks", conferences: "Conferences", datasets: "Datasets" };
-
+/** What a note script can read with `kavot.items(id)`. */
 export function collectionList() {
-  const ids = [...new Set([...Object.keys(builtInCollections), ...state.databases.map(db => db.id)])];
-  return ids.map(id => ({ id, name: state.databases.find(db => db.id === id)?.name || builtInCollections[id] || id }));
+  return [{ id: "notes", name: "Notes" }, { id: "articles", name: "Articles" }, { id: "tasks", name: "Tasks" }];
 }
-
-export const collectionName = (id: string) => collectionList().find(c => c.id === id)?.name || id;

@@ -9,26 +9,24 @@ from app.core.search import embeddings
 def workspace(client):
     project = client.post("/api/projects", json={"name": "Glacier study"}).json()
     other = client.post("/api/projects", json={"name": "Teaching"}).json()
-    dataset = client.post("/api/datasets", json={"name": "Alpine ice cores", "project_ids": [project["id"]]}).json()
-    conference = client.post("/api/conferences", json={"name": "European Geosciences Union", "acronym": "EGU",
-                                                       "dataset_ids": [dataset["id"]], "project_ids": [project["id"]]}).json()
     melt = client.post("/api/notes", json={"title": "Résumé of melt rates", "project_id": project["id"],
                                            "content": "<p id='b1'>Glaciers lose mass faster in summer.</p>"
                                                       "<p id='b2'>Albedo feedback accelerates surface melting.</p>"}).json()
     lecture = client.post("/api/notes", json={"title": "Lecture plan", "project_id": other["id"],
                                               "content": "<p>Automobile emissions and urban air.</p>"}).json()
     task = client.post("/api/tasks", json={"title": "Calibrate the ablation stakes", "project_id": project["id"]}).json()
-    return {"project": project, "other": other, "dataset": dataset, "conference": conference,
+    return {"project": project, "other": other,
             "melt": melt, "lecture": lecture, "task": task}
 
 
 def test_records_api_reads_every_collection(client, workspace):
     catalog = {c["id"]: c for c in client.get("/api/records").json()}
-    assert catalog["conferences"]["plugin"] == "research" and catalog["notes"]["plugin"] == "core"
+    assert catalog["tasks"]["plugin"] == "planning" and catalog["notes"]["plugin"] == "core"
+    assert not {"conferences", "datasets"} & set(catalog)
     item = client.get(f"/api/records/tasks/{workspace['task']['id']}").json()
     assert item["title"] == "Calibrate the ablation stakes"
-    listed = client.get("/api/records/conferences", params={"fields": ["acronym"]}).json()
-    assert listed["items"] == [{"id": workspace["conference"]["id"], "acronym": "EGU"}]
+    listed = client.get("/api/records/tasks", params={"fields": ["title"]}).json()
+    assert {"id": workspace["task"]["id"], "title": "Calibrate the ablation stakes"} in listed["items"]
 
 
 def test_links_are_derived_with_provenance(client, workspace):
@@ -37,10 +35,6 @@ def test_links_are_derived_with_provenance(client, workspace):
     members = {link["ref"] for link in links["links"] if link["relation"] == "in_project"}
     assert f"kavot://notes/{workspace['melt']['id']}" in members
     assert f"kavot://tasks/{workspace['task']['id']}" in members
-    conference = client.get("/api/links", params={"ref": f"kavot://conferences/{workspace['conference']['id']}",
-                                                  "relation": "uses_dataset"}).json()
-    assert conference["links"][0]["ref"] == f"kavot://datasets/{workspace['dataset']['id']}"
-    assert conference["links"][0]["provenance"] == "field:conferences.dataset_ids"
 
 
 def test_journal_records_author(client, workspace):
@@ -70,8 +64,8 @@ def test_search_stages(client, workspace):
     # Filters by collection and project.
     scoped = client.get("/api/search", params={"q": "plan", "project_id": workspace["project"]["id"]}).json()
     assert all(workspace["project"]["id"] in hit.get("project_ids", []) for hit in scoped["hits"])
-    only = client.get("/api/search", params={"q": "EGU", "collections": ["conferences"]}).json()
-    assert [hit["collection"] for hit in only["hits"]] == ["conferences"]
+    only = client.get("/api/search", params={"q": "ablation", "collections": ["tasks"]}).json()
+    assert only["hits"] and {hit["collection"] for hit in only["hits"]} == {"tasks"}
 
 
 def test_index_follows_changes(client, workspace):
@@ -115,8 +109,8 @@ def test_read_by_address(workspace):
     from app.core.records import api
     note = api.read(f"kavot://notes/{workspace['melt']['id']}")
     assert note["passages"][0]["anchor"] == "b1" and "Albedo" in note["passages"][0]["text"]
-    conference = api.read(f"kavot://conferences/{workspace['conference']['id']}", fields=["acronym"])
-    assert conference["item"] == {"id": workspace["conference"]["id"], "acronym": "EGU"}
+    task = api.read(f"kavot://tasks/{workspace['task']['id']}", fields=["title"])
+    assert task["item"] == {"id": workspace["task"]["id"], "title": "Calibrate the ablation stakes"}
 
 
 def test_script_blocks_keep_no_block_ids_inside():

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Response
 from fastapi.responses import FileResponse
+from starlette.background import BackgroundTask
 
 from app.models.projects import ProjectCreate, ProjectExternalResourceCreate, ProjectResourceLink, ProjectUpdate
 from app.core.projects import projects, code as project_code, trash as project_trash
@@ -50,8 +52,6 @@ def get_project(project_id: int) -> dict[str, Any]:
         "papers": [item for item in state["papers"] if project_id in item.get("project_ids", [])],
         "tasks": [item for item in state["tasks"] if item.get("project_id") == project_id and not item.get("archived_at")],
         "notes": [item for item in state["notes"] if item.get("project_id") == project_id and not item.get("trashed_at")],
-        "conferences": [item for item in state["conferences"] if project_id in item.get("project_ids", [])],
-        "datasets": [item for item in state["datasets"] if project_id in item.get("project_ids", [])],
     })
     return result
 
@@ -72,12 +72,12 @@ def update_project(project_id: int, payload: ProjectUpdate) -> dict[str, Any]:
 def add_resource(project_id: int, payload: ProjectResourceLink) -> dict[str, Any]:
     values = json_values(payload)
     state = store.read()
-    collection = {"paper": "papers", "task": "tasks", "conference": "conferences", "dataset": "datasets"}.get(payload.resource_type)
+    collection = {"paper": "papers", "task": "tasks"}.get(payload.resource_type)
     if collection:
         item = next((row for row in state[collection] if str(row["id"]) == str(payload.resource_id)), None)
         if item:
             values["title"] = item.get("title") or item.get("name")
-            if payload.resource_type in {"paper", "conference", "dataset"} and project_id not in item.get("project_ids", []):
+            if payload.resource_type == "paper" and project_id not in item.get("project_ids", []):
                 store.update(collection, int(item["id"]), {"project_ids": [*item.get("project_ids", []), project_id]})
             elif payload.resource_type == "task":
                 store.update(collection, int(item["id"]), {"project_id": project_id})
@@ -100,18 +100,12 @@ def export_project(project_id: int) -> FileResponse:
     root = projects.directory(project)
     temporary = Path(tempfile.mkdtemp(prefix="kavot-export-"))
     archive = temporary / f"{root.name}.zip"
-    import shutil
     shutil.make_archive(str(archive.with_suffix("")), "zip", root)
-    return FileResponse(archive, filename=archive.name, media_type="application/zip")
+    # The archive is deleted once sent: every export used to leave a copy of the project in the temp folder.
+    return FileResponse(archive, filename=archive.name, media_type="application/zip",
+                        background=BackgroundTask(shutil.rmtree, temporary, ignore_errors=True))
 
 
 @router.delete("/{project_id}")
 def delete_project(project_id: int) -> dict[str, str]:
     return {"trash_id": project_trash.trash(project_id)}
-
-
-
-
-
-
-

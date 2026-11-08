@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useOptionalRuntime } from '../../app/runtime';
 import { Icon } from '../../components/Icon';
 import type { ExternalEngine } from '../../components/ExternalAgentSettings';
-import { relative, tokens, totalTokens } from '../atelier/types';
+import { billedTokens as totalTokens, relative, tokens } from './format';
 import { ENGINE_NAMES, needsAttention, STATUS_LABELS, statusOf, type Summary } from './api';
 
 function dayGroup(value: string) {

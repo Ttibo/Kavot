@@ -3,7 +3,7 @@ import katex from 'katex';
 type MathExpression = { from: number; to: number; source: string; display: boolean };
 
 /** Keep code and escaped dollar signs literal when locating TeX delimiters. */
-export function mathExpressions(text: string): MathExpression[] {
+function mathExpressions(text: string): MathExpression[] {
   const expressions: MathExpression[] = [];
   const pattern = /(^[ \t]*(`{3,}|~{3,})[^\n]*\n[\s\S]*?(?:^[ \t]*\2[^\n]*(?=\n|$)|(?![\s\S])))|(`+)[^`]*?\3|\\\$|(?<!\\)\$\$([\s\S]+?)(?<!\\)\$\$|(?<![\\$])\$(?![\s$])((?:\\.|[^$\n])+?)(?<![\\\s])\$(?!\d)|(?<!\\)\\\(([\s\S]+?)\\\)|(?<!\\)\\\[([\s\S]+?)\\\]/gm;
   for (const match of text.matchAll(pattern)) {
@@ -14,7 +14,7 @@ export function mathExpressions(text: string): MathExpression[] {
   return expressions;
 }
 
-export function renderMath(source: string, display = false) {
+function renderMath(source: string, display = false) {
   return katex.renderToString(source, { displayMode: display, throwOnError: false, trust: false, maxSize: 20, maxExpand: 1000, strict: 'ignore' });
 }
 

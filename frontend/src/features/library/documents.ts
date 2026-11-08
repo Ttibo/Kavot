@@ -7,9 +7,10 @@ import { api } from '../../services/api';
 import { flushCurrentNoteAutosave, flushSecondaryNoteAutosave, refreshWorkspaceTreeOnly, renderNotes, replaceActiveWorkspaceTab, replaceActiveWorkspaceTabPair, workspaceNoteTab, workspaceResourceTab } from '../documents/workspace';
 import { currentMarkdownBlockInput, markdownBlockSourceOffset, setMarkdownBlockEditorContent } from '../documents/markdown';
 import { editorSession } from '../../app/editorSession';
-import { loadPdfEngine } from '../documents/pdfEngine';
-import { bindPdfAnnotations } from '../documents/pdfAnnotations';
-import { pdfIcon } from '../documents/pdfIcons';
+import { loadPdfEngine } from '../documents/pdf/engine';
+import { bindPdfAnnotations } from '../documents/pdf/annotations';
+import { pdfIcon } from '../documents/pdf/icons';
+import { onDisconnect } from '../documents/domLifecycle';
 
 
 
@@ -677,10 +678,7 @@ export function bindWorkspacePdfExtractors(root) {
       () => Boolean(captureTarget()),
       {},
     );
-    const removalObserver = new MutationObserver(() => {
-      if (!captureRoot.isConnected) { dispose?.(); removalObserver.disconnect(); }
-    });
-    removalObserver.observe(document.body, { childList: true, subtree: true });
+    onDisconnect(captureRoot, () => dispose?.());
     refreshAvailability();
   });
 }
@@ -743,26 +741,6 @@ export async function editPaperMetadataModal(paperId) {
           toast(error.message, "error");
         }
       });
-  } catch (error) {
-    toast(error.message, "error");
-  }
-}
-
-export async function savePaperProjects(source) {
-  const paperId = Number(source?.dataset.paperId || 0);
-  const selector = source?.closest(".paper-project-selector");
-  if (!paperId || !selector) return;
-  const projectIds = [
-    ...selector.querySelectorAll('input[type="checkbox"]:checked'),
-  ].map((input) => Number(input.value));
-  try {
-    await api(`/papers/${paperId}/projects`, {
-      method: "PUT",
-      body: JSON.stringify({ project_ids: projectIds }),
-    });
-    await refreshData();
-    renderPapers();
-    toast("Related projects updated");
   } catch (error) {
     toast(error.message, "error");
   }

@@ -7,16 +7,11 @@ const load = <K extends string>(loader: () => Promise<Record<K, ComponentType<an
   lazy(() => loader().then(module => ({ default: module[name] })));
 
 export const pageComponents: Record<PageId, ComponentType<any>> = {
-  dashboard: load(() => import('../views/DashboardView'), 'DashboardView'),
-  chat: load(() => import('../views/ChatView'), 'ChatView'),
   tasks: load(() => import('../views/TasksView'), 'TasksView'),
   calendar: load(() => import('../views/CalendarView'), 'CalendarView'),
-  watchers: load(() => import('../views/WatchersView'), 'WatchersView'),
-  workflows: load(() => import('../views/WorkflowsView'), 'WorkflowsView'),
   papers: load(() => import('../views/LibraryView'), 'LibraryView'),
-  conferences: load(() => import('../views/ResearchViews'), 'ConferencesView'),
-  datasets: load(() => import('../views/ResearchViews'), 'DatasetsView'),
-  database: load(() => import('../views/CollectionsView'), 'CollectionsView'),
+  chat: load(() => import('../views/ChatView'), 'ChatView'),
+  terminal: load(() => import('../views/AgentsView'), 'AgentsView'),
   trash: load(() => import('../views/TrashView'), 'TrashView'),
 };
 

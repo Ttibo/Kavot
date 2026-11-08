@@ -15,11 +15,8 @@ def mapped(client):
     note = client.post("/api/notes", json={"title": "Reef survey protocol", "project_id": project["id"], "content":
         "<h1 id='h-intro'>Survey protocol</h1><p id='p1'>Divers record bleaching along fixed transects.</p>"
         "<h2 id='h-gear'>Equipment</h2><p id='p2'>Each team carries a camera and a temperature logger.</p>"}).json()
-    client.post("/api/databases", json={"id": "sites", "name": "Sites", "record_kind": "site", "fields": [
-        {"id": "region", "name": "Region", "type": "select", "options": ["North", "South"]},
-        {"id": "depth", "name": "Depth", "type": "number"}]})
-    for region, depth in (("North", 5), ("North", 12), ("South", 20)):
-        client.post("/api/databases/sites/records", json={"values": {"title": f"Site {depth}", "region": region, "depth": depth}})
+    for depth in (5, 12, 20):
+        client.post("/api/tasks", json={"title": f"Survey site {depth}"})
     folder = settings.storage_path / "notes" / "data"
     folder.mkdir(parents=True, exist_ok=True)
     (folder / "temperatures.csv").write_text("site,temperature,date\nA,28.5,2026-01-03\nB,29.1,2026-01-04\nC,30.2,2026-02-01\n",
@@ -32,7 +29,7 @@ def mapped(client):
 def test_workspace_level_lists_collections_and_projects(mapped):
     top = explore()
     collections = {c["ref"]: c for c in top["collections"]}
-    assert collections["kavot://collections/sites"]["items"] == 3 and collections["kavot://collections/files"]["items"] >= 2
+    assert collections["kavot://collections/tasks"]["items"] >= 3 and collections["kavot://collections/files"]["items"] >= 2
     reef = next(p for p in top["projects"] if p["ref"] == f"kavot://projects/{mapped['project']['id']}")
     # The protocol note and the project's own home note.
     assert reef["gist"].startswith("Bleaching") and reef["items"] == 2
@@ -40,11 +37,9 @@ def test_workspace_level_lists_collections_and_projects(mapped):
 
 
 def test_collection_level_profiles_the_data(mapped):
-    sites = explore("kavot://collections/sites")
-    columns = sites["profile"]["columns"]
-    assert columns["region"]["top"] == ["North (2)", "South (1)"]
-    assert columns["depth"] == {"filled": "3/3", "type": "number", "min": 5.0, "max": 20.0, "mean": 12.3333}
-    assert len(sites["children"]) == 3 and all("cost" in child for child in sites["children"])
+    tasks = explore("kavot://collections/tasks")
+    assert tasks["profile"]["columns"]
+    assert len(tasks["children"]) >= 3 and all("cost" in child for child in tasks["children"])
 
 
 def test_item_level_outline_and_section_reading(mapped):
@@ -90,20 +85,17 @@ def test_digest_replaces_the_extracted_summary_until_the_source_changes(mapped, 
     assert client.delete("/api/digests", params={"ref": note_ref}).status_code == 204
 
 
-def test_agents_save_digests_and_explore_within_scope(mapped, client):
-    from tests.core.test_mcp import call, make_run, tools_of
-    other = client.post("/api/projects", json={"name": "Hidden"}).json()
-    client.post("/api/notes", json={"title": "Hidden plan", "project_id": other["id"], "content": "<p>secret</p>"})
-    run = make_run(project_id=mapped["project"]["id"])
-    server = tools_of(run)[0]
+def test_agents_save_digests_and_explore(mapped, client):
+    from tests.core.test_mcp import call, new_server
+    server = new_server()
     top = json.loads(call(server, "explore", {}))
-    assert [p["title"] for p in top["projects"]] == ["Coral reefs"]
+    assert "Coral reefs" in [p["title"] for p in top["projects"]]
     note_ref = f"kavot://notes/{mapped['note']['id']}"
     call(server, "save_digest", {"ref": note_ref, "summary": "Protocol for reef bleaching surveys."})
     digest = store.get(note_ref)
-    assert digest["fresh"] and digest["author"]["kind"] == "agent" and digest["author"]["run"] == "test"
-    with pytest.raises(Exception, match="outside"):
-        asyncio.run(server.call_tool("explore", {"ref": f"kavot://projects/{other['id']}"}))
+    assert digest["fresh"] and digest["author"]["kind"] == "agent"
+    with pytest.raises(Exception, match="Unknown"):
+        call(server, "save_digest", {"ref": "kavot://notes/999999", "summary": "A note that does not exist at all."})
 
 
 class TopicProvider:
