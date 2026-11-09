@@ -1,22 +1,48 @@
-# 📝 Live notes
+# 📝 Notes
 
 Notes are standalone HTML documents edited with a rich editor. They open in any
-browser, even without Kavot. Open **Workspace** in the sidebar to browse your
-notes, projects and collections in a tree, with tabs for the open notes.
+browser, even without Kavot.
 
-![A note with a formula, a table and a checklist](images/notes.png)
+![A note in a project, with the tree of notes on the left](images/notes.png)
+
+## The tree
+
+The panel beside the ribbon shows your notes and folders as a tree, like a
+vault. Its toolbar creates a note, a folder, a canvas or a drawing in the
+selected folder, searches, collapses everything and opens the trash.
+
+- **Projects** appear in the tree as folders. Expanding one shows its
+  **Tasks**, **Library** and **Project canvas** first, then its notes.
+- Drag notes and folders to move them; right-click for the other actions.
+- Drop Word, Excel, CSV or PDF files on a folder to import them. Office files
+  and tables open in their own tab.
+- `Ctrl+\` hides or shows the tree.
+
+## Tabs and panes
+
+Everything opens as a tab: notes, canvases, PDFs and the Library, Agents, Tasks
+and Calendar pages. A click replaces the current tab, **Ctrl+click** opens a new
+one, and **Open to the side** (right-click) splits the window into two panes.
+Each tab keeps its own Back/Forward history.
+
+## Search
+
+**Ctrl+P** (or **Ctrl+F**) opens the finder: type a few letters to find notes,
+articles, PDFs and files by title and content, with a preview of the match.
+**Enter** opens the result, **Ctrl+Enter** opens it in a new tab.
+
+![The finder](images/search.png)
 
 ## Writing
 
 - The toolbar groups text formatting, paragraph options and insertion
   commands. Right-click a block (or press Shift+F10) for the same commands.
-- **Edit** and **Read** switch between editing and a read-only view
-  (Ctrl+E). Changes are saved automatically.
+- Changes are saved automatically.
 - Drag the ⠿ handle on the left of a block to move it; click it for the block
   menu.
-- Insert headings, lists, checklists, quotes, dividers, images, media,
-  side-by-side columns and collapsible sections.
-- Math is rendered locally with KaTeX: `$…$` inline, `$$…$$` for a block.
+- Insert headings, lists, task lists, quotes, code blocks, callouts, dividers,
+  images, side-by-side columns and collapsible sections.
+- **Reference** links a note, an article or a task; the link opens it in a tab.
 
 ## Tables
 
@@ -24,21 +50,13 @@ Tables have a header row, **+** buttons to add rows and columns, Tab and
 Shift+Tab navigation, merged cells and several styles (standard, striped,
 minimal, compact, colored header).
 
-## Live collection views
-
-**Insert → Collection** embeds a collection (notes, articles, tasks,
-conferences, datasets or one of your own) as a **table**, **list**,
-**gallery** or **kanban** board. Choose the fields, filters, sort order and
-grouping. Views stay live: they refresh when the collection changes, and
-dragging a kanban card updates the item.
-
 ## Scripts
 
 **Insert → Script** adds a small HTML, CSS and JavaScript program to a note,
 with a live preview: a chart, a timer, a table of contents, a calendar, a task
 counter… Scripts run in an isolated frame with no direct access to the app or
-the network. They read your collections through a small `kavot` API, and can
-only reach a URL you approved. Scripts can be saved to a library, shared and
+the network. They read your notes, articles and tasks through a small `kavot`
+API, and can only reach a URL you approved. Scripts can be saved to a library, shared and
 imported.
 
 ### Example: the library in 3D
@@ -48,8 +66,6 @@ cdnjs. This note loads [three.js](https://threejs.org), reads the library with
 `kavot.items('articles')` and draws one sphere per article on a rotating
 helix, colored by reading status. The scene is live: add or read an article and
 it updates with the note.
-
-![A note running a three.js scene built from the library](images/notes-script-3d.gif)
 
 <details>
 <summary><b>The script</b> (HTML, CSS and JavaScript tabs of the script editor)</summary>
@@ -158,11 +174,11 @@ new ResizeObserver(() => {
 ## Drawings
 
 A drawing is a note of its own, made in the **Drawing studio**: diagrams,
-sketches, figures for a paper. Create one with the ✎ button (**New Draw
-diagram**) at the top of the Workspace tree; drawings are marked **DRAW** in the tree. The
-same studio opens from a drawing card on a [canvas](canvases.md).
+sketches, figures for a paper. Create one with the ✎ button at the top of the
+tree, or **Drawing** in a new tab; drawings are marked **DRAW** in the tree.
+The same studio opens from a drawing card on a [canvas](canvases.md).
 
-![Drawing a small pipeline in the drawing studio](images/drawing.gif)
+![Drawing a small pipeline in the drawing studio](images/drawing.png)
 
 - **Shapes**: rectangle, ellipse and a library of 89 shapes with search.
 - **Lines**: arrows, straight lines, elbow and curved connectors, polylines,

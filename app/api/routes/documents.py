@@ -352,6 +352,8 @@ def preview_template(payload: NoteTemplatePreview) -> dict[str, str]:
 
 @router.get("/workspace/tree")
 def workspace_tree() -> list[dict[str, Any]]:
+    from app.core.workspace.markdown_import import import_markdown_notes
+    import_markdown_notes()
     return tree.workspace_tree()
 
 

@@ -9,7 +9,7 @@
 .calendar-grid { height: calc(100% - 30px); grid-template-rows: repeat(6, minmax(74px, 1fr)); }
 .calendar-day { min-width: 0; overflow: hidden; padding: 6px; border-right: 1px solid var(--line); border-bottom: 1px solid var(--line); background: var(--surface, #fff); }
 .calendar-day:nth-child(7n) { border-right: 0; }.calendar-day:nth-last-child(-n+7) { border-bottom: 0; }
-.calendar-day.outside { background: #faf9f6; color: var(--subtle); }.calendar-day.today { background: #f7feff; }
+.calendar-day.outside { background: var(--surface-soft); color: var(--subtle); }.calendar-day.today { background: var(--surface-soft); }
 .calendar-day > header { display: flex; align-items: center; justify-content: space-between; min-height: 19px; }
 .calendar-day > header span { display: grid; place-items: center; width: 21px; height: 21px; border-radius: 7px; font: 10px "DM Mono", monospace; }
 .calendar-day.today > header span { background: var(--accent); color: #fff; }.calendar-day > header small { color: var(--accent); font-size: 8px; }

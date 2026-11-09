@@ -6,13 +6,12 @@ optional cloud sync.
 
 ## Backups
 
-![Workspace backups](images/backups.png)
-
-In **Settings → Storage and backups**:
+In **Settings → Storage**, under **Backups**:
 
 - **Automatic backup** saves a dated ZIP of the whole workspace on a schedule.
-  A backup is made only when something changed. Kavot keeps one per day for a
-  week, one per week for a month and one per month for a year.
+  A backup is made only when something changed. By default (**Smart**) Kavot
+  keeps one per day for a week, one per week for a month and one per month for
+  a year; you can choose a fixed period instead.
 - **Back up now** makes a manual backup, with an optional name such as
   "Before migration". Manual backups are kept until you delete them.
 - **Restore** brings a backup back; **Import a ZIP…** adds a backup made
@@ -26,8 +25,8 @@ Local backups are stored in `.kavot-backups/` in your workspace.
 
 ![The trash](images/trash.png)
 
-Deleted notes, files and projects go to the **Trash** at the bottom of the
-sidebar. They stay in the workspace folder (in `.meta_kavot/`) until you
+Deleted notes, files and projects go to the **Trash**, opened with the 🗑
+button of the tree toolbar. They stay in the workspace folder (in `.meta_kavot/`) until you
 **Restore** them or **Delete permanently**.
 
 ## Archives
@@ -37,11 +36,12 @@ and restores them.
 
 ## Cloud sync (optional)
 
-With a Kavot Cloud account, **Settings → Storage and backups → Sync** keeps the
+With a Kavot Cloud account, **Settings → Storage → Sync** keeps the
 same files on every linked device. Each file keeps its own version history, so
 you can restore an earlier version of a single file. When a file changed on two
-devices, Kavot lists the conflict and lets you compare the versions before
-choosing one.
+devices, Kavot keeps both: the other version is saved as a conflict copy next to
+the file, so nothing is overwritten. A sync that would delete many files at once
+is held until you confirm it.
 
 ## Always readable
 

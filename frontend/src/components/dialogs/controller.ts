@@ -69,6 +69,7 @@ export async function closeModal() {
   modal.classList.remove("modal-pdf-preview");
   modal.classList.remove("modal-paper-note");
   modal.classList.remove("modal-canvas-note");
+  modal.classList.remove("modal-compact");
   setActiveNavigation(state.view);
   setTimeout(() => {
     if (returnFocus?.isConnected && modalBackdrop.classList.contains("hidden")) returnFocus.focus({ preventScroll: true });

@@ -5,7 +5,7 @@
 # Kavot
 
 **A local-first workspace for research projects.**
-Articles, PDFs, notes, canvases, tasks and agent workflows in one desktop app,
+Notes, a library of articles and PDFs, and your own agents in one desktop app,
 stored as plain files in a folder you own.
 
 [**Download**](https://kavot.cloud) · [Website](https://kavot.cloud) · [Report a bug](https://github.com/Ttibo/Kavot/issues) · [Contribute](CONTRIBUTING.md)
@@ -18,7 +18,7 @@ stored as plain files in a folder you own.
 
 <br>
 
-<img src="docs/images/home.png" alt="Kavot research home: tasks, agenda, projects and recent notes" width="900">
+<img src="docs/images/notes.png" alt="Kavot: a project in the tree of notes, with a reading note open" width="900">
 
 </div>
 
@@ -32,14 +32,14 @@ stored as plain files in a folder you own.
 
 - **Local first.** No account and no server needed. Everything lives in a folder you
   choose: JSON, HTML and PDF files that you can back up, version or open without Kavot.
-- **One place for a research project.** A library and PDF reader, notes, canvases,
-  tasks, a calendar and custom collections, all linked to each other. Each project
-  opens on its own canvas.
+- **One place for a research project.** A tree of notes like a vault, a library
+  and PDF reader, canvases, tasks and a calendar, all linked to each other. A
+  project is a folder of the tree with its own tasks, articles and canvas.
 - **Notes that outlive the app.** Notes are standalone HTML documents that open in any
   browser.
 - **Agents on your terms.** Connect an agent already installed on your computer
-  (Claude Code, Codex or OpenCode). It reads your workspace through a local
-  [MCP server](app/docs/mcp-local.md) and only *proposes* changes, which you approve.
+  (Claude Code, Codex or OpenCode). Chat with it next to your note or canvas: it reads your workspace through a
+  local [MCP server](app/docs/mcp-local.md) and proposes changes you approve.
 - **No tracking.** Kavot sends no telemetry and no analytics.
 
 ## Features
@@ -48,15 +48,12 @@ Each feature has its own page with screenshots and details.
 
 | Feature | What it does | |
 | --- | --- | --- |
-| 📚 **[Library](docs/library.md)** | Import a Zotero library, organize articles in folders, read and annotate PDFs | [Details →](docs/library.md) |
-| 🔎 **[Discovery](docs/discovery.md)** | Search scholarly sources and explore citation graphs | [Details →](docs/discovery.md) |
-| 🛰️ **[Watchers](docs/watchers.md)** | Scheduled watches that find new articles, conferences or items for your collections | [Details →](docs/watchers.md) |
-| ⚙️ **[Workflows](docs/workflows.md)** | Chain sources, agent steps (summarize, filter, extract, compare, build) and outputs (notes, tasks, collections, files). Every run keeps the output of each step | [Details →](docs/workflows.md) |
-| 💬 **[Assistant](docs/assistant.md)** | Chat with your agent about the open note, project or library; changes wait for your approval | [Details →](docs/assistant.md) |
-| 📝 **[Live notes](docs/notes.md)** | Rich editor with math, collection views (table, list, gallery, kanban), sandboxed scripts (even a three.js scene) and a drawing studio | [Details →](docs/notes.md) |
+| 📝 **[Notes](docs/notes.md)** | Rich notes in a vault-like tree, tabs and split panes, a finder (Ctrl+P), sandboxed scripts and a drawing studio | [Details →](docs/notes.md) |
+| 📚 **[Library](docs/library.md)** | Import from a DOI, PDFs or Zotero, organize articles in folders, read and annotate PDFs, weekly article watches | [Details →](docs/library.md) |
+| 🔎 **[Discovery](docs/discovery.md)** | Explore the references and citations around an article | [Details →](docs/discovery.md) |
+| 💬 **[Agents](docs/assistant.md)** | Chat with Claude Code, Codex or OpenCode about the open note, canvas or graph; changes wait for your approval | [Details →](docs/assistant.md) |
 | 🧭 **[Canvases](docs/canvases.md)** | Lay out notes, articles, tasks and links between them on an infinite canvas | [Details →](docs/canvases.md) |
-| ✅ **[Planning](docs/planning.md)** | Tasks, kanban boards, a calendar, conferences and datasets | [Details →](docs/planning.md) |
-| 🗂️ **[Collections](docs/collections.md)** | Your own typed collections with custom fields | [Details →](docs/collections.md) |
+| ✅ **[Planning](docs/planning.md)** | Tasks on a kanban board or a list, and a calendar | [Details →](docs/planning.md) |
 | 💾 **[Safety](docs/safety.md)** | Local backups, a restorable trash and optional cloud sync | [Details →](docs/safety.md) |
 
 ## Install
@@ -65,7 +62,7 @@ The easiest way is the installer from **[kavot.cloud](https://kavot.cloud)**.
 To run Kavot from source, see [Build from source](#build-from-source).
 
 Agent features are optional. To use them, install one of the supported agent CLIs
-and enable it in **Settings → AI and agents**.
+and enable it in **Settings → Agents**.
 
 ## Build from source
 
@@ -126,16 +123,15 @@ npm --prefix frontend run dev
 ```text
 desktop.py                 Desktop launcher: local API + pywebview window
 app/
-├── api/routes/            HTTP routes (validation and responses only)
-├── services/              Business logic and file persistence
+├── api/routes/            HTTP routes of the core (validation and responses only)
+├── core/                  Kernel, records, workspace files, agents, storage and sync
+├── mcp/                   Local MCP server the agents use
 ├── models/                Pydantic schemas
-├── core/                  Configuration and storage helpers
-├── bootstrap/             Startup migrations and reconciliation
-└── cloud_sync/            Optional Kavot Cloud client
+└── plugins/               Domains: papers (library), planning (tasks, calendar)
 frontend/
-├── src/app/               Runtime, navigation and global events
-├── src/views/             One React view per screen
-├── src/features/          Feature modules (library, documents, tasks…)
+├── src/app/               Runtime, navigation, pages and tabs
+├── src/views/             Page components
+├── src/features/          Feature modules (library, documents, agents, tasks…)
 ├── src/components/        Shared UI components
 └── src/styles/            Stylesheets
 install/                   Scripts that build the Windows, macOS and Linux installers
@@ -164,8 +160,8 @@ Your workspace is a regular folder:
 kavot.state.json     Index of projects, articles, notes and tasks
 projects/            Project manifests and canvases
 library/             Articles and their PDFs
-notes/               Notes as HTML documents
-databases/           Collections
+notes/               Notes as HTML documents, in their folders
+databases/           Records of articles, notes and tasks
 .kavot-backups/      Local backups
 .meta_kavot/         Extractions, metadata and the restorable trash
 ```
@@ -184,7 +180,7 @@ It is **free during the beta** and may later become a paid option. Everything th
 runs locally stays free, and your local data always remains yours and readable
 without Kavot.
 
-In **Settings → Cloud and storage**, you can save dated workspace ZIP versions online,
+In **Settings → Storage**, you can save dated workspace ZIP versions online,
 upload an existing Kavot backup ZIP, download or delete a version, and restore a
 cloud ZIP into a new folder. Online backups use your account's storage quota; creating
 one also keeps a local ZIP in `.kavot-backups/`.

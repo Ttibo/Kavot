@@ -45,7 +45,11 @@ def reconcile_workspace() -> None:
     store.ensure()
     from app.core.workspace.documents import backfill_article_pdf_links
     from app.core.workspace.note_migration import migrate_html_notes
+    from app.core.workspace.markdown_import import import_markdown_notes, register_orphan_documents
+    # Markdown under notes/ becomes catalogued notes; the legacy migration then handles library/ and projects/.
+    import_markdown_notes(settle=0)
     migrate_html_notes()
+    register_orphan_documents()
     backfill_article_pdf_links()
     from app.core.records.migrations import migrate_legacy_files, archive_retired_collections
     migrate_legacy_files()
@@ -65,7 +69,9 @@ async def lifespan(_: FastAPI):
     automatic_sync = os.getenv("KAVOT_DESKTOP", "").lower() in {"1", "true", "yes"}
     from app.core.kernel.plugins import load as load_plugins
     services = load_plugins().background_services
+    from app.core.workspace.markdown_import import importer as markdown_importer
     if automatic_sync:
+        markdown_importer.start()
         start_background_sync()
         from app.core.storage import backups as workspace_backups
         workspace_backups.start_scheduler()
@@ -81,6 +87,7 @@ async def lifespan(_: FastAPI):
         yield
     finally:
         if automatic_sync:
+            markdown_importer.stop()
             stop_background_sync()
             workspace_backups.stop_scheduler()
             for service in services:

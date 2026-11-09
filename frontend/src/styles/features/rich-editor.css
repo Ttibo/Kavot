@@ -203,7 +203,7 @@
   background: var(--accent-soft);
 }
 .rich-content pre {
-  background: var(--surface-hover, #f5f5f5);
+  background: var(--hover);
   padding: 16px;
   white-space: pre-wrap;
 }

@@ -7,7 +7,7 @@ import { isTreeRowSelected } from '../../features/documents/treeSelection';
 import { mergeWorkspacePanes } from '../../features/documents/workspace';
 import { paperDragEnded, paperDragOver, paperDrop } from './library';
 import { taskDragOver, taskDrop } from './tasks';
-import { resetDropHighlight, treeDragOver, treeDrop } from './workspaceTree';
+import { resetDropHighlight, treeDragOver, treeDrop, treeDropTargetAt } from './workspaceTree';
 import { removeClasses } from './shared';
 
 function carry(type: string, payload: string, transfer: DataTransfer, effect: DataTransfer['effectAllowed'], formats: Record<string, string> = {}) {
@@ -18,6 +18,8 @@ function carry(type: string, payload: string, transfer: DataTransfer, effect: Da
 }
 
 function dragStart(event: DragEvent) {
+  // A native drag took over: the browser cancels the pointer, and that cancel must not clear this drag.
+  pointerWorkspaceDrag = null;
   const target = event.target as HTMLElement;
   const transfer = event.dataTransfer;
   // Dragging one row of a multi-selection carries the whole selection.
@@ -153,17 +155,32 @@ async function drop(event: DragEvent) {
   await taskDrop(event, transfer);
 }
 
-// Rows of the tree dragged with the pointer onto a canvas or a document: the drop is sent to it as a native one.
-type PointerWorkspaceDrag = { pointerId: number; startX: number; startY: number; dragging: boolean; row: HTMLElement; type: string; payload: string };
+// Rows of the tree are dragged with the pointer (it is captured, so no native drag starts): onto a canvas or a
+// document, or onto a folder of the tree. The drop is sent to its target as a native one.
+type PointerWorkspaceDrag = { pointerId: number; startX: number; startY: number; dragging: boolean; row: HTMLElement; type: string;
+  payload: string; treePayload: string };
 let pointerWorkspaceDrag: PointerWorkspaceDrag | null = null;
 
-const documentUnder = (event: PointerEvent) =>
-  document.elementFromPoint(event.clientX, event.clientY)?.closest?.('.canvas-viewport, .continuous-editor') || null;
+const elementUnder = (event: PointerEvent) => document.elementFromPoint(event.clientX, event.clientY);
+const documentUnder = (event: PointerEvent) => elementUnder(event)?.closest?.('.canvas-viewport, .continuous-editor') || null;
+
+function sendDrop(target: Element, event: PointerEvent, payload: string, format: string) {
+  const transfer = new DataTransfer();
+  transfer.effectAllowed = 'all';
+  transfer.setData(format, payload);
+  transfer.setData('text/plain', payload);
+  target.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: event.clientX, clientY: event.clientY, dataTransfer: transfer }));
+}
 
 function clearPointerWorkspaceDrag() {
-  pointerWorkspaceDrag?.row.classList.remove('dragging');
-  removeClasses('.canvas-viewport.is-file-drop', 'is-file-drop');
+  const drag = pointerWorkspaceDrag;
   pointerWorkspaceDrag = null;
+  // Nothing to undo when the pointer never dragged, or when a native drag replaced it.
+  if (!drag?.dragging) return;
+  drag.row.classList.remove('dragging');
+  removeClasses('.canvas-viewport.is-file-drop', 'is-file-drop');
+  removeClasses('.workspace-file-row.multi-selected.dragging', 'dragging');
+  treeDropTargetAt(null);
   if (['note', 'workspace'].includes(editorSession.activeDragType)) {
     editorSession.activeDragType = null;
     editorSession.activeDragPayload = '';
@@ -176,10 +193,12 @@ function initializePointerWorkspaceDrag() {
     const row = target.closest<HTMLElement>('.workspace-file-row.file[data-note-drag], .workspace-file-row.file[data-workspace-drag]');
     if (!row || event.button !== 0 || target.closest('button, input, label, a, .workspace-item-actions, .workspace-open-side')) return;
     const noteId = Number(row.dataset.noteDrag || 0) || null;
+    const payload = noteId ? `note:${noteId}` : `workspace:${row.dataset.workspaceDrag || ''}`;
     pointerWorkspaceDrag = {
       pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, dragging: false, row,
-      type: noteId ? 'note' : 'workspace',
-      payload: noteId ? `note:${noteId}` : `workspace:${row.dataset.workspaceDrag || ''}`,
+      type: noteId ? 'note' : 'workspace', payload,
+      // Dragging one row of a multi-selection moves the whole selection within the tree.
+      treePayload: isTreeRowSelected(row) ? 'selection:tree' : payload,
     };
     row.setPointerCapture?.(event.pointerId);
   });
@@ -191,6 +210,8 @@ function initializePointerWorkspaceDrag() {
     if (!drag.dragging) {
       drag.dragging = true;
       drag.row.classList.add('dragging');
+      if (drag.treePayload === 'selection:tree')
+        document.querySelectorAll('.workspace-file-row.multi-selected').forEach((row) => row.classList.add('dragging'));
       editorSession.activeDragType = drag.type;
       editorSession.activeDragPayload = drag.payload;
       shownDrop = null;
@@ -200,19 +221,20 @@ function initializePointerWorkspaceDrag() {
       document.querySelectorAll('.canvas-viewport').forEach((item) => item.classList.toggle('is-file-drop', item === viewport));
       shownDrop = viewport;
     }
+    treeDropTargetAt(viewport ? null : elementUnder(event));
     event.preventDefault();
   });
   document.addEventListener('pointerup', (event) => {
     const drag = pointerWorkspaceDrag;
     if (!drag || event.pointerId !== drag.pointerId) return;
-    const viewport = documentUnder(event);
-    if (drag.dragging && viewport) {
+    const viewport = drag.dragging ? documentUnder(event) : null;
+    const folder = drag.dragging && !viewport ? treeDropTargetAt(elementUnder(event)) : null;
+    if (viewport) {
       event.preventDefault();
-      const transfer = new DataTransfer();
-      transfer.effectAllowed = 'all';
-      transfer.setData(drag.type === 'note' ? 'application/x-kavot-note' : 'application/x-kavot-workspace', drag.payload);
-      transfer.setData('text/plain', drag.payload);
-      viewport.dispatchEvent(new DragEvent('drop', { bubbles: true, cancelable: true, clientX: event.clientX, clientY: event.clientY, dataTransfer: transfer }));
+      sendDrop(viewport, event, drag.payload, drag.type === 'note' ? 'application/x-kavot-note' : 'application/x-kavot-workspace');
+    } else if (folder) {
+      event.preventDefault();
+      sendDrop(folder, event, drag.treePayload, drag.treePayload.startsWith('note:') ? 'application/x-kavot-note' : 'application/x-kavot-workspace');
     }
     clearPointerWorkspaceDrag();
   });

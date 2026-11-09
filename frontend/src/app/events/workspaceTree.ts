@@ -26,6 +26,13 @@ const hasExternalFiles = (transfer: DataTransfer | null) => Boolean(transfer?.ty
 const dropHighlight = highlighter('workspace-drag-over');
 export const resetDropHighlight = () => dropHighlight.reset();
 
+/** The tree folder a pointer-driven drag would land in, highlighted; null outside the tree. */
+export function treeDropTargetAt(element: Element | null) {
+  const target = workspaceDropTarget(element);
+  dropHighlight.set(target);
+  return target;
+}
+
 /** Runs a change on a drop target, showing it busy meanwhile. */
 async function onTarget(target: HTMLElement, run: () => Promise<void>) {
   target.setAttribute('aria-busy', 'true');

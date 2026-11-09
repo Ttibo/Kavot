@@ -154,7 +154,9 @@ def save_preferences(value: dict[str, Any]) -> dict[str, Any]:
 
 
 BACKUP_SCHEDULES = {"off", "daily", "weekly"}
-DEFAULT_BACKUPS = {"schedule": "daily", "online": False}
+# Days an automatic backup is kept; 0 is the default day/week/month thinning.
+BACKUP_KEEP_DAYS = {0, 7, 14, 30, 60, 90, 180, 365}
+DEFAULT_BACKUPS = {"schedule": "daily", "online": False, "keep_days": 0}
 
 
 def load_backup_settings() -> dict[str, Any]:
@@ -165,6 +167,8 @@ def load_backup_settings() -> dict[str, Any]:
             result["schedule"] = stored["schedule"]
         if isinstance(stored.get("online"), bool):
             result["online"] = stored["online"]
+        if stored.get("keep_days") in BACKUP_KEEP_DAYS:
+            result["keep_days"] = stored["keep_days"]
     return result
 
 
@@ -174,6 +178,8 @@ def save_backup_settings(value: dict[str, Any]) -> dict[str, Any]:
         result["schedule"] = value["schedule"]
     if isinstance(value.get("online"), bool):
         result["online"] = value["online"]
+    if value.get("keep_days") in BACKUP_KEEP_DAYS:
+        result["keep_days"] = value["keep_days"]
     payload = _read()
     payload["backups"] = result
     _settings_file().write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

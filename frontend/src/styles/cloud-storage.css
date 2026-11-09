@@ -32,7 +32,7 @@
 .storage-settings .storage-empty { padding: 20px; border: 1px dashed var(--line); border-radius: 10px; color: var(--muted); text-align: center; }
 .storage-settings .storage-empty p { margin: 0; }
 .cloud-files-table { max-height: 360px; overflow: auto; }
-.cloud-files-table .cloud-file-history td { background: var(--surface-2, transparent); }
+.cloud-files-table .cloud-file-history td { background: var(--surface-soft); }
 .cloud-files-table .cloud-file-history ol { display: grid; gap: 6px; margin: 4px 0; padding: 0; list-style: none; }
 .cloud-files-table .cloud-file-history li { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; }
 .cloud-files-table .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }

@@ -1,4 +1,4 @@
-import { escapeHtml, state } from '../../app/state';
+import { escapeHtml, modal, state } from '../../app/state';
 import { closeModal, openModal } from '../../components/dialogs/controller';
 import { api } from '../../services/api';
 import { navigate, refreshData, render, toast } from '../../app/navigation';
@@ -53,11 +53,20 @@ export function addProjectResourceModal(projectId) {
   });
 }
 
+function projectFormMarkup(id, title, submitLabel, project = null) {
+  const name = project ? escapeHtml(project.name) : '';
+  const description = project ? escapeHtml(project.description || '') : '';
+  const color = project ? escapeHtml(project.color) : '#087e86';
+  return `<header class="modal-header"><h2>${title}</h2></header><div class="modal-body"><form id="${id}" class="project-form-compact"><div class="project-form-name"><input name="color" type="color" value="${color}" aria-label="Project color" title="Project color"><input name="name" required maxlength="120" value="${name}" placeholder="Project name" aria-label="Project name" autofocus></div><textarea name="description" rows="3" placeholder="Objective — research question, scope, expected result (optional)" aria-label="Objective">${description}</textarea><div class="form-actions"><button type="button" class="button" data-close-modal>Cancel</button><button class="button button-primary">${submitLabel}</button></div></form></div>`;
+}
+
+function openProjectFormModal(markup) {
+  openModal(markup);
+  modal.classList.add('modal-compact');
+}
+
 export function newProjectModal() {
-  openModal(
-    `<header class="modal-header"><h2>New project</h2><p>The project starts with an editable note containing its name and goal.</p></header><div class="modal-body"><form id="project-form" class="form-grid"><div class="form-field full"><label for="project-name">Project name</label><input id="project-name" name="name" required maxlength="120" placeholder="Ex. Systematic review on…"></div><div class="form-field full"><label for="project-description">Objective</label><textarea id="project-description" name="description" placeholder="Research question, scope, and expected result…"></textarea></div><div class="form-field"><label for="project-color">Project color</label><input id="project-color" name="color" type="color" value="#087e86"></div><div class="form-actions"><button type="button" class="button" data-close-modal>Cancel</button><button class="button button-primary">Create project</button></div></form></div>`,
-    true,
-  );
+  openProjectFormModal(projectFormMarkup('project-form', 'New project', 'Create project'));
   document
     .querySelector("#project-form")
     .addEventListener("submit", async (event) => {
@@ -89,9 +98,7 @@ export function editProjectModal(projectId) {
     state.selectedProject;
   if (!project) return;
   const returnToCanvas = state.primaryResource?.path === project.canvas_path;
-  openModal(
-    `<header class="modal-header"><h2>Edit project</h2><p>Update its name, objective, or color.</p></header><div class="modal-body"><form id="project-edit-form" class="form-grid"><div class="form-field full"><label>Project name</label><input name="name" required maxlength="120" value="${escapeHtml(project.name)}"></div><div class="form-field full"><label>Objective</label><textarea name="description">${escapeHtml(project.description || "")}</textarea></div><div class="form-field"><label>Color</label><input name="color" type="color" value="${escapeHtml(project.color)}"></div><div class="form-actions"><button type="button" class="button" data-close-modal>Cancel</button><button class="button button-primary">Save</button></div></form></div>`,
-  );
+  openProjectFormModal(projectFormMarkup('project-edit-form', 'Edit project', 'Save', project));
   document
     .querySelector("#project-edit-form")
     .addEventListener("submit", async (event) => {

@@ -13,7 +13,7 @@
 .research-shell .library-refined .paper-row.library-entry:has(.status-reading) { border-left-color: #d28b25; }
 .research-shell .library-refined .paper-row.library-entry:has(.status-key) { border-left-color: #68b8c8; }
 .favorite-toggle { border: 1px solid var(--line); background: var(--surface); color: var(--muted); width: 32px; height: 32px; border-radius: 9px; font-size: 22px; cursor: pointer; }
-.favorite-toggle[aria-pressed="true"] { color: #a96809; background: #fff0c9; border-color: #e9c975; }
+.favorite-toggle[aria-pressed="true"] { color: #a96809; background: color-mix(in srgb, #ffb800 21%, var(--surface)); border-color: #e9c975; }
 .research-shell .canvas-studio { --studio-paper: var(--canvas); --studio-line: var(--line); }
 .research-shell .canvas-studio .canvas-viewport { background-color: var(--canvas); background-image: radial-gradient(color-mix(in srgb,var(--accent) 24%,transparent) 1px,transparent 1px); background-size: 24px 24px; }
 .research-shell .canvas-studio .canvas-node:not(.canvas-node-zone):not(.canvas-node-shape):not(.canvas-node-text) { border: 1.5px solid color-mix(in srgb,var(--canvas-card-color) 60%,var(--line)); border-top: 5px solid var(--canvas-card-color); border-radius: 16px; background: color-mix(in srgb,var(--canvas-card-color) var(--canvas-card-tint),var(--surface)); box-shadow: 0 8px 22px #17346816; }

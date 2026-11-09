@@ -138,7 +138,7 @@ html:not([data-theme="dark"]) .research-shell {
 .research-frame { background: var(--canvas); }
 .research-shell #main-content { padding: 22px; }
 
-.research-shell .canvas-viewport { background-color: #fbfcff; background-image: radial-gradient(#aebbd044 .85px,transparent .85px); background-size: 18px 18px; }
+.research-shell .canvas-viewport { background-color: var(--surface-soft); background-image: radial-gradient(#aebbd044 .85px,transparent .85px); background-size: 18px 18px; }
 html[data-theme="dark"] .research-shell .canvas-viewport { background-color: var(--canvas-deep); background-image: radial-gradient(var(--grid-dot) .85px,transparent .85px); }
 .research-shell .canvas-toolbar { top: auto; right: auto; bottom: 26px; left: 50%; display: flex; width: auto; max-width: calc(100% - 28px); height: 60px; max-height: 60px; flex-direction: row; align-items: center; gap: 3px; overflow-x: auto; overflow-y: hidden; transform: translateX(-50%); border-color: var(--line); border-radius: 12px; padding: 5px; box-shadow: 0 10px 30px #52607a1c; }
 .research-shell .canvas-toolbar button { display: grid; place-items: center; flex: 0 0 auto; width: auto; min-width: 38px; min-height: 44px; border-color: transparent; border-radius: 8px; background: transparent; padding: 4px 8px; font-size: 10px; }

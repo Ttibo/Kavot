@@ -80,6 +80,7 @@ class BackupCreate(BaseModel):
 class BackupSchedule(BaseModel):
     schedule: Literal["off", "daily", "weekly"] | None = None
     online: bool | None = None
+    keep_days: Literal[0, 7, 14, 30, 60, 90, 180, 365] | None = None
 
 
 @router.post("/settings/backups", status_code=201)
@@ -99,7 +100,10 @@ def backup_schedule() -> dict[str, Any]:
 
 @router.patch("/settings/backup-schedule")
 def update_backup_schedule(payload: BackupSchedule) -> dict[str, Any]:
-    return {**save_backup_settings(payload.model_dump(exclude_none=True)), **workspace_backups.schedule_status}
+    saved = save_backup_settings(payload.model_dump(exclude_none=True))
+    if payload.keep_days is not None:
+        workspace_backups.prune()
+    return {**saved, **workspace_backups.schedule_status}
 
 
 @router.get("/settings/backups/{backup_id}/download")

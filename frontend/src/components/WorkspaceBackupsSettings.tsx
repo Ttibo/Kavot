@@ -6,7 +6,10 @@ import '../styles/workspace-backups.css';
 type Kind = 'auto' | 'manual' | 'uploaded';
 type LocalBackup = { id: string; size: number; created_at: number; version: number; kind: Kind; label: string | null; files: number | null };
 type OnlineBackup = { id: string; name: string; size: number; created_at: number; kind: Kind; local_id: string | null };
-type Schedule = { schedule: 'off' | 'daily' | 'weekly'; online: boolean; last_error: string | null };
+type Schedule = { schedule: 'off' | 'daily' | 'weekly'; online: boolean; keep_days: number; last_error: string | null };
+/** How long automatic backups are kept; 0 thins them out by day, week and month. */
+const keepOptions: [number, string][] = [[0, 'Smart (up to a year)'], [7, '1 week'], [14, '2 weeks'], [30, '1 month'],
+  [60, '2 months'], [90, '3 months'], [180, '6 months'], [365, '1 year']];
 /** One backup, wherever its copies are. */
 type Backup = { key: string; created_at: number; kind: Kind; label: string | null; size: number; files: number | null;
   version: number | null; local?: LocalBackup; online?: OnlineBackup };
@@ -88,6 +91,10 @@ export function WorkspaceBackupsSettings() {
   const updateSchedule = (change: Partial<Schedule>) => run(async () => {
     setSchedule(await api<Schedule>('/settings/backup-schedule', { method: 'PATCH', body: JSON.stringify(change) }));
   });
+  const updateKeep = (keep_days: number) => run(async () => {
+    setSchedule(await api<Schedule>('/settings/backup-schedule', { method: 'PATCH', body: JSON.stringify({ keep_days }) }));
+    await refreshLocal();
+  });
   const keepOnline = !!schedule?.online && connected;
 
   function openRestored(result: { path: string }) {
@@ -149,12 +156,19 @@ export function WorkspaceBackupsSettings() {
             <option value="daily">Every day</option><option value="weekly">Every week</option><option value="off">Off</option>
           </select>
         </label>
+        <label>Delete automatic backups after
+          <select value={schedule?.keep_days ?? 0} disabled={busy || !schedule} onChange={event => void updateKeep(Number(event.target.value))}>
+            {keepOptions.map(([days, text]) => <option key={days} value={days}>{text}</option>)}
+          </select>
+        </label>
         <fieldset className="backup-where"><legend>Keep backups</legend>
           <label><input type="radio" name="backup-where" checked={!schedule?.online} disabled={busy || !schedule} onChange={() => void updateSchedule({ online: false })}/> On this device</label>
           <label><input type="radio" name="backup-where" checked={!!schedule?.online} disabled={busy || !schedule || !connected} onChange={() => void updateSchedule({ online: true })}/> On this device and online{!connected && <small> · link Kavot Cloud first</small>}</label>
         </fieldset>
       </div>
-      <p className="settings-hint">A backup is made only when something changed. Kept: one per day for a week, one per week for a month, one per month for a year. Manual backups are kept until you delete them.{latest ? ` Latest: ${dayLabel(latest.created_at).toLowerCase()} at ${time(latest.created_at)}.` : ''}</p>
+      <p className="settings-hint">A backup is made only when something changed. {schedule?.keep_days
+        ? `Automatic backups older than ${keepOptions.find(([days]) => days === schedule.keep_days)?.[1]} are deleted; the latest one is always kept.`
+        : 'Kept: one per day for a week, one per week for a month, one per month for a year.'} Manual backups are kept until you delete them.{latest ? ` Latest: ${dayLabel(latest.created_at).toLowerCase()} at ${time(latest.created_at)}.` : ''}</p>
       {schedule?.online && !connected && <p className="settings-hint">Online copies are paused until this device is linked to Kavot Cloud again.</p>}
       {schedule?.last_error && <p role="alert" className="backup-error">Last automatic backup failed: {schedule.last_error}</p>}
       <div className="backup-actions">

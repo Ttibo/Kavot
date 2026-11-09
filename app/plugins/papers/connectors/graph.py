@@ -92,7 +92,7 @@ def _remote_citation_graph(paper: dict[str, Any], limit: int = 20, persist: bool
     if progress:
         progress("references", "warning" if "openalex_references" in errors else "done")
         progress("citations", "running")
-    query = urlencode({"filter": f"cites:{str(focus_id).rsplit('/', 1)[-1]}", "per-page": limit, "sort": "-cited_by_count"})
+    query = urlencode({"filter": f"cites:{str(focus_id).rsplit('/', 1)[-1]}", "per-page": limit, "sort": "cited_by_count:desc"})
     try:
         citing = _request("openalex", f"/works?{query}").get("results") or []
     except HTTPException as error:

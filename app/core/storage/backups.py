@@ -1,7 +1,8 @@
 """Portable workspace snapshots with non-destructive restoration.
 
 Snapshots are dated, numbered versions. Manual ones are kept until deleted;
-automatic ones follow a day/week/month retention policy.
+automatic ones follow a day/week/month retention policy, or are deleted once
+older than the number of days chosen in the settings.
 """
 from __future__ import annotations
 
@@ -133,13 +134,18 @@ def delete_backup(identifier: str) -> None:
             _write_index(index)
 
 
-def retained(items: list[dict], now: float) -> set[str]:
-    """Grandfather-father-son retention: the newest snapshot per day (7 days),
-    per week (4 weeks) and per month (12 months), plus the newest overall."""
+def retained(items: list[dict], now: float, keep_days: int = 0) -> set[str]:
+    """The newest snapshot is always kept. With `keep_days`, every snapshot younger
+    than that many days is kept too. Otherwise grandfather-father-son retention:
+    the newest snapshot per day (7 days), per week (4 weeks) and per month (12 months)."""
     keep, buckets = set(), set()
     for position, item in enumerate(sorted(items, key=lambda value: value["created_at"], reverse=True)):
         if position == 0:
             keep.add(item["id"])
+        if keep_days:
+            if now - item["created_at"] <= keep_days * 86400:
+                keep.add(item["id"])
+            continue
         moment = time.localtime(item["created_at"])
         age = (now - item["created_at"]) / 86400
         for name, days, pattern in (("day", 7, "%Y-%m-%d"), ("week", 28, "%G-%V"), ("month", 366, "%Y-%m")):
@@ -152,8 +158,9 @@ def retained(items: list[dict], now: float) -> set[str]:
 
 def prune(now: float | None = None) -> list[str]:
     """Remove automatic snapshots outside the retention policy; manual ones stay."""
+    from app.core.kernel.user_settings import load_backup_settings
     automatic = [item for item in list_backups() if item["kind"] == "auto"]
-    keep = retained(automatic, now or time.time())
+    keep = retained(automatic, now or time.time(), load_backup_settings()["keep_days"])
     removed = []
     for item in automatic:
         if item["id"] not in keep:

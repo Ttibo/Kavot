@@ -1,15 +1,13 @@
 # 🧭 Canvases
 
-Each project opens on its own canvas: an infinite board where you lay out the
+Each project has its own canvas: an infinite board where you lay out the
 notes, articles, tasks and ideas of the project and draw the links between
-them. Open a project in **Workspace**, then its **Project canvas**.
+them. Expand the project in the tree, then open its **Project canvas**. You can
+also create other canvases with the canvas button of the tree toolbar.
 
 ![A project canvas with a zone of articles, notes, a task and an idea](images/canvas.png)
 
 Moving a zone carries the cards inside it, and links follow their cards.
-Right-drag anywhere to pan:
-
-![Moving a zone and panning around a project canvas](images/canvas.gif)
 
 ## Cards
 
@@ -22,10 +20,10 @@ The toolbar at the bottom of the canvas adds:
 - **images** and other files;
 - **links** to web pages;
 - **zones**, which group cards under a title and a description;
-- **collections**, such as the articles or tasks of the project.
+- **items** of the workspace: articles (as a card or as their PDF), tasks and
+  notes.
 
-You can also drag articles, tasks, conferences, datasets, notes or files from
-the tree, or drop a URL or a file on the canvas. Placing an article creates its
+You can also drag notes or files from the tree, or drop a URL or a file on the canvas. Placing an article creates its
 reading note.
 
 Dropping a project, or another canvas, from the tree adds a frame that shows that
@@ -37,8 +35,8 @@ double-click one, or the frame, to open it. Moving the frame carries its cards.
 ## Links
 
 Drag from the edge of a card to another card to link them. Links show how
-ideas, sources and tasks depend on each other, and they appear in the global
-graph.
+ideas, sources and tasks depend on each other. Open a link to give it a
+label (*supports*, *contradicts*…), a note and a color.
 
 ## Moving around
 

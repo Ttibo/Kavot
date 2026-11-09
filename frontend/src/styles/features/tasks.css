@@ -1,6 +1,6 @@
 
 .kanban { display: flex; gap: 11px; align-items: flex-start; overflow-x: auto; padding-bottom: 8px; }
-.kanban-column { --column-accent: #8c8c85; display: flex; flex: 1 1 276px; min-width: 268px; max-width: none; height: min(610px, calc(calc(100vh - var(--titlebar-height)) - 105px)); min-height: 360px; flex-direction: column; padding: 8px; overflow: hidden; border: 1px solid var(--line); border-top: 3px solid var(--column-accent); border-radius: 12px; background: color-mix(in srgb, var(--column-accent) 7%, #f1f0eb); transition: 150ms ease; }
+.kanban-column { --column-accent: #8c8c85; display: flex; flex: 1 1 276px; min-width: 268px; max-width: none; height: min(610px, calc(calc(100vh - var(--titlebar-height)) - 105px)); min-height: 360px; flex-direction: column; padding: 8px; overflow: hidden; border: 1px solid var(--line); border-top: 3px solid var(--column-accent); border-radius: 12px; background: color-mix(in srgb, var(--column-accent) 7%, var(--surface-soft)); transition: 150ms ease; }
 .kanban-column.drag-over { transform: translateY(-3px); border-color: var(--column-accent); box-shadow: 0 0 0 4px color-mix(in srgb, var(--column-accent) 13%, transparent); }
 .kanban-column.column-dragging { opacity: .42; transform: rotate(.5deg) scale(.98); }
 .kanban-column.column-reorder-over { box-shadow: -5px 0 0 var(--accent); }
@@ -13,12 +13,12 @@
 .kanban-head i { width: 8px; height: 8px; border-radius: 3px; background: var(--column-accent); }
 .kanban-head > div { display: flex; align-items: center; gap: 3px; }
 .column-menu { display: grid; place-items: center; width: 27px; height: 27px; border: 0; border-radius: 7px; background: transparent; color: var(--muted); cursor: pointer; }
-.column-menu:hover { background: rgba(255,255,255,.8); }
-.count-badge { display: grid; place-items: center; min-width: 21px; height: 21px; border-radius: 99px; background: #fff; color: var(--muted); font: 10px "DM Mono"; }
+.column-menu:hover { background: color-mix(in srgb, var(--surface) 80%, transparent); }
+.count-badge { display: grid; place-items: center; min-width: 21px; height: 21px; border-radius: 99px; background: var(--surface); color: var(--muted); font: 10px "DM Mono"; }
 .task-stack { display: grid; align-content: start; flex: 1; min-height: 0; gap: 6px; overflow-y: auto; overscroll-behavior: contain; padding: 1px 4px 3px 1px; scrollbar-color: #cbc8be transparent; scrollbar-width: thin; }
 .task-stack::-webkit-scrollbar { width: 6px; }
 .task-stack::-webkit-scrollbar-thumb { border-radius: 99px; background: #cbc8be; }
-.task-card { position: relative; padding: 11px 10px 9px; border: 1px solid #e0ded6; border-radius: 10px; background: #fff; box-shadow: 0 2px 5px rgba(40,39,32,.03); cursor: pointer; transition: 150ms ease; }
+.task-card { position: relative; padding: 11px 10px 9px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); box-shadow: 0 2px 5px rgba(40,39,32,.03); cursor: pointer; transition: 150ms ease; }
 .task-card:hover { transform: translateY(-2px); border-color: #d0cdc2; box-shadow: 0 8px 22px rgba(40,39,32,.08); }
 .task-card:focus-visible { outline: 3px solid rgba(88,208,232,.2); border-color: var(--accent); }
 .task-card.dragging { opacity: .38; transform: rotate(1deg) scale(.98); }
@@ -26,23 +26,23 @@
 .trello-labels { display: flex; flex-wrap: wrap; gap: 3px; margin: 0 16px 7px 0; }
 .trello-labels span { max-width: 100px; overflow: hidden; border-radius: 4px; background: var(--label-color); padding: 2px 5px; color: #fff; font-size: 6px; font-weight: 700; text-overflow: ellipsis; white-space: nowrap; }
 .task-description { display: -webkit-box; min-height: 0; max-height: 42px; margin: 0 0 7px; overflow: hidden; color: var(--muted); font-size: 9px; line-height: 1.45; white-space: pre-line; -webkit-box-orient: vertical; -webkit-line-clamp: 3; }
-.task-description.empty { color: #b0b1aa; font-style: italic; }
+.task-description.empty { color: var(--subtle); font-style: italic; }
 .task-meta-row { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0; }
-.task-meta-row span { width: fit-content; padding: 3px 5px; border-radius: 5px; background: #f1f0eb; color: #777872; font: 7px "DM Mono", monospace; }
-.task-meta-row .overdue { background: #feecea; color: #b95050; }
-.task-card-bottom { display: flex; align-items: center; gap: 5px; margin-top: 7px; padding-top: 6px; border-top: 1px solid #eeece6; }
+.task-meta-row span { width: fit-content; padding: 3px 5px; border-radius: 5px; background: var(--surface-soft); color: var(--muted); font: 7px "DM Mono", monospace; }
+.task-meta-row .overdue { background: color-mix(in srgb, #f31800 8%, var(--surface)); color: #b95050; }
+.task-card-bottom { display: flex; align-items: center; gap: 5px; margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); }
 .task-card .priority-pill { padding: 3px 6px; font-size: 8px; }
-.priority-pill.high { background: #feecea; color: #b95050; }
-.priority-pill.medium { background: #fff3dc; color: #a46916; }
-.priority-pill.low { background: #e9f4f1; color: #397f71; }
+.priority-pill.high { background: color-mix(in srgb, #f31800 8%, var(--surface)); color: #b95050; }
+.priority-pill.medium { background: color-mix(in srgb, #ffa800 14%, var(--surface)); color: #a46916; }
+.priority-pill.low { background: color-mix(in srgb, #00805d 9%, var(--surface)); color: #397f71; }
 .task-project { display: flex; align-items: center; gap: 4px; color: var(--subtle); font-size: 8px; max-width: 105px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.kanban-empty { display: grid; place-items: center; min-height: 76px; border: 1px dashed #d5d2c8; border-radius: 9px; color: var(--subtle); font-size: 9px; }
+.kanban-empty { display: grid; place-items: center; min-height: 76px; border: 1px dashed var(--line-strong); border-radius: 9px; color: var(--subtle); font-size: 9px; }
 .kanban-add { width: 100%; flex: 0 0 auto; margin-top: 6px; border: 0; border-radius: 8px; background: transparent; padding: 7px; color: var(--muted); font-size: 9px; cursor: pointer; }
-.kanban-add:hover { background: rgba(255,255,255,.7); color: var(--ink); }
+.kanban-add:hover { background: color-mix(in srgb, var(--surface) 70%, transparent); color: var(--ink); }
 .task-list-row { display: grid; grid-template-columns: minmax(240px, 1.7fr) minmax(130px, .7fr) minmax(120px, .7fr) 110px 82px 54px; align-items: center; gap: 12px; }
 .task-list-row { min-height: 66px; border-bottom: 1px solid var(--line); padding: 9px 14px; }
 .task-list-row:last-child { border-bottom: 0; }
-.task-list-row:hover { background: #fbfaf7; }
+.task-list-row:hover { background: var(--hover); }
 .task-list-title { min-width: 0; }
 .task-list-title strong, .task-list-title small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .task-list-title strong { font-size: 11px; }
@@ -50,13 +50,13 @@
 .task-list-project { display: flex; min-width: 0; align-items: center; gap: 6px; overflow: hidden; color: var(--muted); font-size: 9px; text-overflow: ellipsis; white-space: nowrap; }
 .task-list-due { color: var(--muted); font-size: 9px; }
 .task-list-due.overdue { color: var(--red); font-weight: 650; }
-.task-list-edit { min-height: 29px; border: 1px solid var(--line); border-radius: 8px; background: #fff; color: var(--muted); font-size: 9px; cursor: pointer; }
-.task-list-edit:hover { border-color: #b0e5ef; color: var(--accent); }
+.task-list-edit { min-height: 29px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); font-size: 9px; cursor: pointer; }
+.task-list-edit:hover { border-color: var(--accent); color: var(--accent); }
 @media(max-width: 900px) {
   .task-list-row { min-width: 850px; }
 }
 .archive-filters { display: grid; grid-template-columns: minmax(180px, 1.4fr) repeat(3, minmax(120px, .7fr)) repeat(2, minmax(120px, .65fr)); gap: 7px; }
-.archive-filters input, .archive-filters select { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: #fff; padding: 8px 9px; }
+.archive-filters input, .archive-filters select { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); padding: 8px 9px; }
 .archive-results-head { display: flex; justify-content: space-between; gap: 12px; margin: 16px 0 8px; color: var(--subtle); font-size: 9px; }
 .archive-results-head strong { color: var(--ink); font-size: 11px; }
 .archive-results { max-height: 480px; overflow-y: auto; border: 1px solid var(--line); border-radius: 11px; }
